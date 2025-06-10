@@ -3,14 +3,14 @@
 
 /* ---------- event ---------- */
 
-event::event(std::shared_ptr<TC> sock, int ev, std::function<void()> cb)
-    : tc(sock), events(ev), call_back_func(cb) {}
+event::event(std::shared_ptr<Socket> sock, int ev, std::function<void()> cb)
+    : socket(sock), events(ev), call_back_func(cb) {}
 
 event::event(int ev) : events(ev) {}
 
 event::~event() {
-    if (tc) {
-        tc.reset();
+    if (socket) {
+        socket.reset();
     }
     if (in_reactor) {
         remove_from_reactor();
@@ -53,7 +53,7 @@ void event::add_to_reactor() {
     struct epoll_event ev = {0, {0}};
     ev.events = events;
     ev.data.ptr = this;
-    if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_ADD, tc->getfd(), &ev) < 0) {
+    if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_ADD, socket->getFd(), &ev) < 0) {
         throw std::runtime_error(std::string(__func__) + ": Failed to add event to reactor - " + strerror(errno) + '\n');
     }
     in_reactor = true;
@@ -64,7 +64,7 @@ void event::remove_from_reactor() {
     if (pr == nullptr || !binded || !in_reactor) {
         throw std::runtime_error(std::string(__func__) + ": No condition to remove event from reactor\n");
     }
-    if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_DEL, tc->getfd(), nullptr) < 0) {
+    if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_DEL, socket->getFd(), nullptr) < 0) {
         throw std::runtime_error(std::string(__func__) + ": Failed to remove event from reactor - " + strerror(errno) + '\n');
     }
     in_reactor = false;
@@ -88,8 +88,8 @@ bool event::in_epoll() const {
 }
 
 int event::get_sockfd() const {
-    if (tc) {
-        return tc->getfd();
+    if (socket) {
+        return socket->getFd();
     }
     return -1;
 }

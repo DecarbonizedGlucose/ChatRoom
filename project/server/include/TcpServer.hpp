@@ -7,9 +7,9 @@
 
 class TcpServer {
 private:
-    std::shared_ptr<rea> pr = nullptr;           // 反应堆, 事件丢到这里
-    std::shared_ptr<TCA> listen_conn = nullptr;   // 监听套接字
-    std::shared_ptr<thread_pool> pool = nullptr; // (外援)线程池, 事件回调丢这里
+    std::shared_ptr<rea> pr = nullptr;              // 反应堆, 事件丢到这里
+    std::shared_ptr<LSocket> listen_conn = nullptr; // 监听套接字
+    std::shared_ptr<thread_pool> pool = nullptr;    // (外援)线程池, 事件回调丢这里
     bool running = false;
 
 public:
@@ -21,7 +21,7 @@ public:
     int get_efd() const;
 
     void set_thread_pool(std::shared_ptr<thread_pool> pool);
-    void listen_init();
+    bool listen_init();
     void accept_connections(std::function<void()> cb = nullptr);
     void launch();
     void stop();

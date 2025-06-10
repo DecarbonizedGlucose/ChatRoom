@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <functional>
 #include <any>
-#include "TcpConnection.hpp"
+#include "Socket.hpp"
 #include <memory>
 
 class reactor;
@@ -42,7 +42,7 @@ public:
 
 class event {
 private:
-    std::shared_ptr<TC> tc = nullptr;
+    std::shared_ptr<Socket> socket = nullptr;
     bool in_reactor = false;
     bool binded = false;
 public:
@@ -53,7 +53,7 @@ public:
     std::any data;
 
     event() = delete;
-    event(std::shared_ptr<TC> sock, int ev, std::function<void()> cb);
+    event(std::shared_ptr<Socket> sock, int ev, std::function<void()> cb);
     event(int ev);
     event(const event&) = delete;
     event(event&&) = delete;

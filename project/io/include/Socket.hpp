@@ -1,0 +1,98 @@
+#ifndef SOCKET_HPP
+#define SOCKET_HPP
+
+#include <cstddef>
+#include <cstdio>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string>
+#include <vector>
+#include <cstdlib>
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <memory>
+
+class Socket;
+class ListenSocket;
+class DataSocket;
+class AcceptedSocket;
+class ConnectSocket;
+
+class Socket {
+protected:
+    int fd = -1;
+
+public:
+    explicit Socket(int fd);
+    Socket(const Socket&) = delete;
+    Socket& operator=(const Socket&) = delete;
+    Socket& operator=(Socket&& other) noexcept;
+    Socket(Socket&& other) noexcept;
+    virtual ~Socket() = 0;
+
+    int getFd() const { return fd; }
+    virtual void bind(const std::string& ip, uint16_t port) = 0;
+    virtual bool listen() = 0;
+};
+
+class DataSocket : public Socket {
+protected:
+    std::vector<char> buf;
+    std::string ip;
+    uint16_t port = 0;
+    sockaddr_in addr;
+
+public:
+    explicit DataSocket(int fd) : Socket(fd) {}
+
+    ssize_t receive_size(size_t* data_size);
+    ssize_t send_size(size_t* data_size);
+    ssize_t receive_from();
+    ssize_t send_to();
+
+    void bind(const std::string& ip, uint16_t port) override final {}
+    bool listen() override final {}
+};
+
+class AcceptedSocket : public DataSocket {
+public:
+    AcceptedSocket() = delete;
+    explicit AcceptedSocket(int fd) : DataSocket(fd) {}
+};
+
+class ConnectSocket : public DataSocket {
+private:
+    bool connected = false;
+
+public:
+    ConnectSocket() = delete;
+    ConnectSocket(const std::string& ip, uint16_t port);
+
+    bool connect();
+    bool disconnect();
+    bool is_connected() const { return connected; }
+};
+
+class ListenSocket : public Socket {
+private:
+    std::string ip;
+    uint16_t port = 0;
+    sockaddr_in addr;
+    bool binded = false;
+
+public:
+    ListenSocket();
+    ListenSocket(const std::string& ip, uint16_t port);
+
+    void bind(const std::string& ip, uint16_t port) override;
+    bool listen();
+    bool isBinded() const { return binded; }
+    std::shared_ptr<AcceptedSocket> accept();
+};
+
+using ASocket = AcceptedSocket;
+using CSocket = ConnectSocket;
+using LSocket = ListenSocket;
+
+#endif

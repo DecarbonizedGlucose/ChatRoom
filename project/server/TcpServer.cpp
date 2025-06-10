@@ -1,13 +1,14 @@
 #include "include/TcpServer.hpp"
+#include <iostream>
 
 TS::TcpServer() {
     pr = std::make_shared<rea>();
-    listen_conn = std::make_shared<TCA>();
+    listen_conn = std::make_shared<LSocket>();
 }
 
 TS::TcpServer(const std::string& ip, uint16_t port, sa_family_t family) {
     pr = std::make_shared<rea>();
-    listen_conn = std::make_shared<TCA>(ip, port, family);
+    listen_conn = std::make_shared<LSocket>(ip, port, family);
 }
 
 TS::~TcpServer() {
@@ -17,7 +18,7 @@ TS::~TcpServer() {
 }
 
 int TS::get_lfd() const {
-    return listen_conn ? listen_conn->getfd() : -1;
+    return listen_conn ? listen_conn->getFd() : -1;
 }
 
 int TS::get_efd() const {
@@ -28,9 +29,10 @@ void TS::set_thread_pool(std::shared_ptr<thread_pool> pool) {
     this->pool = pool;
 }
 
-void TS::listen_init() {
-    if (!listen_conn->set_listen()) {
-        throw std::runtime_error("Failed to connect to the listening socket\n");
+bool TS::listen_init() {
+    if (!listen_conn->listen()) {
+        std::cerr << "Failed to start listening on " << listen_conn->getFd() << ": " << strerror(errno) << '\n';
+        return false;
     }
     // 这里不用智能指针是因为，reactor内部已经管理得当
     event* ev = new event(listen_conn, EPOLLIN, [this]() {
@@ -40,19 +42,15 @@ void TS::listen_init() {
     if (!pr->add_event(ev)) {
         // 不用担心listen_conn被析构，因为它是在event里是shared_ptr
         delete ev;
-        throw std::runtime_error("Failed to add listening event to reactor\n");
+        std::cerr << "Failed to add listening event to reactor: " << strerror(errno) << '\n';
+        return false;
     }
     ev->add_to_reactor();
+    return true;
 }
 
 void TS::accept_connections(std::function<void()> cb) {
-    struct sockaddr_in client_addr = {0};
-    socklen_t addr_len = sizeof(client_addr);
-    int cfd = accept(listen_conn->getfd(), (struct sockaddr*)&client_addr, &addr_len);
-    if (cfd < 0) {
-        throw std::runtime_error("Failed to accept new connection: " + std::string(strerror(errno)) + '\n');
-    }
-    std::shared_ptr<TCD> new_conn = std::make_shared<TCD>(cfd);
+    std::shared_ptr<ASocket> new_conn = listen_conn->accept();
     // fcntl had set non-blocking in make shared<TCD>
     event* new_event = new event(new_conn, EPOLLIN | EPOLLONESHOT, cb);
     new_event->bind_with(pr.get());
@@ -64,9 +62,6 @@ void TS::accept_connections(std::function<void()> cb) {
 }
 
 void TS::launch() {
-    if (listen_conn->is_listening() == false) {
-        listen_init();
-    }
     running = true;
     int nready;
     while (running) {
