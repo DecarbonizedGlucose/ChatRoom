@@ -15,12 +15,14 @@ ChatRoom/
             net/...
         server/
             include/...
+            chat/... (业务逻辑)
             CMakeLists.txt
             servermain.cpp (main)
             服务器主体定义
             数据库(redis)
         client/
             include/...
+            chat/... (业务逻辑)
             CMakeLists.txt
             clientmain.cpp (main)
             客户端主体定义(后端)

@@ -10,6 +10,7 @@
 #include <functional>
 #include <any>
 #include "TcpConnection.hpp"
+#include <memory>
 
 class reactor;
 class event;
@@ -41,7 +42,7 @@ public:
 
 class event {
 private:
-    TC* tc = nullptr;
+    std::shared_ptr<TC> tc = nullptr;
     bool in_reactor = false;
     bool binded = false;
 public:
@@ -52,7 +53,7 @@ public:
     std::any data;
 
     event() = delete;
-    event(TcpConnection* sock, int ev, std::function<void()> cb);
+    event(std::shared_ptr<TC> sock, int ev, std::function<void()> cb);
     event(int ev);
     event(const event&) = delete;
     event(event&&) = delete;
@@ -63,7 +64,7 @@ public:
     void set(int ev);
     void set(std::function<void()> cb);
     void set(int ev, std::function<void()> cb);
-    void bind_with(reactor* rea);
+    void bind_with(reactor* re);
     void add_to_reactor();
     void remove_from_reactor();
     void call_back();

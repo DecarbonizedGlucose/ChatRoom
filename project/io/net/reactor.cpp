@@ -3,21 +3,22 @@
 
 /* ---------- event ---------- */
 
-event::event(Socket* sock, int ev, std::function<void()> cb)
-    : socket(sock), events(ev), call_back_func(cb) {}
+event::event(std::shared_ptr<TC> sock, int ev, std::function<void()> cb)
+    : tc(sock), events(ev), call_back_func(cb) {}
 
 event::event(int ev) : events(ev) {}
 
 event::~event() {
-    if (socket) {
-        delete socket;
-        socket = nullptr;
+    if (tc) {
+        tc.reset();
     }
     if (in_reactor) {
         remove_from_reactor();
         in_reactor = false;
     }
     if (binded) {
+        // 不要delete! 不要delete! 不要delete!
+        // 这里的pr是reactor的智能指针的原指针
         pr = nullptr;
         binded = false;
     }
@@ -36,11 +37,11 @@ void event::set(int ev, std::function<void()> cb) {
     call_back_func = cb;
 }
 
-void event::bind_with(reactor* rea) {
-    if (rea == nullptr || binded || in_reactor) {
+void event::bind_with(rea* re) {
+    if (re == nullptr || binded || in_reactor) {
         throw std::runtime_error (std::string(__func__) + "No need to bind with reactor\n");
     }
-    pr = rea;
+    pr = re;
     binded = true;
     return;
 }
@@ -52,7 +53,7 @@ void event::add_to_reactor() {
     struct epoll_event ev = {0, {0}};
     ev.events = events;
     ev.data.ptr = this;
-    if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_ADD, socket->fd, &ev) < 0) {
+    if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_ADD, tc->getfd(), &ev) < 0) {
         throw std::runtime_error(std::string(__func__) + ": Failed to add event to reactor - " + strerror(errno) + '\n');
     }
     in_reactor = true;
@@ -63,11 +64,19 @@ void event::remove_from_reactor() {
     if (pr == nullptr || !binded || !in_reactor) {
         throw std::runtime_error(std::string(__func__) + ": No condition to remove event from reactor\n");
     }
-    if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_DEL, socket->fd, nullptr) < 0) {
+    if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_DEL, tc->getfd(), nullptr) < 0) {
         throw std::runtime_error(std::string(__func__) + ": Failed to remove event from reactor - " + strerror(errno) + '\n');
     }
     in_reactor = false;
     return;
+}
+
+void event::call_back() {
+    if (call_back_func) {
+        call_back_func();
+    } else {
+        return;
+    }
 }
 
 bool event::is_binded() const {
@@ -78,12 +87,11 @@ bool event::in_epoll() const {
     return in_reactor;
 }
 
-void event::call_back() {
-    if (call_back_func) {
-        call_back_func();
-    } else {
-        return;
+int event::get_sockfd() const {
+    if (tc) {
+        return tc->getfd();
     }
+    return -1;
 }
 
 /* ---------- reactor ---------- */
