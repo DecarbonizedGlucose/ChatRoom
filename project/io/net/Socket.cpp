@@ -60,6 +60,14 @@ ssize_t DataSocket::send_to() {
     return ::write_to(fd, buf);
 }
 
+ssize_t DataSocket::receive_file(const FilePtr& file) {
+
+}
+
+ssize_t DataSocket::send_file(const FilePtr& file) {
+    
+}
+
 /* ----- AcceptedSocket ----- */
 
 /* ----- ConnectSocket ----- */

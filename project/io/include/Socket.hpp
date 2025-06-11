@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <memory>
+#include "../../global/include/file.hpp"
 
 class Socket;
 class ListenSocket;
@@ -50,6 +51,9 @@ public:
     ssize_t send_size(size_t* data_size);
     ssize_t receive_from();
     ssize_t send_to();
+
+    ssize_t receive_file(const FilePtr& file);
+    ssize_t send_file(const FilePtr& file);
 
     void bind(const std::string& ip, uint16_t port) override final {}
     bool listen() override final {}

@@ -2,6 +2,7 @@
 #define USER_HPP
 
 #include <string>
+#include <memory>
 
 class Account {
 public:
@@ -34,5 +35,9 @@ public:
     User_Status status;
     User_Role role;               // 用户角色 in session
 };
+
+using US = User_Status;
+using UR = User_Role;
+using UserPtr = std::shared_ptr<User>;
 
 #endif
