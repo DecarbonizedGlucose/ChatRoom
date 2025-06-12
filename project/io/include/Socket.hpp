@@ -13,6 +13,8 @@
 #include <netinet/in.h>
 #include <memory>
 #include "../../global/include/file.hpp"
+#include "../../global/include/message.hpp"
+#include "../include/ioaction.hpp"
 
 class Socket;
 class ListenSocket;
@@ -47,13 +49,17 @@ protected:
 public:
     explicit DataSocket(int fd) : Socket(fd) {}
 
-    ssize_t receive_size(size_t* data_size);
-    ssize_t send_size(size_t* data_size);
-    ssize_t receive_from();
-    ssize_t send_to();
+    ssize_t receive(size_t size = io::err);
+    ssize_t send(size_t size = io::err);
 
-    ssize_t receive_file(const FilePtr& file);
-    ssize_t send_file(const FilePtr& file);
+    MesPtr receive_header();
+    bool send_header(const MesPtr& message);
+
+    MesPtr receive_message();
+    bool send_message(const MesPtr& message);
+
+    bool send_file(const FilePtr& file);
+    bool receive_file(const FilePtr& file);
 
     void bind(const std::string& ip, uint16_t port) override final {}
     bool listen() override final {}
