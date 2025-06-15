@@ -15,6 +15,7 @@
 #include "../../global/include/file.hpp"
 #include "../../global/include/message.hpp"
 #include "../include/ioaction.hpp"
+#include "../../global/include/command.hpp"
 
 class Socket;
 class ListenSocket;
@@ -49,6 +50,7 @@ protected:
 public:
     explicit DataSocket(int fd) : Socket(fd) {}
 
+    // 下面这几个接口用于收发消息(Message)
     ssize_t receive(size_t size = io::err);
     ssize_t send(size_t size = io::err);
 
@@ -56,10 +58,14 @@ public:
     bool send_header(const MesPtr& message);
 
     MesPtr receive_message();
-    bool send_message(const MesPtr& message);
+    bool send_message(const MesPtr& message); // todo
 
-    bool send_file(const FilePtr& file);
-    bool receive_file(const FilePtr& file);
+    // 用在文件类消息收发函数内部
+    bool send_file(const FilePtr& file); // todo
+    bool receive_file(const FilePtr& file); // todo
+
+    bool send_command(const ComPtr& command); // todo
+    ComPtr receive_command(); // todo
 
     void bind(const std::string& ip, uint16_t port) override final {}
     bool listen() override final {}
@@ -104,5 +110,10 @@ public:
 using ASocket = AcceptedSocket;
 using CSocket = ConnectSocket;
 using LSocket = ListenSocket;
+
+using pSocket = std::shared_ptr<Socket>;
+using pASocket = std::shared_ptr<AcceptedSocket>;
+using pCSocket = std::shared_ptr<ConnectSocket>;
+using pLSocket = std::shared_ptr<ListenSocket>;
 
 #endif

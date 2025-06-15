@@ -144,6 +144,19 @@ MesPtr DataSocket::receive_message() {
     }
 }
 
+bool DataSocket::send_message(const MesPtr& message) {
+
+}
+
+bool DataSocket::send_file(const FilePtr& file) {
+
+}
+
+bool DataSocket::receive_file(const FilePtr& file) {
+    
+}
+
+
 /* ----- AcceptedSocket ----- */
 
 /* ----- ConnectSocket ----- */

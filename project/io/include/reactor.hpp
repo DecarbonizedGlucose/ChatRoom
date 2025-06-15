@@ -42,7 +42,7 @@ public:
 
 class event {
 private:
-    std::shared_ptr<Socket> socket = nullptr;
+    pSocket socket = nullptr;
     bool in_reactor = false;
     bool binded = false;
 public:
@@ -67,7 +67,7 @@ public:
     void bind_with(reactor* re);
     void add_to_reactor();
     void remove_from_reactor();
-    void call_back();
+    void call_back(); // 安全的，调用期间暂时移除事件，避免重复触发
 
     bool is_binded() const;
     bool in_epoll() const;

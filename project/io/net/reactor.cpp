@@ -72,11 +72,13 @@ void event::remove_from_reactor() {
 }
 
 void event::call_back() {
+    remove_from_reactor();
     if (call_back_func) {
         call_back_func();
     } else {
         return;
     }
+    add_to_reactor();
 }
 
 bool event::is_binded() const {

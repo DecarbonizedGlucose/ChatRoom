@@ -8,7 +8,7 @@ class Account {
 public:
     Account() = default;
 
-    std::string user_ID;          // 唯一表示ID, 6位字符串(0-9, a-z, A-Z)
+    std::string user_ID;          // 唯一标识ID, 6位字符串(0-9, a-z, A-Z)
     std::string username;         // 用户名, 6-20位字符串(0-9, a-z, A-Z, _ - .)
 
 private:
@@ -21,11 +21,11 @@ enum class User_Status {
 };
 
 enum class User_Role {
-    Normal,                       // 普通用户(群聊成员、私信好友)
+    Normal,                       // 普通用户(私信好友)
+    Member,                       // 群成员
     Admin,                        // 群管理员
     Master                        // 群主
 };
-
 
 class User {
 public:
