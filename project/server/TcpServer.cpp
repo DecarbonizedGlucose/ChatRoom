@@ -94,3 +94,10 @@ void TS::stop() {
     running = false;
 }
 
+void TS::transfer_content(const std::string& user_ID, const MesPtr& message) {
+    event* ev = conn_manager->get_user_event(user_ID);
+    // 再封装一层吧
+}
+
+void TS::transfer_content(const std::string& user_ID, const ComPtr& command) {
+}

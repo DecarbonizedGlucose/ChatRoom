@@ -11,6 +11,7 @@
 #include <any>
 #include "Socket.hpp"
 #include <memory>
+#include <mutex> // 升级更安全
 
 class reactor;
 class event;
@@ -40,11 +41,17 @@ public:
     int get_epoll_fd() const;
 };
 
+enum class event_state {
+    Running,
+    Free
+};
+
 class event {
 private:
     pSocket socket = nullptr;
     bool in_reactor = false;
     bool binded = false;
+    std::mutex mtx;
 public:
     reactor* pr = nullptr;
     int events = 0; // EPOLLIN, EPOLLOUT, etc.
@@ -72,6 +79,7 @@ public:
     bool is_binded() const;
     bool in_epoll() const;
     int get_sockfd() const;
+    pSocket get_socket() const;
 };
 
 using rea = reactor;

@@ -47,6 +47,7 @@ void event::bind_with(rea* re) {
 }
 
 void event::add_to_reactor() {
+    std::lock_guard<std::mutex> lock(mtx);
     if (pr == nullptr || !binded || in_reactor) {
         throw std::runtime_error(std::string(__func__) + ": No condition to add event to reactor\n");
     }
@@ -61,6 +62,7 @@ void event::add_to_reactor() {
 }
 
 void event::remove_from_reactor() {
+    std::lock_guard<std::mutex> lock(mtx);
     if (pr == nullptr || !binded || !in_reactor) {
         throw std::runtime_error(std::string(__func__) + ": No condition to remove event from reactor\n");
     }
@@ -78,7 +80,7 @@ void event::call_back() {
     } else {
         return;
     }
-    add_to_reactor();
+    add_to_reactor(); // 比较安全，虽然一次调用来回增删纯折磨就是了
 }
 
 bool event::is_binded() const {
@@ -94,6 +96,10 @@ int event::get_sockfd() const {
         return socket->getFd();
     }
     return -1;
+}
+
+pSocket event::get_socket() const {
+    return socket;
 }
 
 /* ---------- reactor ---------- */

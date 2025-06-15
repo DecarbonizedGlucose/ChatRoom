@@ -33,7 +33,7 @@ public:
 
     // 核心功能：中转
     // 由一个用户发送的消息或命令，转发给另一个用户/另一群组
-    void transfer_content(const std::string& user_ID, const MesPtr& message);
+    void transfer_content(const std::string& user_ID, const MesPtr& message); // 内部区分消息类型
     void transfer_content(const std::string& user_ID, const ComPtr& command);
 };
 

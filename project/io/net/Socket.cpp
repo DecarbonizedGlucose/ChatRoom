@@ -31,20 +31,6 @@ Socket& Socket::operator=(Socket&& other) noexcept {
 
 /* ----- DataSocket ----- */
 
-// ssize_t DataSocket::receive_size(size_t* data_size) {
-//     if (fd < 0 || !data_size) {
-//         return -1;
-//     }
-//     return ::read_size_from(fd, data_size);
-// }
-
-// ssize_t DataSocket::send_size(size_t* data_size) {
-//     if (fd < 0 || !data_size) {
-//         return -1;
-//     }
-//     return ::write_size_to(fd, data_size);
-// }
-
 ssize_t DataSocket::receive(size_t size) {
     if (fd < 0) {
         return -1;
