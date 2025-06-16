@@ -1,4 +1,5 @@
 #include "include/TcpServer.hpp"
+#include "include/callbacks.hpp"
 #include <iostream>
 
 TS::TcpServer() {
@@ -29,15 +30,14 @@ void TS::set_thread_pool(std::shared_ptr<thread_pool> pool) {
     this->pool = pool;
 }
 
-bool TS::listen_init() {
+bool TS::listen_init(void (*first_func)(event<>*)) {
     if (!listen_conn->listen()) {
         std::cerr << "Failed to start listening on " << listen_conn->getFd() << ": " << strerror(errno) << '\n';
         return false;
     }
     // 这里不用智能指针是因为，reactor内部已经管理得当
-    event* ev = new event(listen_conn, EPOLLIN, [this]() {
-        this->accept_connections();
-    });
+    event<>* ev = new event(listen_conn, EPOLLIN | EPOLLET);
+    std::function<void()> cb = std::bind(first_func, ev);
     ev->bind_with(pr.get());
     if (!pr->add_event(ev)) {
         // 不用担心listen_conn被析构，因为它是在event里是shared_ptr
@@ -52,7 +52,7 @@ bool TS::listen_init() {
 void TS::accept_connections(std::function<void()> cb) {
     std::shared_ptr<ASocket> new_conn = listen_conn->accept();
     // fcntl had set non-blocking in make shared<TCD>
-    event* new_event = new event(new_conn, EPOLLIN | EPOLLONESHOT, cb);
+    event<>* new_event = new event(new_conn, EPOLLIN | EPOLLONESHOT, cb);
     new_event->bind_with(pr.get());
     if (!pr->add_event(new_event)) {
         delete new_event;
@@ -77,7 +77,7 @@ void TS::launch() {
         for (int i = 0; i < nready; ++i) {
             auto ev = pr->epoll_events[i];
             if (ev.events & EPOLLIN || ev.events & EPOLLOUT) {
-                event* e = static_cast<event*>(ev.data.ptr);
+                event<>* e = static_cast<event<>*>(ev.data.ptr);
                 if (pool) {
                     pool->submit([e]() {
                         e->call_back();
@@ -95,7 +95,7 @@ void TS::stop() {
 }
 
 void TS::transfer_content(const std::string& user_ID, const MesPtr& message) {
-    event* ev = conn_manager->get_user_event(user_ID);
+    event<>* ev = conn_manager->get_user_event(user_ID);
     // 再封装一层吧
 }
 

@@ -1,6 +1,13 @@
 #ifndef ACTION_HPP
 #define ACTION_HPP
 
+/*
+ * enum class Action 描述了各种用户行为和系统操作
+ * 客户端和服务器对命令的反应不同
+ * 服务器接收命令后，处理云端数据后，将该命令发送到波及到的用户
+ * 客户端接收命令后，修改对应的数据
+ * 这期间还会有额外数据包的传输
+*/
 enum class Action {
     /*      账号系统      */
     Sign_In,                      // 登录
