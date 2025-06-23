@@ -49,9 +49,9 @@ bool TS::listen_init(void (*first_func)(event<>*)) {
     return true;
 }
 
-void TS::accept_connections(std::function<void()> cb) {
+void TS::accept_connections(std::function<std::any()> cb) {
     std::shared_ptr<ASocket> new_conn = listen_conn->accept();
-    // fcntl had set non-blocking in make shared<TCD>
+    // fcntl had set non-blocking in make_shared<ASocket>
     event<>* new_event = new event(new_conn, EPOLLIN | EPOLLONESHOT, cb);
     new_event->bind_with(pr.get());
     if (!pr->add_event(new_event)) {

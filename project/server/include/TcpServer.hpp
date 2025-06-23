@@ -27,7 +27,7 @@ public:
     // 配置和初始化
     void set_thread_pool(std::shared_ptr<thread_pool> pool);
     bool listen_init(void (*first_func)(event<>*) = nullptr);
-    void accept_connections(std::function<void()> cb);
+    void accept_connections(std::function<std::any()> cb);
     void launch();
     void stop();
 
