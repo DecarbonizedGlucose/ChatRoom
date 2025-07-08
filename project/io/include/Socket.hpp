@@ -13,7 +13,7 @@
 #include <netinet/in.h>
 #include <memory>
 #include "../../global/include/file.hpp"
-#include "../../global/include/message.hpp"
+#include "../../global/include/chatmessage.hpp"
 #include "../include/ioaction.hpp"
 #include "../../global/include/command.hpp"
 
@@ -50,22 +50,21 @@ protected:
 public:
     explicit DataSocket(int fd) : Socket(fd) {}
 
-    // 下面这几个接口用于收发消息(Message)
     ssize_t receive(size_t size = io::err);
     ssize_t send(size_t size = io::err);
+    ssize_t send_with_size();
+    bool send_json(const nlohmann::json& json); // with size
+    bool receive_json(nlohmann::json& json);
 
-    MesPtr receive_header();
-    bool send_header(const MesPtr& message);
-
-    MesPtr receive_message();
-    bool send_message(const MesPtr& message); // todo
+    ChatMessagePtr receive_message();
+    bool send_message(const ChatMessagePtr& message);
 
     // 用在文件类消息收发函数内部
-    bool send_file(const FilePtr& file); // todo
-    bool receive_file(const FilePtr& file); // todo
+    //bool receive_file(const ChatFilePtr& file); // 不是这么玩的
+    //bool send_file(const ChatFilePtr& file);
 
-    bool send_command(const ComPtr& command); // todo
-    ComPtr receive_command(); // todo
+    ComPtr receive_command();
+    bool send_command(const ComPtr& command);
 
     void bind(const std::string& ip, uint16_t port) override final {}
     bool listen() override final {}
@@ -111,9 +110,9 @@ using ASocket = AcceptedSocket;
 using CSocket = ConnectSocket;
 using LSocket = ListenSocket;
 
-using pSocket = std::shared_ptr<Socket>;
-using pASocket = std::shared_ptr<AcceptedSocket>;
-using pCSocket = std::shared_ptr<ConnectSocket>;
-using pLSocket = std::shared_ptr<ListenSocket>;
+using SocketPtr = std::shared_ptr<Socket>;
+using ASocketPtr = std::shared_ptr<AcceptedSocket>;
+using CSocketPtr = std::shared_ptr<ConnectSocket>;
+using LSocketPtr = std::shared_ptr<ListenSocket>;
 
 #endif

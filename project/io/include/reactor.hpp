@@ -50,7 +50,7 @@ enum class event_state {
 template<typename Ret = std::any>
 class event {
 private:
-    pSocket socket = nullptr;
+    SocketPtr socket = nullptr;
     bool in_reactor = false;
     bool binded = false;
     std::mutex mtx;
@@ -161,7 +161,7 @@ public:
         return -1;
     }
 
-    pSocket get_socket() const  {
+    SocketPtr get_socket() const  {
         return socket;
     }
 };

@@ -9,6 +9,45 @@ namespace io {
     ssize_t err = ssize_t(-1);
 }
 
+ssize_t read_size_from(int fd, const size_t* const datasize) {
+    if (fd < 0 || !datasize) {
+        return io::err;
+    }
+    ssize_t n;
+again:
+    n = read(fd, (size_t*)datasize, sizeof(size_t));
+    if (n == io::err) {
+        if (errno == EINTR) {
+            goto again;
+        }
+        else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return 0;
+        }
+        else {
+            return io::err;
+        }
+    }
+    return n;
+}
+
+ssize_t write_size_to(int fd, size_t* const datasize) {
+    ssize_t n;
+again:
+    n = write(fd, (size_t*)datasize, sizeof(size_t));
+    if (n == io::err) {
+        if (errno == EINTR) {
+            goto again;
+        }
+        else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return 0;
+        }
+        else {
+            return io::err;
+        }
+    }
+    return n;
+}
+
 ssize_t read_from(int fd, std::vector<char>& buf, size_t size = io::err) {
     if (fd < 0) {
         return io::err;

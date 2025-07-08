@@ -45,103 +45,85 @@ ssize_t DataSocket::send(size_t size) {
     return ::write_to(fd, buf, size);
 }
 
-MesPtr DataSocket::receive_header() {
+ssize_t DataSocket::send_with_size() {
     if (fd < 0) {
-        return nullptr;
+        return -1;
     }
-    char type = 0;
-    // 头部全读出来
-    receive(33);
-    type = buf[0];
-    MesPtr message;
-    switch (type) {
-    case 'T':
-        message = std::make_shared<TMes>();
-        break;
-    case 'F':
-        message = std::make_shared<FMes>();
-        break;
-    case 'I':
-        message = std::make_shared<IMes>();
-        break;
-    case 'C':
-        message = std::make_shared<CMes>();
-        break;
-    default:
-        return nullptr;
-    }
-    if (message == nullptr) {
-        return nullptr;
-    }
-    std::memcpy(&message->timestamp, buf.data() + 1, sizeof(message->timestamp));
-    std::memcpy(&message->sender, buf.data() + 9, sizeof(message->sender));
-    std::memcpy(&message->receiver, buf.data() + 17, sizeof(message->receiver));
-    std::memcpy(&message->size, buf.data() + 25, sizeof(message->size));
-    return message;
+    size_t size = buf.size();
+    ssize_t sent = ::write_size_to(fd, &size);
+    return send(size);
 }
 
-bool DataSocket::send_header(const MesPtr& message) {
-    if (fd < 0 || !message) {
-        return false;
-    }
-    buf.resize(33);
-    buf[0] = message->type; // 消息类型
-    std::memcpy(buf.data() + 1, &message->timestamp, sizeof(message->timestamp));
-    std::memcpy(buf.data() + 9, &message->sender, sizeof(message->sender));
-    std::memcpy(buf.data() + 17, &message->receiver, sizeof(message->receiver));
-    std::memcpy(buf.data() + 25, &message->size, sizeof(message->size));
-    return send(33) >= 0;
+bool DataSocket::send_json(const nlohmann::json& _json) {
+    std::string json_str = _json.dump(); 
+    this->buf.assign(json_str.begin(), json_str.end());
+    return send_with_size() > 0;
 }
 
-MesPtr DataSocket::receive_message() {
-    MesPtr message = receive_header();
-    if (!message) {
-        return nullptr; // 读取消息头失败
+bool DataSocket::receive_json(nlohmann::json& json) {
+    if (fd < 0) {
+        return false; // Invalid socket
     }
-    switch (message->type) {
-    case 'T': {
-            auto text_message = std::static_pointer_cast<TMes>(message);
-            if (receive(text_message->size) < 0) {
-                message.reset();
-                text_message.reset();
-                return nullptr; // 读取文本消息内容失败
-            }
-            text_message->content.assign(buf.data(), text_message->size);
-            return text_message;
-        }
-    case 'F': {
-            auto file_message = std::static_pointer_cast<FMes>(message);
-            if (receive(file_message->size) < 0) {
-                message.reset();
-                file_message.reset();
-                return nullptr; // 读取文件消息内容失败
-            }
-            size_t name_size;
-            receive(sizeof(size_t));
-            std::memcpy(&name_size, buf.data(), sizeof(size_t));
-            receive(name_size);
-            file_message->file_name.assign(buf.data(), name_size);
-            return file_message;
-        }
-    case 'I':
-    case 'C':
-    default:
-        return nullptr;
+    size_t size = 0;
+    ssize_t received = ::read_size_from(fd, &size);
+    if (received <= 0) {
+        return false; // Failed to read size or no data
+    }
+    buf.resize(size);
+    received = receive(size);
+    if (received <= 0) {
+        return false; // Failed to read message content
+    }
+    try {
+        json = nlohmann::json::parse(buf);
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        return false; // JSON parsing error
     }
 }
 
-bool DataSocket::send_message(const MesPtr& message) {
-
+ChatMessagePtr DataSocket::receive_message() {
+    if (fd < 0) {
+        return nullptr; // Invalid socket
+    }
+    nlohmann::json _json;
+    if (!receive_json(_json)) {
+        return nullptr; // Failed to receive JSON
+    }
+    try {
+        auto message = std::make_shared<ChatMessage>();
+        message->message_json = _json;
+        return message;
+    } catch (const std::exception& e) {
+        return nullptr; // Failed to create ChatMessage
+    }
 }
 
-bool DataSocket::send_file(const FilePtr& file) {
-
+bool DataSocket::send_message(const ChatMessagePtr& message) {
+    return send_json(message->message_json);
 }
 
-bool DataSocket::receive_file(const FilePtr& file) {
-    
+ComPtr DataSocket::receive_command() {
+    nlohmann::json _json;
+    if (!receive_json(_json)) {
+        return nullptr; // Failed to receive JSON
+    }
+    try {
+        return std::make_shared<Command>(std::move(_json));
+    } catch (const std::exception& e) {
+        return nullptr; // Failed to create Com
+    }
 }
 
+bool DataSocket::send_command(const ComPtr& command) {
+    return send_json(command->data);
+}
+
+// 收发文件？？不用json，用protocol
+// TODO
+
+// 发送大量(拉取)数据的函数？？
+// TODO
 
 /* ----- AcceptedSocket ----- */
 
