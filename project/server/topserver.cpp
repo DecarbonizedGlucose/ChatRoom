@@ -15,16 +15,17 @@ TopServer::~TopServer() {
 }
 
 void TopServer::launch() {
-    if (!command_server->listen_init()) {
-        throw std::runtime_error("Failed to initialize command server");
-    }
-    if (!data_server->listen_init()) {
-        throw std::runtime_error("Failed to initialize data server");
-    }
-    pool->submit([this]() {
-        command_server->launch();
-    });
-    pool->submit([this]() {
-        data_server->launch();
-    });
+    // 现在改成3通道了，通信格式也改变了。必须重写
+    // if (!command_server->listen_init()) {
+    //     throw std::runtime_error("Failed to initialize command server");
+    // }
+    // if (!data_server->listen_init()) {
+    //     throw std::runtime_error("Failed to initialize data server");
+    // }
+    // pool->submit([this]() {
+    //     command_server->launch();
+    // });
+    // pool->submit([this]() {
+    //     data_server->launch();
+    // });
 }

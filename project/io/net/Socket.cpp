@@ -54,13 +54,12 @@ ssize_t DataSocket::send_with_size() {
     return send(size);
 }
 
-bool DataSocket::send_json(const nlohmann::json& _json) {
-    std::string json_str = _json.dump(); 
-    this->buf.assign(json_str.begin(), json_str.end());
+bool DataSocket::send_protocol(std::string& proto) {
+    this->buf.assign(proto.begin(), proto.end());
     return send_with_size() > 0;
 }
 
-bool DataSocket::receive_json(nlohmann::json& json) {
+bool DataSocket::receive_protocol(std::string& proto) {
     if (fd < 0) {
         return false; // Invalid socket
     }
@@ -74,49 +73,50 @@ bool DataSocket::receive_json(nlohmann::json& json) {
     if (received <= 0) {
         return false; // Failed to read message content
     }
-    try {
-        json = nlohmann::json::parse(buf);
-        return true;
-    } catch (const nlohmann::json::parse_error& e) {
-        return false; // JSON parsing error
-    }
+    proto.assign(buf.begin(), buf.end());
+    return true;
 }
 
 ChatMessagePtr DataSocket::receive_message() {
     if (fd < 0) {
         return nullptr; // Invalid socket
     }
-    nlohmann::json _json;
-    if (!receive_json(_json)) {
-        return nullptr; // Failed to receive JSON
+    std::string proto;
+    if (!receive_protocol(proto)) {
+        return nullptr; // Failed to receive protocol
     }
-    try {
-        auto message = std::make_shared<ChatMessage>();
-        message->message_json = _json;
-        return message;
-    } catch (const std::exception& e) {
-        return nullptr; // Failed to create ChatMessage
+    auto message = std::make_shared<ChatMessage>();
+    if (!message->ParseFromString(proto)) {
+        return nullptr; // Failed to parse message
     }
+    return message;
 }
 
-bool DataSocket::send_message(const ChatMessagePtr& message) {
-    return send_json(message->message_json);
+bool DataSocket::send_message(const ChatMessagePtr& chat_message) {
+    std::string proto;
+    chat_message->SerializeToString(&proto);
+    return send_protocol(proto);
 }
 
-ComPtr DataSocket::receive_command() {
-    nlohmann::json _json;
-    if (!receive_json(_json)) {
-        return nullptr; // Failed to receive JSON
+CommandPtr DataSocket::receive_command() {
+    if (fd < 0) {
+        return nullptr; // Invalid socket
     }
-    try {
-        return std::make_shared<Command>(std::move(_json));
-    } catch (const std::exception& e) {
-        return nullptr; // Failed to create Com
+    std::string proto;
+    if (!receive_protocol(proto)) {
+        return nullptr; // Failed to receive protocol
     }
+    auto command = std::make_shared<CommandRequest>();
+    if (!command->ParseFromString(proto)) {
+        return nullptr; // Failed to parse command
+    }
+    return command;
 }
 
-bool DataSocket::send_command(const ComPtr& command) {
-    return send_json(command->data);
+bool DataSocket::send_command(const CommandPtr& command) {
+    std::string proto;
+    command->SerializeToString(&proto);
+    return send_protocol(proto);
 }
 
 // 收发文件？？不用json，用protocol

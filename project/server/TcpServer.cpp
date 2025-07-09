@@ -30,7 +30,7 @@ void TS::set_thread_pool(std::shared_ptr<thread_pool> pool) {
     this->pool = pool;
 }
 
-bool TS::listen_init(void (*first_func)(event<>*)) {
+bool TS::listen_init(void (*first_func)(event<>*)) { // 这必须改
     if (!listen_conn->listen()) {
         std::cerr << "Failed to start listening on " << listen_conn->getFd() << ": " << strerror(errno) << '\n';
         return false;
@@ -78,13 +78,14 @@ void TS::launch() {
             auto ev = pr->epoll_events[i];
             if (ev.events & EPOLLIN || ev.events & EPOLLOUT) {
                 event<>* e = static_cast<event<>*>(ev.data.ptr);
-                if (pool) {
-                    pool->submit([e]() {
-                        e->call_back();
-                    });
-                } else {
-                    e->call_back();
-                }
+                // if (pool) {
+                //     pool->submit([e]() {
+                //         e->call_back();
+                //     });
+                // } else {
+                //     e->call_back();
+                // }
+                // 我异步获取呢？必须改
             }
         }
     }
@@ -94,10 +95,10 @@ void TS::stop() {
     running = false;
 }
 
-void TS::transfer_content(const std::string& user_ID, const MesPtr& message) {
-    event<>* ev = conn_manager->get_user_event(user_ID);
-    // 再封装一层吧
-}
+// void TS::transfer_content(const std::string& user_ID, const MesPtr& message) {
+//     event<>* ev = conn_manager->get_user_event(user_ID);
+//     // 再封装一层吧
+// }
 
-void TS::transfer_content(const std::string& user_ID, const ComPtr& command) {
-}
+// void TS::transfer_content(const std::string& user_ID, const CommandPtr& command) {
+// }

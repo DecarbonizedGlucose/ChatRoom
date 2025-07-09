@@ -26,15 +26,15 @@ public:
 
     // 配置和初始化
     void set_thread_pool(std::shared_ptr<thread_pool> pool);
-    bool listen_init(void (*first_func)(event<>*) = nullptr);
+    bool listen_init(void (*first_func)(event<>*) = nullptr); // 这写的啥啊？
     void accept_connections(std::function<std::any()> cb);
     void launch();
     void stop();
 
-    // 核心功能：中转
-    // 由一个用户发送的消息或命令，转发给另一个用户/另一群组
-    void transfer_content(const std::string& user_ID, const MesPtr& message); // 内部区分消息类型
-    void transfer_content(const std::string& user_ID, const ComPtr& command);
+    // // 核心功能：中转
+    // // 由一个用户发送的消息或命令，转发给另一个用户/另一群组
+    // void transfer_content(const std::string& user_ID, const MesPtr& message); // 内部区分消息类型
+    // void transfer_content(const std::string& user_ID, const CommandPtr& command);
 };
 
 using TS = TcpServer;

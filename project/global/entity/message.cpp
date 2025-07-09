@@ -1,30 +1,29 @@
 #include "../include/message.hpp"
-#include <stdexcept>
 
-/* ----- base message ----- */
+// Message::Message(const std::string& sender, const std::string& receiver, const std::string& text = "", bool pin = false, const ChatFilePtr& cfile = nullptr) {
+// }
 
-Base_Message::Base_Message() 
-    : timestamp(std::time(nullptr)) {} // 初始化时间戳为当前时间
+// void Message::settimestamp() {
+//     if (message_ptr) {
+//         message_ptr->set_timestamp(static_cast<int64_t>(std::time(nullptr)));
+//     }
+// }
 
-/* ----- text message ----- */
-
-TMes::Text_Message(const std::string& content) 
-    : Base_Message(), content(content) {}
-
-TMes::Text_Message(const char* str) 
-    : Base_Message(), content(std::string(str)) {}
-
-/* ----- file message ----- */
-
-FMes::File_Message(const std::string& file_name)
-    : Base_Message(), file_name(file_name) {}
-
-FMes::File_Message(const FilePtr& file) : Base_Message(), file(file) {
-    if (file) {
-        file_name = file->file_name;
-        file_size = file->file_size;
+ChatMessagePtr getChatMessagePtr(const std::string& sender,
+    const std::string& receiver, const std::string& text = "",
+    bool pin = false, const ChatFilePtr& cfileptr = nullptr,
+    size_t file_size) {
+    auto message = std::make_shared<ChatMessage>();
+    message->set_sender(sender);
+    message->set_receiver(receiver);
+    message->set_timestamp(static_cast<int64_t>(std::time(nullptr)));
+    message->set_text(text);
+    message->set_pin(pin);
+    if (cfileptr) {
+        auto file = message->mutable_payload();
+        file->set_file_name(cfileptr->file_name());
+        file->set_file_size(file_size);
+        file->set_file_hash(cfileptr->file_hash());
     }
-    else {
-        throw std::runtime_error("File pointer is null");
-    }
+    return message;
 }

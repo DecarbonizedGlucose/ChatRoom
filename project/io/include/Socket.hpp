@@ -13,7 +13,7 @@
 #include <netinet/in.h>
 #include <memory>
 #include "../../global/include/file.hpp"
-#include "../../global/include/chatmessage.hpp"
+#include "../../global/include/message.hpp"
 #include "../include/ioaction.hpp"
 #include "../../global/include/command.hpp"
 
@@ -53,8 +53,8 @@ public:
     ssize_t receive(size_t size = io::err);
     ssize_t send(size_t size = io::err);
     ssize_t send_with_size();
-    bool send_json(const nlohmann::json& json); // with size
-    bool receive_json(nlohmann::json& json);
+    bool send_protocol(std::string& proto);
+    bool receive_protocol(std::string& proto);
 
     ChatMessagePtr receive_message();
     bool send_message(const ChatMessagePtr& message);
@@ -63,8 +63,8 @@ public:
     //bool receive_file(const ChatFilePtr& file); // 不是这么玩的
     //bool send_file(const ChatFilePtr& file);
 
-    ComPtr receive_command();
-    bool send_command(const ComPtr& command);
+    CommandPtr receive_command();
+    bool send_command(const CommandPtr& command);
 
     void bind(const std::string& ip, uint16_t port) override final {}
     bool listen() override final {}

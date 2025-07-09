@@ -2,10 +2,10 @@
 #define COMMAND_HPP
 
 #include "action.hpp"
-#include "nlohmann/json.hpp"
 #include <memory>
 #include <vector>
-using json = nlohmann::json;
+#include "../abstract/command.pb.h" // Protobuf generated header
+using CommandPtr = std::shared_ptr<CommandRequest>;
 
 /*
     一个command对象代表一个命令实例化对象
@@ -21,28 +21,28 @@ data: {
     ]
 }
 */
-class Command {
-public:
-    json data;
-    Command() = delete;
-    Command(Action action, const std::string& sender, const std::vector<std::string>& args);
-    Command(Action action, const std::string& sender);
-};
+// class Command {
+// public:
+//     json data;
+//     Command() = delete;
+//     Command(Action action, const std::string& sender, const std::vector<std::string>& args);
+//     Command(Action action, const std::string& sender);
+// };
 
-using ComPtr = std::shared_ptr<Command>;
+// using CommandPtr = std::shared_ptr<Command>;
 
-Command::Command(Action action, const std::string& sender, const std::vector<std::string>& args)
-    : data({
-        {"action", static_cast<int>(action)},
-        {"sender", sender},
-        {"args", args} // 使用传入的参数列表
-    }) {}
+// Command::Command(Action action, const std::string& sender, const std::vector<std::string>& args)
+//     : data({
+//         {"action", static_cast<int>(action)},
+//         {"sender", sender},
+//         {"args", args} // 使用传入的参数列表
+//     }) {}
 
-Command::Command(Action action, const std::string& sender)
-    : data({
-        {"action", static_cast<int>(action)},
-        {"sender", sender},
-        {"args", json::array()} // 空数组
-    }) {}
+// Command::Command(Action action, const std::string& sender)
+//     : data({
+//         {"action", static_cast<int>(action)},
+//         {"sender", sender},
+//         {"args", json::array()} // 空数组
+//     }) {}
 
 #endif

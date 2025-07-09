@@ -7,10 +7,10 @@
 arch/manjaro:
 ~~~sh
 yay -S openssl
-echo 114514
-echo 下面还有东西
+yay -S protobuf
 ~~~
 debian/ubuntu:
 ~~~sh
 sudo apt install openssl
+sudo apt install protobuf-compiler libprotobuf-dev
 ~~~
