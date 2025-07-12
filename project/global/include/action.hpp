@@ -34,6 +34,10 @@ enum class Action {
     Search_Group,                 // 搜索群组*
     Add_Admin,                    // 添加管理员
     Remove_Admin,                 // 移除管理员
+
+    /*      消息行为      */
+    Download_File,                // 下载文件
+    
 };
 
 #endif

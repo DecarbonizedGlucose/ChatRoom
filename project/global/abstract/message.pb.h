@@ -52,7 +52,6 @@ struct TableStruct_message_2eproto {
 extern "C" {
 extern const ::google::protobuf::internal::DescriptorTable descriptor_table_message_2eproto;
 }  // extern "C"
-namespace chat {
 class ChatMessage;
 struct ChatMessageDefaultTypeInternal;
 extern ChatMessageDefaultTypeInternal _ChatMessage_default_instance_;
@@ -61,13 +60,11 @@ class FilePayload;
 struct FilePayloadDefaultTypeInternal;
 extern FilePayloadDefaultTypeInternal _FilePayload_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull FilePayload_class_data_;
-}  // namespace chat
 namespace google {
 namespace protobuf {
 }  // namespace protobuf
 }  // namespace google
 
-namespace chat {
 
 // ===================================================================
 
@@ -75,7 +72,7 @@ namespace chat {
 // -------------------------------------------------------------------
 
 class FilePayload final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:chat.FilePayload) */ {
+/* @@protoc_insertion_point(class_definition:FilePayload) */ {
  public:
   inline FilePayload() : FilePayload(nullptr) {}
   ~FilePayload() PROTOBUF_FINAL;
@@ -193,7 +190,7 @@ class FilePayload final : public ::google::protobuf::Message
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "chat.FilePayload"; }
+  static ::absl::string_view FullMessageName() { return "FilePayload"; }
 
  protected:
   explicit FilePayload(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
@@ -261,12 +258,12 @@ class FilePayload final : public ::google::protobuf::Message
   void _internal_set_file_size(::int64_t value);
 
   public:
-  // @@protoc_insertion_point(class_scope:chat.FilePayload)
+  // @@protoc_insertion_point(class_scope:FilePayload)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
   static const ::google::protobuf::internal::TcParseTable<2, 3,
-                                   0, 43,
+                                   0, 38,
                                    2>
       _table_;
 
@@ -300,7 +297,7 @@ extern const ::google::protobuf::internal::ClassDataFull FilePayload_class_data_
 // -------------------------------------------------------------------
 
 class ChatMessage final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:chat.ChatMessage) */ {
+/* @@protoc_insertion_point(class_definition:ChatMessage) */ {
  public:
   inline ChatMessage() : ChatMessage(nullptr) {}
   ~ChatMessage() PROTOBUF_FINAL;
@@ -418,7 +415,7 @@ class ChatMessage final : public ::google::protobuf::Message
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "chat.ChatMessage"; }
+  static ::absl::string_view FullMessageName() { return "ChatMessage"; }
 
  protected:
   explicit ChatMessage(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
@@ -444,10 +441,11 @@ class ChatMessage final : public ::google::protobuf::Message
   enum : int {
     kSenderFieldNumber = 1,
     kReceiverFieldNumber = 2,
-    kTextFieldNumber = 4,
-    kPayloadFieldNumber = 6,
-    kTimestampFieldNumber = 3,
-    kPinFieldNumber = 5,
+    kTextFieldNumber = 5,
+    kPayloadFieldNumber = 7,
+    kTimestampFieldNumber = 4,
+    kIsGroupFieldNumber = 3,
+    kPinFieldNumber = 6,
   };
   // string sender = 1;
   void clear_sender() ;
@@ -479,7 +477,7 @@ class ChatMessage final : public ::google::protobuf::Message
   ::std::string* PROTOBUF_NONNULL _internal_mutable_receiver();
 
   public:
-  // string text = 4;
+  // string text = 5;
   void clear_text() ;
   const ::std::string& text() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -494,22 +492,22 @@ class ChatMessage final : public ::google::protobuf::Message
   ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
 
   public:
-  // .chat.FilePayload payload = 6;
+  // .FilePayload payload = 7;
   bool has_payload() const;
   void clear_payload() ;
-  const ::chat::FilePayload& payload() const;
-  [[nodiscard]] ::chat::FilePayload* PROTOBUF_NULLABLE release_payload();
-  ::chat::FilePayload* PROTOBUF_NONNULL mutable_payload();
-  void set_allocated_payload(::chat::FilePayload* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_payload(::chat::FilePayload* PROTOBUF_NULLABLE value);
-  ::chat::FilePayload* PROTOBUF_NULLABLE unsafe_arena_release_payload();
+  const ::FilePayload& payload() const;
+  [[nodiscard]] ::FilePayload* PROTOBUF_NULLABLE release_payload();
+  ::FilePayload* PROTOBUF_NONNULL mutable_payload();
+  void set_allocated_payload(::FilePayload* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_payload(::FilePayload* PROTOBUF_NULLABLE value);
+  ::FilePayload* PROTOBUF_NULLABLE unsafe_arena_release_payload();
 
   private:
-  const ::chat::FilePayload& _internal_payload() const;
-  ::chat::FilePayload* PROTOBUF_NONNULL _internal_mutable_payload();
+  const ::FilePayload& _internal_payload() const;
+  ::FilePayload* PROTOBUF_NONNULL _internal_mutable_payload();
 
   public:
-  // int64 timestamp = 3;
+  // int64 timestamp = 4;
   void clear_timestamp() ;
   ::int64_t timestamp() const;
   void set_timestamp(::int64_t value);
@@ -519,7 +517,17 @@ class ChatMessage final : public ::google::protobuf::Message
   void _internal_set_timestamp(::int64_t value);
 
   public:
-  // bool pin = 5;
+  // bool is_group = 3;
+  void clear_is_group() ;
+  bool is_group() const;
+  void set_is_group(bool value);
+
+  private:
+  bool _internal_is_group() const;
+  void _internal_set_is_group(bool value);
+
+  public:
+  // bool pin = 6;
   void clear_pin() ;
   bool pin() const;
   void set_pin(bool value);
@@ -529,12 +537,12 @@ class ChatMessage final : public ::google::protobuf::Message
   void _internal_set_pin(bool value);
 
   public:
-  // @@protoc_insertion_point(class_scope:chat.ChatMessage)
+  // @@protoc_insertion_point(class_scope:ChatMessage)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 6,
-                                   1, 43,
+  static const ::google::protobuf::internal::TcParseTable<3, 7,
+                                   1, 38,
                                    2>
       _table_;
 
@@ -558,8 +566,9 @@ class ChatMessage final : public ::google::protobuf::Message
     ::google::protobuf::internal::ArenaStringPtr sender_;
     ::google::protobuf::internal::ArenaStringPtr receiver_;
     ::google::protobuf::internal::ArenaStringPtr text_;
-    ::chat::FilePayload* PROTOBUF_NULLABLE payload_;
+    ::FilePayload* PROTOBUF_NULLABLE payload_;
     ::int64_t timestamp_;
+    bool is_group_;
     bool pin_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -593,7 +602,7 @@ inline void FilePayload::clear_file_name() {
 }
 inline const ::std::string& FilePayload::file_name() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:chat.FilePayload.file_name)
+  // @@protoc_insertion_point(field_get:FilePayload.file_name)
   return _internal_file_name();
 }
 template <typename Arg_, typename... Args_>
@@ -601,12 +610,12 @@ PROTOBUF_ALWAYS_INLINE void FilePayload::set_file_name(Arg_&& arg, Args_... args
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_._has_bits_[0] |= 0x00000001u;
   _impl_.file_name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:chat.FilePayload.file_name)
+  // @@protoc_insertion_point(field_set:FilePayload.file_name)
 }
 inline ::std::string* PROTOBUF_NONNULL FilePayload::mutable_file_name()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::std::string* _s = _internal_mutable_file_name();
-  // @@protoc_insertion_point(field_mutable:chat.FilePayload.file_name)
+  // @@protoc_insertion_point(field_mutable:FilePayload.file_name)
   return _s;
 }
 inline const ::std::string& FilePayload::_internal_file_name() const {
@@ -625,7 +634,7 @@ inline ::std::string* PROTOBUF_NONNULL FilePayload::_internal_mutable_file_name(
 }
 inline ::std::string* PROTOBUF_NULLABLE FilePayload::release_file_name() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:chat.FilePayload.file_name)
+  // @@protoc_insertion_point(field_release:FilePayload.file_name)
   if ((_impl_._has_bits_[0] & 0x00000001u) == 0) {
     return nullptr;
   }
@@ -647,7 +656,7 @@ inline void FilePayload::set_allocated_file_name(::std::string* PROTOBUF_NULLABL
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.file_name_.IsDefault()) {
     _impl_.file_name_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:chat.FilePayload.file_name)
+  // @@protoc_insertion_point(field_set_allocated:FilePayload.file_name)
 }
 
 // int64 file_size = 2;
@@ -657,13 +666,13 @@ inline void FilePayload::clear_file_size() {
   _impl_._has_bits_[0] &= ~0x00000004u;
 }
 inline ::int64_t FilePayload::file_size() const {
-  // @@protoc_insertion_point(field_get:chat.FilePayload.file_size)
+  // @@protoc_insertion_point(field_get:FilePayload.file_size)
   return _internal_file_size();
 }
 inline void FilePayload::set_file_size(::int64_t value) {
   _internal_set_file_size(value);
   _impl_._has_bits_[0] |= 0x00000004u;
-  // @@protoc_insertion_point(field_set:chat.FilePayload.file_size)
+  // @@protoc_insertion_point(field_set:FilePayload.file_size)
 }
 inline ::int64_t FilePayload::_internal_file_size() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -682,7 +691,7 @@ inline void FilePayload::clear_file_hash() {
 }
 inline const ::std::string& FilePayload::file_hash() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:chat.FilePayload.file_hash)
+  // @@protoc_insertion_point(field_get:FilePayload.file_hash)
   return _internal_file_hash();
 }
 template <typename Arg_, typename... Args_>
@@ -690,12 +699,12 @@ PROTOBUF_ALWAYS_INLINE void FilePayload::set_file_hash(Arg_&& arg, Args_... args
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_._has_bits_[0] |= 0x00000002u;
   _impl_.file_hash_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:chat.FilePayload.file_hash)
+  // @@protoc_insertion_point(field_set:FilePayload.file_hash)
 }
 inline ::std::string* PROTOBUF_NONNULL FilePayload::mutable_file_hash()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::std::string* _s = _internal_mutable_file_hash();
-  // @@protoc_insertion_point(field_mutable:chat.FilePayload.file_hash)
+  // @@protoc_insertion_point(field_mutable:FilePayload.file_hash)
   return _s;
 }
 inline const ::std::string& FilePayload::_internal_file_hash() const {
@@ -714,7 +723,7 @@ inline ::std::string* PROTOBUF_NONNULL FilePayload::_internal_mutable_file_hash(
 }
 inline ::std::string* PROTOBUF_NULLABLE FilePayload::release_file_hash() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:chat.FilePayload.file_hash)
+  // @@protoc_insertion_point(field_release:FilePayload.file_hash)
   if ((_impl_._has_bits_[0] & 0x00000002u) == 0) {
     return nullptr;
   }
@@ -736,7 +745,7 @@ inline void FilePayload::set_allocated_file_hash(::std::string* PROTOBUF_NULLABL
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.file_hash_.IsDefault()) {
     _impl_.file_hash_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:chat.FilePayload.file_hash)
+  // @@protoc_insertion_point(field_set_allocated:FilePayload.file_hash)
 }
 
 // -------------------------------------------------------------------
@@ -751,7 +760,7 @@ inline void ChatMessage::clear_sender() {
 }
 inline const ::std::string& ChatMessage::sender() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:chat.ChatMessage.sender)
+  // @@protoc_insertion_point(field_get:ChatMessage.sender)
   return _internal_sender();
 }
 template <typename Arg_, typename... Args_>
@@ -759,12 +768,12 @@ PROTOBUF_ALWAYS_INLINE void ChatMessage::set_sender(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_._has_bits_[0] |= 0x00000001u;
   _impl_.sender_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:chat.ChatMessage.sender)
+  // @@protoc_insertion_point(field_set:ChatMessage.sender)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_sender()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::std::string* _s = _internal_mutable_sender();
-  // @@protoc_insertion_point(field_mutable:chat.ChatMessage.sender)
+  // @@protoc_insertion_point(field_mutable:ChatMessage.sender)
   return _s;
 }
 inline const ::std::string& ChatMessage::_internal_sender() const {
@@ -783,7 +792,7 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_sender() {
 }
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_sender() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:chat.ChatMessage.sender)
+  // @@protoc_insertion_point(field_release:ChatMessage.sender)
   if ((_impl_._has_bits_[0] & 0x00000001u) == 0) {
     return nullptr;
   }
@@ -805,7 +814,7 @@ inline void ChatMessage::set_allocated_sender(::std::string* PROTOBUF_NULLABLE v
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.sender_.IsDefault()) {
     _impl_.sender_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:chat.ChatMessage.sender)
+  // @@protoc_insertion_point(field_set_allocated:ChatMessage.sender)
 }
 
 // string receiver = 2;
@@ -816,7 +825,7 @@ inline void ChatMessage::clear_receiver() {
 }
 inline const ::std::string& ChatMessage::receiver() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:chat.ChatMessage.receiver)
+  // @@protoc_insertion_point(field_get:ChatMessage.receiver)
   return _internal_receiver();
 }
 template <typename Arg_, typename... Args_>
@@ -824,12 +833,12 @@ PROTOBUF_ALWAYS_INLINE void ChatMessage::set_receiver(Arg_&& arg, Args_... args)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_._has_bits_[0] |= 0x00000002u;
   _impl_.receiver_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:chat.ChatMessage.receiver)
+  // @@protoc_insertion_point(field_set:ChatMessage.receiver)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_receiver()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::std::string* _s = _internal_mutable_receiver();
-  // @@protoc_insertion_point(field_mutable:chat.ChatMessage.receiver)
+  // @@protoc_insertion_point(field_mutable:ChatMessage.receiver)
   return _s;
 }
 inline const ::std::string& ChatMessage::_internal_receiver() const {
@@ -848,7 +857,7 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_receiver()
 }
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_receiver() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:chat.ChatMessage.receiver)
+  // @@protoc_insertion_point(field_release:ChatMessage.receiver)
   if ((_impl_._has_bits_[0] & 0x00000002u) == 0) {
     return nullptr;
   }
@@ -870,23 +879,47 @@ inline void ChatMessage::set_allocated_receiver(::std::string* PROTOBUF_NULLABLE
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.receiver_.IsDefault()) {
     _impl_.receiver_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:chat.ChatMessage.receiver)
+  // @@protoc_insertion_point(field_set_allocated:ChatMessage.receiver)
 }
 
-// int64 timestamp = 3;
+// bool is_group = 3;
+inline void ChatMessage::clear_is_group() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.is_group_ = false;
+  _impl_._has_bits_[0] &= ~0x00000020u;
+}
+inline bool ChatMessage::is_group() const {
+  // @@protoc_insertion_point(field_get:ChatMessage.is_group)
+  return _internal_is_group();
+}
+inline void ChatMessage::set_is_group(bool value) {
+  _internal_set_is_group(value);
+  _impl_._has_bits_[0] |= 0x00000020u;
+  // @@protoc_insertion_point(field_set:ChatMessage.is_group)
+}
+inline bool ChatMessage::_internal_is_group() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.is_group_;
+}
+inline void ChatMessage::_internal_set_is_group(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.is_group_ = value;
+}
+
+// int64 timestamp = 4;
 inline void ChatMessage::clear_timestamp() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_ = ::int64_t{0};
   _impl_._has_bits_[0] &= ~0x00000010u;
 }
 inline ::int64_t ChatMessage::timestamp() const {
-  // @@protoc_insertion_point(field_get:chat.ChatMessage.timestamp)
+  // @@protoc_insertion_point(field_get:ChatMessage.timestamp)
   return _internal_timestamp();
 }
 inline void ChatMessage::set_timestamp(::int64_t value) {
   _internal_set_timestamp(value);
   _impl_._has_bits_[0] |= 0x00000010u;
-  // @@protoc_insertion_point(field_set:chat.ChatMessage.timestamp)
+  // @@protoc_insertion_point(field_set:ChatMessage.timestamp)
 }
 inline ::int64_t ChatMessage::_internal_timestamp() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -897,7 +930,7 @@ inline void ChatMessage::_internal_set_timestamp(::int64_t value) {
   _impl_.timestamp_ = value;
 }
 
-// string text = 4;
+// string text = 5;
 inline void ChatMessage::clear_text() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.text_.ClearToEmpty();
@@ -905,7 +938,7 @@ inline void ChatMessage::clear_text() {
 }
 inline const ::std::string& ChatMessage::text() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:chat.ChatMessage.text)
+  // @@protoc_insertion_point(field_get:ChatMessage.text)
   return _internal_text();
 }
 template <typename Arg_, typename... Args_>
@@ -913,12 +946,12 @@ PROTOBUF_ALWAYS_INLINE void ChatMessage::set_text(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_._has_bits_[0] |= 0x00000004u;
   _impl_.text_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:chat.ChatMessage.text)
+  // @@protoc_insertion_point(field_set:ChatMessage.text)
 }
 inline ::std::string* PROTOBUF_NONNULL ChatMessage::mutable_text()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::std::string* _s = _internal_mutable_text();
-  // @@protoc_insertion_point(field_mutable:chat.ChatMessage.text)
+  // @@protoc_insertion_point(field_mutable:ChatMessage.text)
   return _s;
 }
 inline const ::std::string& ChatMessage::_internal_text() const {
@@ -937,7 +970,7 @@ inline ::std::string* PROTOBUF_NONNULL ChatMessage::_internal_mutable_text() {
 }
 inline ::std::string* PROTOBUF_NULLABLE ChatMessage::release_text() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:chat.ChatMessage.text)
+  // @@protoc_insertion_point(field_release:ChatMessage.text)
   if ((_impl_._has_bits_[0] & 0x00000004u) == 0) {
     return nullptr;
   }
@@ -959,23 +992,23 @@ inline void ChatMessage::set_allocated_text(::std::string* PROTOBUF_NULLABLE val
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.text_.IsDefault()) {
     _impl_.text_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:chat.ChatMessage.text)
+  // @@protoc_insertion_point(field_set_allocated:ChatMessage.text)
 }
 
-// bool pin = 5;
+// bool pin = 6;
 inline void ChatMessage::clear_pin() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.pin_ = false;
-  _impl_._has_bits_[0] &= ~0x00000020u;
+  _impl_._has_bits_[0] &= ~0x00000040u;
 }
 inline bool ChatMessage::pin() const {
-  // @@protoc_insertion_point(field_get:chat.ChatMessage.pin)
+  // @@protoc_insertion_point(field_get:ChatMessage.pin)
   return _internal_pin();
 }
 inline void ChatMessage::set_pin(bool value) {
   _internal_set_pin(value);
-  _impl_._has_bits_[0] |= 0x00000020u;
-  // @@protoc_insertion_point(field_set:chat.ChatMessage.pin)
+  _impl_._has_bits_[0] |= 0x00000040u;
+  // @@protoc_insertion_point(field_set:ChatMessage.pin)
 }
 inline bool ChatMessage::_internal_pin() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -986,7 +1019,7 @@ inline void ChatMessage::_internal_set_pin(bool value) {
   _impl_.pin_ = value;
 }
 
-// .chat.FilePayload payload = 6;
+// .FilePayload payload = 7;
 inline bool ChatMessage::has_payload() const {
   bool value = (_impl_._has_bits_[0] & 0x00000008u) != 0;
   PROTOBUF_ASSUME(!value || _impl_.payload_ != nullptr);
@@ -997,34 +1030,34 @@ inline void ChatMessage::clear_payload() {
   if (_impl_.payload_ != nullptr) _impl_.payload_->Clear();
   _impl_._has_bits_[0] &= ~0x00000008u;
 }
-inline const ::chat::FilePayload& ChatMessage::_internal_payload() const {
+inline const ::FilePayload& ChatMessage::_internal_payload() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::chat::FilePayload* p = _impl_.payload_;
-  return p != nullptr ? *p : reinterpret_cast<const ::chat::FilePayload&>(::chat::_FilePayload_default_instance_);
+  const ::FilePayload* p = _impl_.payload_;
+  return p != nullptr ? *p : reinterpret_cast<const ::FilePayload&>(::_FilePayload_default_instance_);
 }
-inline const ::chat::FilePayload& ChatMessage::payload() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:chat.ChatMessage.payload)
+inline const ::FilePayload& ChatMessage::payload() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:ChatMessage.payload)
   return _internal_payload();
 }
 inline void ChatMessage::unsafe_arena_set_allocated_payload(
-    ::chat::FilePayload* PROTOBUF_NULLABLE value) {
+    ::FilePayload* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (GetArena() == nullptr) {
     delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.payload_);
   }
-  _impl_.payload_ = reinterpret_cast<::chat::FilePayload*>(value);
+  _impl_.payload_ = reinterpret_cast<::FilePayload*>(value);
   if (value != nullptr) {
     _impl_._has_bits_[0] |= 0x00000008u;
   } else {
     _impl_._has_bits_[0] &= ~0x00000008u;
   }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:chat.ChatMessage.payload)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:ChatMessage.payload)
 }
-inline ::chat::FilePayload* PROTOBUF_NULLABLE ChatMessage::release_payload() {
+inline ::FilePayload* PROTOBUF_NULLABLE ChatMessage::release_payload() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
   _impl_._has_bits_[0] &= ~0x00000008u;
-  ::chat::FilePayload* released = _impl_.payload_;
+  ::FilePayload* released = _impl_.payload_;
   _impl_.payload_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
     auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
@@ -1039,31 +1072,31 @@ inline ::chat::FilePayload* PROTOBUF_NULLABLE ChatMessage::release_payload() {
   }
   return released;
 }
-inline ::chat::FilePayload* PROTOBUF_NULLABLE ChatMessage::unsafe_arena_release_payload() {
+inline ::FilePayload* PROTOBUF_NULLABLE ChatMessage::unsafe_arena_release_payload() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:chat.ChatMessage.payload)
+  // @@protoc_insertion_point(field_release:ChatMessage.payload)
 
   _impl_._has_bits_[0] &= ~0x00000008u;
-  ::chat::FilePayload* temp = _impl_.payload_;
+  ::FilePayload* temp = _impl_.payload_;
   _impl_.payload_ = nullptr;
   return temp;
 }
-inline ::chat::FilePayload* PROTOBUF_NONNULL ChatMessage::_internal_mutable_payload() {
+inline ::FilePayload* PROTOBUF_NONNULL ChatMessage::_internal_mutable_payload() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.payload_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::chat::FilePayload>(GetArena());
-    _impl_.payload_ = reinterpret_cast<::chat::FilePayload*>(p);
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::FilePayload>(GetArena());
+    _impl_.payload_ = reinterpret_cast<::FilePayload*>(p);
   }
   return _impl_.payload_;
 }
-inline ::chat::FilePayload* PROTOBUF_NONNULL ChatMessage::mutable_payload()
+inline ::FilePayload* PROTOBUF_NONNULL ChatMessage::mutable_payload()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   _impl_._has_bits_[0] |= 0x00000008u;
-  ::chat::FilePayload* _msg = _internal_mutable_payload();
-  // @@protoc_insertion_point(field_mutable:chat.ChatMessage.payload)
+  ::FilePayload* _msg = _internal_mutable_payload();
+  // @@protoc_insertion_point(field_mutable:ChatMessage.payload)
   return _msg;
 }
-inline void ChatMessage::set_allocated_payload(::chat::FilePayload* PROTOBUF_NULLABLE value) {
+inline void ChatMessage::set_allocated_payload(::FilePayload* PROTOBUF_NULLABLE value) {
   ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (message_arena == nullptr) {
@@ -1080,8 +1113,8 @@ inline void ChatMessage::set_allocated_payload(::chat::FilePayload* PROTOBUF_NUL
     _impl_._has_bits_[0] &= ~0x00000008u;
   }
 
-  _impl_.payload_ = reinterpret_cast<::chat::FilePayload*>(value);
-  // @@protoc_insertion_point(field_set_allocated:chat.ChatMessage.payload)
+  _impl_.payload_ = reinterpret_cast<::FilePayload*>(value);
+  // @@protoc_insertion_point(field_set_allocated:ChatMessage.payload)
 }
 
 #ifdef __GNUC__
@@ -1089,7 +1122,6 @@ inline void ChatMessage::set_allocated_payload(::chat::FilePayload* PROTOBUF_NUL
 #endif  // __GNUC__
 
 // @@protoc_insertion_point(namespace_scope)
-}  // namespace chat
 
 
 // @@protoc_insertion_point(global_scope)

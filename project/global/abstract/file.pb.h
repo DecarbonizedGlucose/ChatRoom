@@ -212,8 +212,9 @@ class ChatFile final : public ::google::protobuf::Message
   enum : int {
     kTypeFieldNumber = 1,
     kFileNameFieldNumber = 2,
-    kFileHashFieldNumber = 3,
-    kContentFieldNumber = 4,
+    kFileHashFieldNumber = 4,
+    kContentFieldNumber = 5,
+    kFileSizeFieldNumber = 3,
   };
   // string type = 1;
   void clear_type() ;
@@ -245,7 +246,7 @@ class ChatFile final : public ::google::protobuf::Message
   ::std::string* PROTOBUF_NONNULL _internal_mutable_file_name();
 
   public:
-  // string file_hash = 3;
+  // string file_hash = 4;
   void clear_file_hash() ;
   const ::std::string& file_hash() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -260,7 +261,7 @@ class ChatFile final : public ::google::protobuf::Message
   ::std::string* PROTOBUF_NONNULL _internal_mutable_file_hash();
 
   public:
-  // bytes content = 4;
+  // bytes content = 5;
   void clear_content() ;
   const ::std::string& content() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -275,11 +276,21 @@ class ChatFile final : public ::google::protobuf::Message
   ::std::string* PROTOBUF_NONNULL _internal_mutable_content();
 
   public:
+  // int64 file_size = 3;
+  void clear_file_size() ;
+  ::int64_t file_size() const;
+  void set_file_size(::int64_t value);
+
+  private:
+  ::int64_t _internal_file_size() const;
+  void _internal_set_file_size(::int64_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:ChatFile)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<2, 4,
+  static const ::google::protobuf::internal::TcParseTable<3, 5,
                                    0, 39,
                                    2>
       _table_;
@@ -305,6 +316,7 @@ class ChatFile final : public ::google::protobuf::Message
     ::google::protobuf::internal::ArenaStringPtr file_name_;
     ::google::protobuf::internal::ArenaStringPtr file_hash_;
     ::google::protobuf::internal::ArenaStringPtr content_;
+    ::int64_t file_size_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -459,7 +471,31 @@ inline void ChatFile::set_allocated_file_name(::std::string* PROTOBUF_NULLABLE v
   // @@protoc_insertion_point(field_set_allocated:ChatFile.file_name)
 }
 
-// string file_hash = 3;
+// int64 file_size = 3;
+inline void ChatFile::clear_file_size() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.file_size_ = ::int64_t{0};
+  _impl_._has_bits_[0] &= ~0x00000010u;
+}
+inline ::int64_t ChatFile::file_size() const {
+  // @@protoc_insertion_point(field_get:ChatFile.file_size)
+  return _internal_file_size();
+}
+inline void ChatFile::set_file_size(::int64_t value) {
+  _internal_set_file_size(value);
+  _impl_._has_bits_[0] |= 0x00000010u;
+  // @@protoc_insertion_point(field_set:ChatFile.file_size)
+}
+inline ::int64_t ChatFile::_internal_file_size() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.file_size_;
+}
+inline void ChatFile::_internal_set_file_size(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.file_size_ = value;
+}
+
+// string file_hash = 4;
 inline void ChatFile::clear_file_hash() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.file_hash_.ClearToEmpty();
@@ -524,7 +560,7 @@ inline void ChatFile::set_allocated_file_hash(::std::string* PROTOBUF_NULLABLE v
   // @@protoc_insertion_point(field_set_allocated:ChatFile.file_hash)
 }
 
-// bytes content = 4;
+// bytes content = 5;
 inline void ChatFile::clear_content() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.content_.ClearToEmpty();

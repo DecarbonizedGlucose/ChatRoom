@@ -8,7 +8,7 @@
 #include "file.hpp"
 #include <memory>
 
-using ChatMessage = chat::ChatMessage;
+using ChatMessage = ChatMessage;
 using ChatMessagePtr = std::shared_ptr<ChatMessage>;
 
 /*

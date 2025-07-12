@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <memory>
+#include <mutex>
 #include "../../global/include/file.hpp"
 #include "../../global/include/message.hpp"
 #include "../include/ioaction.hpp"
@@ -27,6 +28,10 @@ class Socket {
 protected:
     int fd = -1;
 
+    std::string ip;
+    uint16_t port = 0;
+    sockaddr_in addr;
+
 public:
     explicit Socket(int fd);
     Socket(const Socket&) = delete;
@@ -35,17 +40,19 @@ public:
     Socket(Socket&& other) noexcept;
     virtual ~Socket() = 0;
 
-    int getFd() const { return fd; }
+    int get_fd() const { return fd; }
+    std::string get_ip() const { return ip; }
+    uint16_t get_port() const { return port; }
     virtual void bind(const std::string& ip, uint16_t port) = 0;
     virtual bool listen() = 0;
 };
 
 class DataSocket : public Socket {
 protected:
-    std::vector<char> buf;
-    std::string ip;
-    uint16_t port = 0;
-    sockaddr_in addr;
+    std::vector<char> read_buf;
+    std::vector<char> write_buf;
+    std::mutex read_mutex;
+    std::mutex write_mutex;
 
 public:
     explicit DataSocket(int fd) : Socket(fd) {}
@@ -59,9 +66,8 @@ public:
     ChatMessagePtr receive_message();
     bool send_message(const ChatMessagePtr& message);
 
-    // 用在文件类消息收发函数内部
-    //bool receive_file(const ChatFilePtr& file); // 不是这么玩的
-    //bool send_file(const ChatFilePtr& file);
+    //bool receive_file(const FilePtr& file); // 文件消息分离，大文件分块（TODO）
+    //bool send_file(const FilePtr& file);
 
     CommandPtr receive_command();
     bool send_command(const CommandPtr& command);
@@ -91,9 +97,6 @@ public:
 
 class ListenSocket : public Socket {
 private:
-    std::string ip;
-    uint16_t port = 0;
-    sockaddr_in addr;
     bool binded = false;
 
 public:

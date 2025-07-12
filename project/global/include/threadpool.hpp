@@ -147,20 +147,28 @@ public:
         m_TaskQueue.clear();
     }
 
-    template<typename F, typename... Args>
-    auto submit(F&& f, Args&&... args) -> std::future<decltype(std::forward<F>(f)(std::forward<Args>(args)...))> {
-        using return_type = decltype(std::forward<F>(f)(std::forward<Args>(args)...));
-        std::function<return_type()> task_func = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
-        auto task_ptr = std::make_shared<std::packaged_task<return_type()>>(task_func);
-        std::function<void()> l_func = [task_ptr]() {
-            (*task_ptr)();
-        };
+    // template<typename F, typename... Args>
+    // auto submit(F&& f, Args&&... args) -> std::future<decltype(std::forward<F>(f)(std::forward<Args>(args)...))> {
+    //     using return_type = decltype(std::forward<F>(f)(std::forward<Args>(args)...));
+    //     std::function<return_type()> task_func = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
+    //     auto task_ptr = std::make_shared<std::packaged_task<return_type()>>(task_func);
+    //     std::function<void()> l_func = [task_ptr]() {
+    //         (*task_ptr)();
+    //     };
+    //     if (pool_status != 0) {
+    //         return std::future<return_type>();
+    //     }
+    //     m_TaskQueue.push(l_func);
+    //     m_Condition.notify_one();
+    //     return task_ptr->get_future();
+    // }
+
+    void submit(std::function<void()> func) {
         if (pool_status != 0) {
-            return std::future<return_type>();
+            return;
         }
-        m_TaskQueue.push(l_func);
+        m_TaskQueue.push(std::move(func));
         m_Condition.notify_one();
-        return task_ptr->get_future();
     }
 };
 

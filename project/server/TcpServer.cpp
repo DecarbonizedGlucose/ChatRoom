@@ -1,104 +1,106 @@
 #include "include/TcpServer.hpp"
-#include "include/callbacks.hpp"
 #include <iostream>
 
-TS::TcpServer() {
-    pr = std::make_shared<rea>();
-    listen_conn = std::make_shared<LSocket>();
+TcpServer::TcpServer() {
+    pr = std::make_shared<reactor>();
+    listen_conn = std::make_shared<ListenSocket>();
 }
 
-TS::TcpServer(const std::string& ip, uint16_t port, sa_family_t family) {
-    pr = std::make_shared<rea>();
-    listen_conn = std::make_shared<LSocket>(ip, port, family);
+TcpServer::TcpServer(const std::string& ip, uint16_t port, sa_family_t family) {
+    pr = std::make_shared<reactor>();
+    listen_conn = std::make_shared<ListenSocket>(ip, port);
 }
 
-TS::~TcpServer() {
+TcpServer::~TcpServer() {
     listen_conn.reset();
     pr.reset();
     pool.reset();
 }
 
-int TS::get_lfd() const {
-    return listen_conn ? listen_conn->getFd() : -1;
+int TcpServer::get_lfd() const {
+    return listen_conn ? listen_conn->get_fd() : -1;
 }
 
-int TS::get_efd() const {
+int TcpServer::get_efd() const {
     return pr ? pr->get_epoll_fd() : -1;
 }
 
-void TS::set_thread_pool(std::shared_ptr<thread_pool> pool) {
+void TcpServer::init(std::shared_ptr<thread_pool> pool) {
     this->pool = pool;
-}
-
-bool TS::listen_init(void (*first_func)(event<>*)) { // 这必须改
+    // 监听不用write event, 更不用创建TcpServerConnection
     if (!listen_conn->listen()) {
-        std::cerr << "Failed to start listening on " << listen_conn->getFd() << ": " << strerror(errno) << '\n';
-        return false;
+    pr.reset();
+    pool.reset();
+
+        throw std::runtime_error("Failed to start listening on " + listen_conn->get_ip() + ":" + std::to_string(listen_conn->get_port()) + ": " + strerror(errno));
     }
-    // 这里不用智能指针是因为，reactor内部已经管理得当
-    event<>* ev = new event(listen_conn, EPOLLIN | EPOLLET);
-    std::function<void()> cb = std::bind(first_func, ev);
-    ev->bind_with(pr.get());
-    if (!pr->add_event(ev)) {
-        // 不用担心listen_conn被析构，因为它是在event里是shared_ptr
-        delete ev;
-        std::cerr << "Failed to add listening event to reactor: " << strerror(errno) << '\n';
-        return false;
+    event* read_event = new event(listen_conn->get_fd(), EPOLLIN | EPOLLET);
+    read_event->bind_with(pr->shared_from_this());
+    if (!pr->add_event(read_event)) {
+        delete read_event;
+        throw std::runtime_error("Failed to add listening events to reactor: " + std::string(strerror(errno)));
     }
-    ev->add_to_reactor();
-    return true;
+    read_event->add_to_reactor();
 }
 
-void TS::accept_connections(std::function<std::any()> cb) {
-    std::shared_ptr<ASocket> new_conn = listen_conn->accept();
-    // fcntl had set non-blocking in make_shared<ASocket>
-    event<>* new_event = new event(new_conn, EPOLLIN | EPOLLONESHOT, cb);
-    new_event->bind_with(pr.get());
-    if (!pr->add_event(new_event)) {
-        delete new_event;
-        throw std::runtime_error("Failed to add new connection event to reactor\n");
-    }
-    new_event->add_to_reactor();
-}
-
-void TS::launch() {
+void TcpServer::start() {
     running = true;
-    int nready;
+    // main loop
     while (running) {
-        nready = pr->wait();
-        if (nready < 0) {
+        int num_ready = pr->wait();
+        if (num_ready < 0) {
             if (errno == EINTR) {
-                continue; // 被信号打断，继续等待
+                continue; // 被打断
             }
-            throw std::runtime_error("Epoll wait failed: " + std::string(strerror(errno)) + '\n');
-        } else if (nready == 0) {
-            continue; // 超时，没有事件发生
+            std::cerr << "Epoll wait failed: " << strerror(errno) << '\n';
+            running = false;
+            break; // Exit on error
+        } else if (num_ready == 0) {
+            continue; // 超时，无事发生
         }
-        for (int i = 0; i < nready; ++i) {
+        // 轮询
+        for (int i = 0; i < num_ready; ++i) {
             auto ev = pr->epoll_events[i];
-            if (ev.events & EPOLLIN || ev.events & EPOLLOUT) {
-                event<>* e = static_cast<event<>*>(ev.data.ptr);
-                // if (pool) {
-                //     pool->submit([e]() {
-                //         e->call_back();
-                //     });
-                // } else {
-                //     e->call_back();
-                // }
-                // 我异步获取呢？必须改
+            event* event_ptr = static_cast<event*>(ev.data.ptr);
+            // 先拉出来listen_conn的事件
+            if (event_ptr->get_sockfd() == listen_conn->get_fd()) {
+                this->pool->submit([this]() {
+                    this->auto_accept();
+                });
+                continue;
+            }
+            // 区分读写，分发事件
+            if (ev.events & EPOLLIN) {
+                // 读事件 谁知道你要读什么 扔进调度器
+            }
+            else {
+                // 写事件 可以直接写 也要扔进调度器
             }
         }
     }
 }
 
-void TS::stop() {
-    running = false;
+void TcpServer::stop() {}
+
+void TcpServer::auto_accept() {
+    auto new_conn = listen_conn->accept();
+    if (!new_conn) {
+        std::cerr << "Failed to accept new connection: " << strerror(errno) << '\n';
+        return;
+    }
+    event* read_event = new event(new_conn->get_fd(), EPOLLIN | EPOLLET);
+    read_event->bind_with(pr->shared_from_this());
+    event* write_event = new event(new_conn->get_fd(), EPOLLOUT | EPOLLET);
+    write_event->bind_with(pr->shared_from_this());
+    if (!pr->add_event(read_event) || !pr->add_event(write_event)) {
+        delete read_event;
+        delete write_event;
+        return;
+    }
+    read_event->add_to_reactor();
+    write_event->add_to_reactor();
+    //TcpServerConnection* conn = new TcpServerConnection(pr->shared_from_this(), disp);
+    //user_connections[conn->get_user_id()] = conn;
 }
 
-// void TS::transfer_content(const std::string& user_ID, const MesPtr& message) {
-//     event<>* ev = conn_manager->get_user_event(user_ID);
-//     // 再封装一层吧
-// }
-
-// void TS::transfer_content(const std::string& user_ID, const CommandPtr& command) {
-// }
+void TcpServer::heartbeat_monitor_loop(int interval_sec, int timeout_sec) {}

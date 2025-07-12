@@ -8,9 +8,11 @@ arch/manjaro:
 ~~~sh
 yay -S openssl
 yay -S protobuf
+yay -S redis-plus-plus
 ~~~
 debian/ubuntu:
 ~~~sh
 sudo apt install openssl
 sudo apt install protobuf-compiler libprotobuf-dev
+sudo apt install libhiredis-dev libssl-dev
 ~~~

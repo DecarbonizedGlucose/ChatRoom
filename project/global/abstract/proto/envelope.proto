@@ -1,0 +1,9 @@
+// envelope.proto
+syntax = "proto3";
+
+import "google/protobuf/any.proto";
+
+message Envelope {
+  string user_id = 1;
+  google.protobuf.Any payload = 2;
+}

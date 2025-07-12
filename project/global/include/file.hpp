@@ -11,8 +11,8 @@ using ChatFilePtr = std::shared_ptr<ChatFile>;
 class File {
 public:
     ChatFilePtr chat_file = nullptr; // data通道的ChatFile(protobuf)
-    std::string file_name;      // 文件名
-    std::string local_path;     // 本地路径, 发送时忽略这项
+    std::string file_name;
+    std::string local_path;
     std::string file_hash;
     off_t file_size;            // using off_t = long;
     int fd = -1;

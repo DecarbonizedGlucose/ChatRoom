@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+import "message.proto";
+
+message FileChunk {
+  string file_id = 1;               // 文件唯一标识（可使用UUID）
+  string filename = 2;             // 原始文件名
+  bytes data = 3;                  // 实际数据内容（建议 64KB 以下）
+
+  uint32 chunk_index = 4;         // 当前分片序号（从0开始）
+  uint32 total_chunks = 5;        // 总分片数量
+  bool is_last_chunk = 6;         // 可选标志
+  string sender_id = 7;
+  string receiver_id = 8;
+}
+
+// 不到啊，AI补的
+message SyncItem {
+  enum SyncType {
+    FRIEND_UPDATE = 0;
+    GROUP_UPDATE = 1;
+    BE_KICKED = 2;
+    FRIEND_REQUEST = 3;
+  }
+
+  SyncType type = 1;
+  string content = 2; // JSON或protobuf序列化的结构，或直接写字段
+}
+
+message OfflineMessages {
+  repeated ChatMessage messages = 1; // 一个50条左右
+}
+

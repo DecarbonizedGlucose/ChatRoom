@@ -35,27 +35,27 @@ ssize_t DataSocket::receive(size_t size) {
     if (fd < 0) {
         return -1;
     }
-    return ::read_from(fd, buf, size);
+    return ::read_from(fd, read_buf, size);
 }
 
 ssize_t DataSocket::send(size_t size) {
     if (fd < 0) {
         return -1;
     }
-    return ::write_to(fd, buf, size);
+    return ::write_to(fd, write_buf, size);
 }
 
 ssize_t DataSocket::send_with_size() {
     if (fd < 0) {
         return -1;
     }
-    size_t size = buf.size();
+    size_t size = write_buf.size();
     ssize_t sent = ::write_size_to(fd, &size);
     return send(size);
 }
 
 bool DataSocket::send_protocol(std::string& proto) {
-    this->buf.assign(proto.begin(), proto.end());
+    this->write_buf.assign(proto.begin(), proto.end());
     return send_with_size() > 0;
 }
 
@@ -68,12 +68,12 @@ bool DataSocket::receive_protocol(std::string& proto) {
     if (received <= 0) {
         return false; // Failed to read size or no data
     }
-    buf.resize(size);
+    read_buf.resize(size);
     received = receive(size);
     if (received <= 0) {
         return false; // Failed to read message content
     }
-    proto.assign(buf.begin(), buf.end());
+    proto.assign(read_buf.begin(), read_buf.end());
     return true;
 }
 

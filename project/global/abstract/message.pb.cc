@@ -24,7 +24,6 @@ PROTOBUF_PRAGMA_INIT_SEG
 namespace _pb = ::google::protobuf;
 namespace _pbi = ::google::protobuf::internal;
 namespace _fl = ::google::protobuf::internal::field_layout;
-namespace chat {
 
 inline constexpr FilePayload::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
@@ -71,6 +70,7 @@ inline constexpr ChatMessage::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         payload_{nullptr},
         timestamp_{::int64_t{0}},
+        is_group_{false},
         pin_{false} {}
 
 template <typename>
@@ -92,7 +92,6 @@ struct ChatMessageDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ChatMessageDefaultTypeInternal _ChatMessage_default_instance_;
-}  // namespace chat
 static constexpr const ::_pb::EnumDescriptor *PROTOBUF_NONNULL *PROTOBUF_NULLABLE
     file_level_enum_descriptors_message_2eproto = nullptr;
 static constexpr const ::_pb::ServiceDescriptor *PROTOBUF_NONNULL *PROTOBUF_NULLABLE
@@ -101,54 +100,56 @@ const ::uint32_t
     TableStruct_message_2eproto::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
         protodesc_cold) = {
         0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::chat::FilePayload, _impl_._has_bits_),
+        PROTOBUF_FIELD_OFFSET(::FilePayload, _impl_._has_bits_),
         6, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::chat::FilePayload, _impl_.file_name_),
-        PROTOBUF_FIELD_OFFSET(::chat::FilePayload, _impl_.file_size_),
-        PROTOBUF_FIELD_OFFSET(::chat::FilePayload, _impl_.file_hash_),
+        PROTOBUF_FIELD_OFFSET(::FilePayload, _impl_.file_name_),
+        PROTOBUF_FIELD_OFFSET(::FilePayload, _impl_.file_size_),
+        PROTOBUF_FIELD_OFFSET(::FilePayload, _impl_.file_hash_),
         0,
         2,
         1,
         0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::chat::ChatMessage, _impl_._has_bits_),
-        9, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::chat::ChatMessage, _impl_.sender_),
-        PROTOBUF_FIELD_OFFSET(::chat::ChatMessage, _impl_.receiver_),
-        PROTOBUF_FIELD_OFFSET(::chat::ChatMessage, _impl_.timestamp_),
-        PROTOBUF_FIELD_OFFSET(::chat::ChatMessage, _impl_.text_),
-        PROTOBUF_FIELD_OFFSET(::chat::ChatMessage, _impl_.pin_),
-        PROTOBUF_FIELD_OFFSET(::chat::ChatMessage, _impl_.payload_),
+        PROTOBUF_FIELD_OFFSET(::ChatMessage, _impl_._has_bits_),
+        10, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::ChatMessage, _impl_.sender_),
+        PROTOBUF_FIELD_OFFSET(::ChatMessage, _impl_.receiver_),
+        PROTOBUF_FIELD_OFFSET(::ChatMessage, _impl_.is_group_),
+        PROTOBUF_FIELD_OFFSET(::ChatMessage, _impl_.timestamp_),
+        PROTOBUF_FIELD_OFFSET(::ChatMessage, _impl_.text_),
+        PROTOBUF_FIELD_OFFSET(::ChatMessage, _impl_.pin_),
+        PROTOBUF_FIELD_OFFSET(::ChatMessage, _impl_.payload_),
         0,
         1,
+        5,
         4,
         2,
-        5,
+        6,
         3,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
-        {0, sizeof(::chat::FilePayload)},
-        {9, sizeof(::chat::ChatMessage)},
+        {0, sizeof(::FilePayload)},
+        {9, sizeof(::ChatMessage)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
-    &::chat::_FilePayload_default_instance_._instance,
-    &::chat::_ChatMessage_default_instance_._instance,
+    &::_FilePayload_default_instance_._instance,
+    &::_ChatMessage_default_instance_._instance,
 };
 const char descriptor_table_protodef_message_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\rmessage.proto\022\004chat\"F\n\013FilePayload\022\021\n\t"
-    "file_name\030\001 \001(\t\022\021\n\tfile_size\030\002 \001(\003\022\021\n\tfi"
-    "le_hash\030\003 \001(\t\"\201\001\n\013ChatMessage\022\016\n\006sender\030"
-    "\001 \001(\t\022\020\n\010receiver\030\002 \001(\t\022\021\n\ttimestamp\030\003 \001"
-    "(\003\022\014\n\004text\030\004 \001(\t\022\013\n\003pin\030\005 \001(\010\022\"\n\007payload"
-    "\030\006 \001(\0132\021.chat.FilePayloadb\006proto3"
+    "\n\rmessage.proto\"F\n\013FilePayload\022\021\n\tfile_n"
+    "ame\030\001 \001(\t\022\021\n\tfile_size\030\002 \001(\003\022\021\n\tfile_has"
+    "h\030\003 \001(\t\"\216\001\n\013ChatMessage\022\016\n\006sender\030\001 \001(\t\022"
+    "\020\n\010receiver\030\002 \001(\t\022\020\n\010is_group\030\003 \001(\010\022\021\n\tt"
+    "imestamp\030\004 \001(\003\022\014\n\004text\030\005 \001(\t\022\013\n\003pin\030\006 \001("
+    "\010\022\035\n\007payload\030\007 \001(\0132\014.FilePayloadb\006proto3"
 };
 static ::absl::once_flag descriptor_table_message_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_message_2eproto = {
     false,
     false,
-    233,
+    240,
     descriptor_table_protodef_message_2eproto,
     "message.proto",
     &descriptor_table_message_2eproto_once,
@@ -161,7 +162,6 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_message_2eprot
     file_level_enum_descriptors_message_2eproto,
     file_level_service_descriptors_message_2eproto,
 };
-namespace chat {
 // ===================================================================
 
 class FilePayload::_Internal {
@@ -179,12 +179,12 @@ FilePayload::FilePayload(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:chat.FilePayload)
+  // @@protoc_insertion_point(arena_constructor:FilePayload)
 }
 PROTOBUF_NDEBUG_INLINE FilePayload::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    const ::chat::FilePayload& from_msg)
+    const ::FilePayload& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         file_name_(arena, from.file_name_),
@@ -205,7 +205,7 @@ FilePayload::FilePayload(
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   _impl_.file_size_ = from._impl_.file_size_;
 
-  // @@protoc_insertion_point(copy_constructor:chat.FilePayload)
+  // @@protoc_insertion_point(copy_constructor:FilePayload)
 }
 PROTOBUF_NDEBUG_INLINE FilePayload::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
@@ -219,7 +219,7 @@ inline void FilePayload::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   _impl_.file_size_ = {};
 }
 FilePayload::~FilePayload() {
-  // @@protoc_insertion_point(destructor:chat.FilePayload)
+  // @@protoc_insertion_point(destructor:FilePayload)
   SharedDtor(*this);
 }
 inline void FilePayload::SharedDtor(MessageLite& self) {
@@ -274,7 +274,7 @@ FilePayload::GetClassData() const {
   return FilePayload_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 3, 0, 43, 2>
+const ::_pbi::TcParseTable<2, 3, 0, 38, 2>
 FilePayload::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(FilePayload, _impl_._has_bits_),
@@ -290,7 +290,7 @@ FilePayload::_table_ = {
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
     #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-    ::_pbi::TcParser::GetTable<::chat::FilePayload>(),  // to_prefetch
+    ::_pbi::TcParser::GetTable<::FilePayload>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
@@ -318,14 +318,14 @@ FilePayload::_table_ = {
   }},
   // no aux_entries
   {{
-    "\20\11\0\11\0\0\0\0"
-    "chat.FilePayload"
+    "\13\11\0\11\0\0\0\0"
+    "FilePayload"
     "file_name"
     "file_hash"
   }},
 };
 PROTOBUF_NOINLINE void FilePayload::Clear() {
-// @@protoc_insertion_point(message_clear_start:chat.FilePayload)
+// @@protoc_insertion_point(message_clear_start:FilePayload)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
@@ -356,7 +356,7 @@ PROTOBUF_NOINLINE void FilePayload::Clear() {
     ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
   const FilePayload& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(serialize_to_array_start:chat.FilePayload)
+  // @@protoc_insertion_point(serialize_to_array_start:FilePayload)
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
@@ -365,7 +365,7 @@ PROTOBUF_NOINLINE void FilePayload::Clear() {
     if (!this_._internal_file_name().empty()) {
       const ::std::string& _s = this_._internal_file_name();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "chat.FilePayload.file_name");
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "FilePayload.file_name");
       target = stream->WriteStringMaybeAliased(1, _s, target);
     }
   }
@@ -384,7 +384,7 @@ PROTOBUF_NOINLINE void FilePayload::Clear() {
     if (!this_._internal_file_hash().empty()) {
       const ::std::string& _s = this_._internal_file_hash();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "chat.FilePayload.file_hash");
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "FilePayload.file_hash");
       target = stream->WriteStringMaybeAliased(3, _s, target);
     }
   }
@@ -394,7 +394,7 @@ PROTOBUF_NOINLINE void FilePayload::Clear() {
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
             this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
   }
-  // @@protoc_insertion_point(serialize_to_array_end:chat.FilePayload)
+  // @@protoc_insertion_point(serialize_to_array_end:FilePayload)
   return target;
 }
 
@@ -405,7 +405,7 @@ PROTOBUF_NOINLINE void FilePayload::Clear() {
 ::size_t FilePayload::ByteSizeLong() const {
   const FilePayload& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:chat.FilePayload)
+  // @@protoc_insertion_point(message_byte_size_start:FilePayload)
   ::size_t total_size = 0;
 
   ::uint32_t cached_has_bits = 0;
@@ -444,7 +444,7 @@ PROTOBUF_NOINLINE void FilePayload::Clear() {
 void FilePayload::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::google::protobuf::MessageLite& from_msg) {
   auto* const _this = static_cast<FilePayload*>(&to_msg);
   auto& from = static_cast<const FilePayload&>(from_msg);
-  // @@protoc_insertion_point(class_specific_merge_from_start:chat.FilePayload)
+  // @@protoc_insertion_point(class_specific_merge_from_start:FilePayload)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
@@ -480,7 +480,7 @@ void FilePayload::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::goo
 }
 
 void FilePayload::CopyFrom(const FilePayload& from) {
-// @@protoc_insertion_point(class_specific_copy_from_start:chat.FilePayload)
+// @@protoc_insertion_point(class_specific_copy_from_start:FilePayload)
   if (&from == this) return;
   Clear();
   MergeFrom(from);
@@ -518,12 +518,12 @@ ChatMessage::ChatMessage(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
     : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:chat.ChatMessage)
+  // @@protoc_insertion_point(arena_constructor:ChatMessage)
 }
 PROTOBUF_NDEBUG_INLINE ChatMessage::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    const ::chat::ChatMessage& from_msg)
+    const ::ChatMessage& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         sender_(arena, from.sender_),
@@ -555,7 +555,7 @@ ChatMessage::ChatMessage(
                offsetof(Impl_, timestamp_) +
                sizeof(Impl_::pin_));
 
-  // @@protoc_insertion_point(copy_constructor:chat.ChatMessage)
+  // @@protoc_insertion_point(copy_constructor:ChatMessage)
 }
 PROTOBUF_NDEBUG_INLINE ChatMessage::Impl_::Impl_(
     ::google::protobuf::internal::InternalVisibility visibility,
@@ -575,7 +575,7 @@ inline void ChatMessage::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
                sizeof(Impl_::pin_));
 }
 ChatMessage::~ChatMessage() {
-  // @@protoc_insertion_point(destructor:chat.ChatMessage)
+  // @@protoc_insertion_point(destructor:ChatMessage)
   SharedDtor(*this);
 }
 inline void ChatMessage::SharedDtor(MessageLite& self) {
@@ -632,23 +632,23 @@ ChatMessage::GetClassData() const {
   return ChatMessage_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 6, 1, 43, 2>
+const ::_pbi::TcParseTable<3, 7, 1, 38, 2>
 ChatMessage::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_._has_bits_),
     0, // no _extensions_
-    6, 56,  // max_field_number, fast_idx_mask
+    7, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967232,  // skipmap
+    4294967168,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    6,  // num_field_entries
+    7,  // num_field_entries
     1,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     ChatMessage_class_data_.base(),
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
     #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-    ::_pbi::TcParser::GetTable<::chat::ChatMessage>(),  // to_prefetch
+    ::_pbi::TcParser::GetTable<::ChatMessage>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
@@ -658,19 +658,21 @@ ChatMessage::_table_ = {
     // string receiver = 2;
     {::_pbi::TcParser::FastUS1,
      {18, 1, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.receiver_)}},
-    // int64 timestamp = 3;
+    // bool is_group = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ChatMessage, _impl_.is_group_), 5>(),
+     {24, 5, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.is_group_)}},
+    // int64 timestamp = 4;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ChatMessage, _impl_.timestamp_), 4>(),
-     {24, 4, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.timestamp_)}},
-    // string text = 4;
+     {32, 4, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.timestamp_)}},
+    // string text = 5;
     {::_pbi::TcParser::FastUS1,
-     {34, 2, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.text_)}},
-    // bool pin = 5;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ChatMessage, _impl_.pin_), 5>(),
-     {40, 5, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.pin_)}},
-    // .chat.FilePayload payload = 6;
+     {42, 2, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.text_)}},
+    // bool pin = 6;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ChatMessage, _impl_.pin_), 6>(),
+     {48, 6, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.pin_)}},
+    // .FilePayload payload = 7;
     {::_pbi::TcParser::FastMtS1,
-     {50, 3, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.payload_)}},
-    {::_pbi::TcParser::MiniParse, {}},
+     {58, 3, 0, PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.payload_)}},
   }}, {{
     65535, 65535
   }}, {{
@@ -680,32 +682,35 @@ ChatMessage::_table_ = {
     // string receiver = 2;
     {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.receiver_), _Internal::kHasBitsOffset + 1, 0,
     (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // int64 timestamp = 3;
+    // bool is_group = 3;
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.is_group_), _Internal::kHasBitsOffset + 5, 0,
+    (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // int64 timestamp = 4;
     {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.timestamp_), _Internal::kHasBitsOffset + 4, 0,
     (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-    // string text = 4;
+    // string text = 5;
     {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.text_), _Internal::kHasBitsOffset + 2, 0,
     (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // bool pin = 5;
-    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.pin_), _Internal::kHasBitsOffset + 5, 0,
+    // bool pin = 6;
+    {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.pin_), _Internal::kHasBitsOffset + 6, 0,
     (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    // .chat.FilePayload payload = 6;
+    // .FilePayload payload = 7;
     {PROTOBUF_FIELD_OFFSET(ChatMessage, _impl_.payload_), _Internal::kHasBitsOffset + 3, 0,
     (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
   }},
   {{
-      {::_pbi::TcParser::GetTable<::chat::FilePayload>()},
+      {::_pbi::TcParser::GetTable<::FilePayload>()},
   }},
   {{
-    "\20\6\10\0\4\0\0\0"
-    "chat.ChatMessage"
+    "\13\6\10\0\0\4\0\0"
+    "ChatMessage"
     "sender"
     "receiver"
     "text"
   }},
 };
 PROTOBUF_NOINLINE void ChatMessage::Clear() {
-// @@protoc_insertion_point(message_clear_start:chat.ChatMessage)
+// @@protoc_insertion_point(message_clear_start:ChatMessage)
   ::google::protobuf::internal::TSanWrite(&_impl_);
   ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
@@ -727,7 +732,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
       _impl_.payload_->Clear();
     }
   }
-  if ((cached_has_bits & 0x00000030u) != 0) {
+  if ((cached_has_bits & 0x00000070u) != 0) {
     ::memset(&_impl_.timestamp_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.pin_) -
         reinterpret_cast<char*>(&_impl_.timestamp_)) + sizeof(_impl_.pin_));
@@ -747,7 +752,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
     ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
   const ChatMessage& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(serialize_to_array_start:chat.ChatMessage)
+  // @@protoc_insertion_point(serialize_to_array_start:ChatMessage)
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
@@ -756,7 +761,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
     if (!this_._internal_sender().empty()) {
       const ::std::string& _s = this_._internal_sender();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "chat.ChatMessage.sender");
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "ChatMessage.sender");
       target = stream->WriteStringMaybeAliased(1, _s, target);
     }
   }
@@ -766,44 +771,53 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
     if (!this_._internal_receiver().empty()) {
       const ::std::string& _s = this_._internal_receiver();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "chat.ChatMessage.receiver");
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "ChatMessage.receiver");
       target = stream->WriteStringMaybeAliased(2, _s, target);
     }
   }
 
-  // int64 timestamp = 3;
+  // bool is_group = 3;
+  if ((this_._impl_._has_bits_[0] & 0x00000020u) != 0) {
+    if (this_._internal_is_group() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          3, this_._internal_is_group(), target);
+    }
+  }
+
+  // int64 timestamp = 4;
   if ((this_._impl_._has_bits_[0] & 0x00000010u) != 0) {
     if (this_._internal_timestamp() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
               stream, this_._internal_timestamp(), target);
     }
   }
 
-  // string text = 4;
+  // string text = 5;
   if ((this_._impl_._has_bits_[0] & 0x00000004u) != 0) {
     if (!this_._internal_text().empty()) {
       const ::std::string& _s = this_._internal_text();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "chat.ChatMessage.text");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "ChatMessage.text");
+      target = stream->WriteStringMaybeAliased(5, _s, target);
     }
   }
 
-  // bool pin = 5;
-  if ((this_._impl_._has_bits_[0] & 0x00000020u) != 0) {
+  // bool pin = 6;
+  if ((this_._impl_._has_bits_[0] & 0x00000040u) != 0) {
     if (this_._internal_pin() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          5, this_._internal_pin(), target);
+          6, this_._internal_pin(), target);
     }
   }
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // .chat.FilePayload payload = 6;
+  // .FilePayload payload = 7;
   if ((cached_has_bits & 0x00000008u) != 0) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        6, *this_._impl_.payload_, this_._impl_.payload_->GetCachedSize(), target,
+        7, *this_._impl_.payload_, this_._impl_.payload_->GetCachedSize(), target,
         stream);
   }
 
@@ -812,7 +826,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
             this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
   }
-  // @@protoc_insertion_point(serialize_to_array_end:chat.ChatMessage)
+  // @@protoc_insertion_point(serialize_to_array_end:ChatMessage)
   return target;
 }
 
@@ -823,7 +837,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
 ::size_t ChatMessage::ByteSizeLong() const {
   const ChatMessage& this_ = *this;
 #endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:chat.ChatMessage)
+  // @@protoc_insertion_point(message_byte_size_start:ChatMessage)
   ::size_t total_size = 0;
 
   ::uint32_t cached_has_bits = 0;
@@ -832,7 +846,7 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if ((cached_has_bits & 0x0000003fu) != 0) {
+  if ((cached_has_bits & 0x0000007fu) != 0) {
     // string sender = 1;
     if ((cached_has_bits & 0x00000001u) != 0) {
       if (!this_._internal_sender().empty()) {
@@ -847,27 +861,33 @@ PROTOBUF_NOINLINE void ChatMessage::Clear() {
                                         this_._internal_receiver());
       }
     }
-    // string text = 4;
+    // string text = 5;
     if ((cached_has_bits & 0x00000004u) != 0) {
       if (!this_._internal_text().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_text());
       }
     }
-    // .chat.FilePayload payload = 6;
+    // .FilePayload payload = 7;
     if ((cached_has_bits & 0x00000008u) != 0) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.payload_);
     }
-    // int64 timestamp = 3;
+    // int64 timestamp = 4;
     if ((cached_has_bits & 0x00000010u) != 0) {
       if (this_._internal_timestamp() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp());
       }
     }
-    // bool pin = 5;
+    // bool is_group = 3;
     if ((cached_has_bits & 0x00000020u) != 0) {
+      if (this_._internal_is_group() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool pin = 6;
+    if ((cached_has_bits & 0x00000040u) != 0) {
       if (this_._internal_pin() != 0) {
         total_size += 2;
       }
@@ -881,13 +901,13 @@ void ChatMessage::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::goo
   auto* const _this = static_cast<ChatMessage*>(&to_msg);
   auto& from = static_cast<const ChatMessage&>(from_msg);
   ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:chat.ChatMessage)
+  // @@protoc_insertion_point(class_specific_merge_from_start:ChatMessage)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if ((cached_has_bits & 0x0000003fu) != 0) {
+  if ((cached_has_bits & 0x0000007fu) != 0) {
     if ((cached_has_bits & 0x00000001u) != 0) {
       if (!from._internal_sender().empty()) {
         _this->_internal_set_sender(from._internal_sender());
@@ -929,6 +949,11 @@ void ChatMessage::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::goo
       }
     }
     if ((cached_has_bits & 0x00000020u) != 0) {
+      if (from._internal_is_group() != 0) {
+        _this->_impl_.is_group_ = from._impl_.is_group_;
+      }
+    }
+    if ((cached_has_bits & 0x00000040u) != 0) {
       if (from._internal_pin() != 0) {
         _this->_impl_.pin_ = from._impl_.pin_;
       }
@@ -939,7 +964,7 @@ void ChatMessage::MergeImpl(::google::protobuf::MessageLite& to_msg, const ::goo
 }
 
 void ChatMessage::CopyFrom(const ChatMessage& from) {
-// @@protoc_insertion_point(class_specific_copy_from_start:chat.ChatMessage)
+// @@protoc_insertion_point(class_specific_copy_from_start:ChatMessage)
   if (&from == this) return;
   Clear();
   MergeFrom(from);
@@ -967,7 +992,6 @@ void ChatMessage::InternalSwap(ChatMessage* PROTOBUF_RESTRICT PROTOBUF_NONNULL o
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)
-}  // namespace chat
 namespace google {
 namespace protobuf {
 }  // namespace protobuf
