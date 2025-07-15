@@ -15,15 +15,16 @@ private:
     std::shared_ptr<reactor> pr = nullptr;              // 反应堆, 事件丢到这里
     std::shared_ptr<ListenSocket> listen_conn = nullptr; // 监听套接字(属于event,这里仅仅拉出来)
     std::shared_ptr<thread_pool> pool = nullptr;    // (外援)线程池, 事件回调丢这里
-    // 连接池进程内放着，用户在线状态存到redis中
-    //std::unordered_map<std::string, TcpServerConnection*> user_connections; // 用户连接池, user_ID -> TcpServerConnection
-    Dispatcher* disp = nullptr; // 分发器, 事件分发到这里
     bool running = false;
 
 public:
-    friend class Dispatcher;
-    TcpServer();
-    TcpServer(const std::string& ip, uint16_t port, sa_family_t family = AF_INET);
+    // 连接池进程内放着，用户在线状态存到redis中
+    std::unordered_map<std::string, TcpServerConnection*> user_connections; // 用户连接池, user_ID -> TcpServerConnection
+    Dispatcher* disp = nullptr; // 分发器, 事件分发到这里
+    int idx;
+
+    TcpServer(int idx);
+    TcpServer(int idx, const std::string& ip, uint16_t port);
     ~TcpServer();
 
     // 获取fd
@@ -31,13 +32,11 @@ public:
     int get_efd() const;
 
     // 配置和初始化
-    void init(std::shared_ptr<thread_pool> pool);
+    void init(std::shared_ptr<thread_pool> pool, RedisController* re, Dispatcher* disp);
     void start();
     void stop();
     void auto_accept();
     void heartbeat_monitor_loop(int interval_sec = 60, int timeout_sec = 90); // 心跳监控
 };
-
-using TcpServer = TcpServer;
 
 #endif

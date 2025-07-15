@@ -11,6 +11,7 @@
 #include <any>
 #include <memory>
 #include <stdexcept>
+#include "../../server/include/TcpServerConnection.hpp"
 
 class reactor;
 class event;
@@ -99,11 +100,11 @@ public:
     }
 };
 
-enum class event_state {
-    Writeable,
-    Readable,
-    Free
-};
+// enum class event_state {
+//     Writeable,
+//     Readable,
+//     Free
+// };
 
 class event {
 private:
@@ -113,16 +114,20 @@ private:
     int events = 0; // EPOLLIN, EPOLLOUT, etc.
 
 public:
+    std::shared_ptr<TcpServerConnection> conn = nullptr;
     std::shared_ptr<reactor> pr = nullptr;
     std::function<void()> call_back_func = nullptr;
     //std::any last_return;
-    event_state state = event_state::Free;
+    //event_state state = event_state::Free;
 
-    event(int fd, int ev, std::function<void()> cb)
-        : fd(fd), events(ev), call_back_func(cb) {}
+    event(int fd, int ev, std::shared_ptr<TcpServerConnection> conn, std::function<void()> cb)
+        : fd(fd), events(ev), conn(conn), call_back_func(cb) {}
 
     event(int fd, int ev)
         : fd(fd), events(ev) {}
+
+    event(int fd, int ev, std::shared_ptr<TcpServerConnection> conn)
+        : fd(fd), events(ev), conn(conn) {}
 
     event() = delete;
     event(const event&) = delete;
@@ -207,6 +212,10 @@ public:
 
     int get_sockfd() const {
         return fd;
+    }
+
+    void set_sockfd(int new_fd) {
+        fd = new_fd;
     }
 };
 

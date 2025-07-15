@@ -11,22 +11,27 @@
 #include "../../global/abstract/message.pb.h"
 #include "../../global/abstract/data.pb.h"
 #include "handler.hpp"
+#include "../database/redis.hpp"
 
 class Dispatcher {
 public:
     //using Task = std::function<void()>;
+    TcpServer* server[3];
+    RedisController* redis_con = nullptr;
 
-    Dispatcher();
+    Dispatcher(RedisController* re);
+    ~Dispatcher();
 
-    void dispatch(const std::string& proto_str, const TcpServerConnectionPtr& conn);
-    void process();
+    void add_server(TcpServer* server, int idx);
+    void dispatch_recv(const TcpServerConnectionPtr& conn);
+    void dispatch_send(const TcpServerConnectionPtr& conn);
 
 private:
-    CommandHandler* cmd_handler = nullptr;
-    MessageHandler* msg_handler = nullptr;
+    CommandHandler* command_handler = nullptr;
+    MessageHandler* message_handler = nullptr;
     FileHandler* file_handler = nullptr;
     SyncHandler* sync_handler = nullptr;
-    OfflineMessageHandler* offline_msg_handler = nullptr;
+    OfflineMessageHandler* offline_message_handler = nullptr;
 };
 
 #endif

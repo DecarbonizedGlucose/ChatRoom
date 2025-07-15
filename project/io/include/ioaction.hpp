@@ -4,6 +4,7 @@
 #include <vector>
 #include <cerrno>
 #include <cstdio>
+#include <string>
 
 namespace io {
     ssize_t err = ssize_t(-1);
@@ -48,7 +49,7 @@ again:
     return n;
 }
 
-ssize_t read_from(int fd, std::vector<char>& buf, size_t size = io::err) {
+ssize_t read_from(int fd, std::string& buf, size_t size = io::err) {
     if (fd < 0) {
         return io::err;
     }
@@ -57,7 +58,7 @@ ssize_t read_from(int fd, std::vector<char>& buf, size_t size = io::err) {
     size_t total = 0;
     while (size == io::err || total < size) {
         size_t to_read = BUFSIZ;
-        if (size == io::err) {
+        if (size != io::err) {
             to_read = std::min((size_t)BUFSIZ, size - total);
         }
         n = read(fd, tmp, to_read);
@@ -70,15 +71,16 @@ ssize_t read_from(int fd, std::vector<char>& buf, size_t size = io::err) {
         } else if (n == 0) {
             return (ssize_t)total;
         }
-        buf.insert(buf.end(), tmp, tmp + n);
+        buf.append(tmp, n);
         total += n;
         if (size != io::err && total >= size) {
             break;
         }
     }
+    return total;
 }
 
-ssize_t write_to(int fd, const std::vector<char>& buf, size_t size = io::err) {
+ssize_t write_to(int fd, const std::string& buf, size_t size = io::err) {
     if (fd < 0) {
         return io::err;
     }

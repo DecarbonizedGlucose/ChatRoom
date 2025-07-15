@@ -6,11 +6,11 @@
 
 /* ----- Socket ----- */
 
-Socket::Socket(int fd) : fd(fd) {
+Socket::Socket(int fd, bool nonblock) : fd(fd) {
     if (fd < 0) {
         throw std::runtime_error("Invalid file descriptor");
     }
-    if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0) {
+    if (nonblock && fcntl(fd, F_SETFL, O_NONBLOCK) < 0) {
         close(fd);
         this->fd = -1;
         throw std::runtime_error("Failed to set socket to non-blocking: " + std::string(strerror(errno)));
@@ -31,18 +31,36 @@ Socket& Socket::operator=(Socket&& other) noexcept {
 
 /* ----- DataSocket ----- */
 
+void DataSocket::get_read_buf(std::string& buf) {
+    std::lock_guard<std::mutex> lock(read_mutex);
+    buf.assign(read_buf.begin(), read_buf.end());
+}
+
+void DataSocket::set_write_buf(const std::string& buf) {
+    std::lock_guard<std::mutex> lock(write_mutex);
+    write_buf.assign(buf.begin(), buf.end());
+}
+
 ssize_t DataSocket::receive(size_t size) {
     if (fd < 0) {
         return -1;
     }
-    return ::read_from(fd, read_buf, size);
+    ssize_t res; {
+        std::lock_guard<std::mutex> lock(read_mutex);
+        res = ::read_from(fd, read_buf, size);
+    }
+    return res;
 }
 
 ssize_t DataSocket::send(size_t size) {
     if (fd < 0) {
         return -1;
     }
-    return ::write_to(fd, write_buf, size);
+    ssize_t res; {
+        std::lock_guard<std::mutex> lock(write_mutex);
+        res = ::write_to(fd, write_buf, size);
+    }
+    return res;
 }
 
 ssize_t DataSocket::send_with_size() {
@@ -77,63 +95,9 @@ bool DataSocket::receive_protocol(std::string& proto) {
     return true;
 }
 
-ChatMessagePtr DataSocket::receive_message() {
-    if (fd < 0) {
-        return nullptr; // Invalid socket
-    }
-    std::string proto;
-    if (!receive_protocol(proto)) {
-        return nullptr; // Failed to receive protocol
-    }
-    auto message = std::make_shared<ChatMessage>();
-    if (!message->ParseFromString(proto)) {
-        return nullptr; // Failed to parse message
-    }
-    return message;
-}
-
-bool DataSocket::send_message(const ChatMessagePtr& chat_message) {
-    std::string proto;
-    chat_message->SerializeToString(&proto);
-    return send_protocol(proto);
-}
-
-CommandPtr DataSocket::receive_command() {
-    if (fd < 0) {
-        return nullptr; // Invalid socket
-    }
-    std::string proto;
-    if (!receive_protocol(proto)) {
-        return nullptr; // Failed to receive protocol
-    }
-    auto command = std::make_shared<CommandRequest>();
-    if (!command->ParseFromString(proto)) {
-        return nullptr; // Failed to parse command
-    }
-    return command;
-}
-
-bool DataSocket::send_command(const CommandPtr& command) {
-    std::string proto;
-    command->SerializeToString(&proto);
-    return send_protocol(proto);
-}
-
-// 收发文件？？不用json，用protocol
-// TODO
-
-// 发送大量(拉取)数据的函数？？
-// TODO
-
 /* ----- AcceptedSocket ----- */
 
 /* ----- ConnectSocket ----- */
-
-CSocket::ConnectSocket(const std::string& ip, uint16_t port)
-    : DataSocket(socket(AF_INET, SOCK_STREAM, 0)) {
-    this->ip = ip;
-    this->port = port;
-}
 
 bool CSocket::connect() {
     if (connected) {
@@ -168,37 +132,35 @@ bool CSocket::disconnect() {
 
 /* ----- ListenSocket ----- */
 
-LSocket::ListenSocket() : Socket(socket(AF_INET, SOCK_STREAM, 0)) {
+LSocket::ListenSocket(bool nonblock) : Socket(socket(AF_INET, SOCK_STREAM, 0), nonblock) {
     if (fd < 0) {
         throw std::runtime_error("Failed to create socket");
     }
 }
 
-LSocket::ListenSocket(const std::string& ip, uint16_t port)
-    : Socket(socket(AF_INET, SOCK_STREAM, 0)) {
+LSocket::ListenSocket(const std::string& ip, uint16_t port, bool nonblock)
+    : Socket(socket(AF_INET, SOCK_STREAM, 0), nonblock), ip(ip), port(port) {
     if (fd < 0) {
         throw std::runtime_error("Failed to create socket");
     }
-    bind(ip, port);
 }
 
-void LSocket::bind(const std::string& ip, uint16_t port) {
-    this-> ip = ip;
-    this->port = port;
+bool LSocket::bind() {
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0) {
-        throw std::runtime_error("Invalid IP address: " + ip);
+        return false;
     }
     int opt = 1;
     // 端口复用
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        throw std::runtime_error("Failed to set socket options: " + std::string(strerror(errno)));
+        return false;
     }
     if (::bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
-        throw std::runtime_error("Failed to bind socket to " + ip + ":" + std::to_string(port));
+        return false;
     }
     this->binded = true;
+    return true;
 }
 
 bool LSocket::listen() {
@@ -208,7 +170,7 @@ bool LSocket::listen() {
     return true;
 }
 
-std::shared_ptr<ASocket> LSocket::accept() {
+ASocketPtr LSocket::accept() {
     if (!binded) {
         throw std::runtime_error("Socket is not binded");
     }

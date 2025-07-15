@@ -1,12 +1,12 @@
 #include "include/TcpServer.hpp"
 #include <iostream>
 
-TcpServer::TcpServer() {
+TcpServer::TcpServer(int idx) : idx(idx) {
     pr = std::make_shared<reactor>();
     listen_conn = std::make_shared<ListenSocket>();
 }
 
-TcpServer::TcpServer(const std::string& ip, uint16_t port, sa_family_t family) {
+TcpServer::TcpServer(int idx, const std::string& ip, uint16_t port) : idx(idx) {
     pr = std::make_shared<reactor>();
     listen_conn = std::make_shared<ListenSocket>(ip, port);
 }
@@ -25,13 +25,14 @@ int TcpServer::get_efd() const {
     return pr ? pr->get_epoll_fd() : -1;
 }
 
-void TcpServer::init(std::shared_ptr<thread_pool> pool) {
+void TcpServer::init(std::shared_ptr<thread_pool> pool, RedisController* re, Dispatcher* disp) {
     this->pool = pool;
+    this->disp = disp;
+    disp->add_server(this, idx);
     // 监听不用write event, 更不用创建TcpServerConnection
-    if (!listen_conn->listen()) {
-    pr.reset();
-    pool.reset();
-
+    if (!(listen_conn->bind() && listen_conn->listen())) {
+        pr.reset();
+        pool.reset();
         throw std::runtime_error("Failed to start listening on " + listen_conn->get_ip() + ":" + std::to_string(listen_conn->get_port()) + ": " + strerror(errno));
     }
     event* read_event = new event(listen_conn->get_fd(), EPOLLIN | EPOLLET);
@@ -71,10 +72,18 @@ void TcpServer::start() {
             }
             // 区分读写，分发事件
             if (ev.events & EPOLLIN) {
-                // 读事件 谁知道你要读什么 扔进调度器
+                // 读事件
+                pool->submit([event_ptr]() {
+                    event_ptr->conn->dispatcher \
+                    ->dispatch_recv(event_ptr->conn);
+                });
             }
             else {
-                // 写事件 可以直接写 也要扔进调度器
+                // 写事件
+                pool->submit([event_ptr]() {
+                    event_ptr->conn->dispatcher \
+                    ->dispatch_send(event_ptr->conn);
+                });
             }
         }
     }
@@ -88,18 +97,19 @@ void TcpServer::auto_accept() {
         std::cerr << "Failed to accept new connection: " << strerror(errno) << '\n';
         return;
     }
-    event* read_event = new event(new_conn->get_fd(), EPOLLIN | EPOLLET);
+    auto conn = std::make_shared<TcpServerConnection>(pr->shared_from_this(), disp);
+    event* read_event = new event(new_conn->get_fd(), EPOLLIN | EPOLLET, conn);
     read_event->bind_with(pr->shared_from_this());
-    event* write_event = new event(new_conn->get_fd(), EPOLLOUT | EPOLLET);
+    event* write_event = new event(new_conn->get_fd(), EPOLLOUT | EPOLLET, conn);
     write_event->bind_with(pr->shared_from_this());
     if (!pr->add_event(read_event) || !pr->add_event(write_event)) {
         delete read_event;
         delete write_event;
+        conn.reset();
         return;
     }
     read_event->add_to_reactor();
     write_event->add_to_reactor();
-    //TcpServerConnection* conn = new TcpServerConnection(pr->shared_from_this(), disp);
     //user_connections[conn->get_user_id()] = conn;
 }
 

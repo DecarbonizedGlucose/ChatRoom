@@ -1,0 +1,6 @@
+#ifndef TERMINAL_INPUT_HPP
+#define TERMINAL_INPUT_HPP
+
+
+
+#endif

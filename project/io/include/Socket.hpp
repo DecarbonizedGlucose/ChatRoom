@@ -33,7 +33,7 @@ protected:
     sockaddr_in addr;
 
 public:
-    explicit Socket(int fd);
+    explicit Socket(int fd, bool nonblock = false);
     Socket(const Socket&) = delete;
     Socket& operator=(const Socket&) = delete;
     Socket& operator=(Socket&& other) noexcept;
@@ -43,19 +43,24 @@ public:
     int get_fd() const { return fd; }
     std::string get_ip() const { return ip; }
     uint16_t get_port() const { return port; }
-    virtual void bind(const std::string& ip, uint16_t port) = 0;
+    void set_ip(const std::string& ip) { this->ip = ip; }
+    void set_port(uint16_t port) { this->port = port; }
+    virtual bool bind() = 0;
     virtual bool listen() = 0;
 };
 
 class DataSocket : public Socket {
 protected:
-    std::vector<char> read_buf;
-    std::vector<char> write_buf;
+    std::string read_buf;
+    std::string write_buf;
     std::mutex read_mutex;
     std::mutex write_mutex;
 
 public:
-    explicit DataSocket(int fd) : Socket(fd) {}
+    explicit DataSocket(int fd, bool nonblock = false) : Socket(fd, nonblock) {}
+
+    void get_read_buf(std::string& buf);
+    void set_write_buf(const std::string& buf);
 
     ssize_t receive(size_t size = io::err);
     ssize_t send(size_t size = io::err);
@@ -63,32 +68,26 @@ public:
     bool send_protocol(std::string& proto);
     bool receive_protocol(std::string& proto);
 
-    ChatMessagePtr receive_message();
-    bool send_message(const ChatMessagePtr& message);
-
-    //bool receive_file(const FilePtr& file); // 文件消息分离，大文件分块（TODO）
-    //bool send_file(const FilePtr& file);
-
-    CommandPtr receive_command();
-    bool send_command(const CommandPtr& command);
-
-    void bind(const std::string& ip, uint16_t port) override final {}
-    bool listen() override final {}
+    bool bind() override {}
+    bool listen() override {}
 };
 
 class AcceptedSocket : public DataSocket {
 public:
     AcceptedSocket() = delete;
-    explicit AcceptedSocket(int fd) : DataSocket(fd) {}
+    explicit AcceptedSocket(int fd, bool nonblock = false) : DataSocket(fd, nonblock) {}
 };
 
 class ConnectSocket : public DataSocket {
 private:
     bool connected = false;
+    std::string ip;
+    uint16_t port = 0;
 
 public:
     ConnectSocket() = delete;
-    ConnectSocket(const std::string& ip, uint16_t port);
+    ConnectSocket(const std::string& ip, uint16_t port, bool nonblock = false)
+        : DataSocket(socket(AF_INET, SOCK_STREAM, 0), nonblock), ip(ip), port(port) {}
 
     bool connect();
     bool disconnect();
@@ -98,15 +97,17 @@ public:
 class ListenSocket : public Socket {
 private:
     bool binded = false;
+    std::string ip;
+    uint16_t port = 0;
 
 public:
-    ListenSocket();
-    ListenSocket(const std::string& ip, uint16_t port);
+    ListenSocket(bool nonblock = false);
+    ListenSocket(const std::string& ip, uint16_t port, bool nonblock = false);
 
-    void bind(const std::string& ip, uint16_t port) override;
+    bool bind();
     bool listen();
     bool isBinded() const { return binded; }
-    std::shared_ptr<AcceptedSocket> accept();
+    ASocketPtr accept();
 };
 
 using ASocket = AcceptedSocket;

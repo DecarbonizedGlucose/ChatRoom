@@ -9,10 +9,15 @@ arch/manjaro:
 yay -S openssl
 yay -S protobuf
 yay -S redis-plus-plus
+sudo pacman -S mariadb mariadb-connector-c
+sudo pacman -S nlohmann-json
 ~~~
 debian/ubuntu:
 ~~~sh
 sudo apt install openssl
 sudo apt install protobuf-compiler libprotobuf-dev
 sudo apt install libhiredis-dev libssl-dev
+sudo apt install # mysql ???
+sudo apt install libmysqlclient-dev
+sudo apt install nlohmann-json3-dev
 ~~~
