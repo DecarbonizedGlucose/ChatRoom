@@ -1,25 +1,27 @@
-#ifndef TCP_CLIENT_HPP
-#define TCP_CLIENT_HPP
+#pragma once
 
 #include "../../io/include/Socket.hpp"
+#include "../../global/include/safe_queue.hpp"
 #include <string>
 #include <memory>
 #include <utility>
+#include <thread>
 
-namespace set_addr {
+namespace set_addr_c {
     using Addr = std::pair<std::string, uint16_t>;
-    Addr client_addr[3];
+    extern Addr client_addr[3];
 
-    bool fetch_addr() {}
+    bool fetch_addr_from_config();
 }
 
 class TcpClient {
-private:
-    CSocketPtr socket; // 直接拥有socket
-
 public:
+    CSocketPtr socket;
+    safe_queue<std::string> send_queue;
+
     TcpClient(std::string server_ip, uint16_t server_port) {
         socket = std::make_shared<ConnectSocket>(server_ip, server_port);
+
     }
 
     void start() {
@@ -30,7 +32,3 @@ public:
         socket->disconnect();
     }
 };
-
-using TcpClientPtr = std::shared_ptr<TcpClient>;
-
-#endif // TCP_CLIENT_HPP

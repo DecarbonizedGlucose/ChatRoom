@@ -1,5 +1,4 @@
-#ifndef HANDLER_HPP
-#define HANDLER_HPP
+#pragma once
 
 #include <google/protobuf/message.h>
 #include "../../global/abstract/envelope.pb.h"
@@ -14,6 +13,10 @@
 #include <vector>
 #include <memory>
 #include <queue> // 扩展用，比如消息队列/任务队列
+
+class Dispatcher;
+class TcpServer;
+class TcpServerConnection;
 
 class Handler {
 public:
@@ -75,8 +78,112 @@ public:
     void handle_recv(const CommandRequest& command, const std::string& ostr) {
         // 处理命令
         Action action = (Action)command.action();
+        std::string subj = command.sender();
+        auto args = command.args();
+        switch (action) {
+            // 这段比较折磨了
+            case Action::Sign_In: {
+                break;
+            }
+            case Action::Sign_Out: {
+                break;
+            }
+            case Action::Register: {
+                break;
+            }
+            case Action::Get_Veri_Code: {
+                handle_send_veri_code(subj);
+                break;
+            }
+            case Action::Find_Password: {
+                break;
+            }
+            case Action::Change_Password: {
 
+            }
+            case Action::Change_Username: {
+                break;
+            }
+            case Action::Authentication: {
+                break;
+            }
+            case Action::Add_Friend: {
+                break;
+            }
+            case Action::Remove_Friend: {
+                break;
+            }
+            case Action::Search_Person: {
+                break;
+            }
+            case Action::Create_Group: {
+                break;
+            }
+            case Action::Join_Group: {
+                break;
+            }
+            case Action::Leave_Group: {
+                break;
+            }
+            case Action::Disband_Group: {
+                break;
+            }
+            case Action::Invite_To_Group: {
+                break;
+            }
+            case Action::Remove_From_Group: {
+                break;
+            }
+            case Action::Search_Group: {
+                break;
+            }
+            case Action::Add_Admin: {
+                break;
+            }
+            case Action::Remove_Admin: {
+                break;
+            }
+            case Action::Get_Relation_Net: {
+                break;
+            }
+            case Action::Download_File: {
+                break;
+            }
+            default: {
+                // 未知命令
+                // 可以考虑记录日志
+                break;
+            }
+        }
     }
+
+    void handle_send(const CommandRequest& command, const std::string& ostr) {
+        
+    }
+
+private:
+    void handle_sign_in();
+    void handle_sign_out();
+    void handle_register();
+    void handle_send_veri_code(std::string subj); // no args
+    void handle_find_password();
+    void handle_change_password();
+    void handle_change_username();
+    void handle_authentication();
+    void handle_add_friend();
+    void handle_remove_friend();
+    void handle_search_person();
+    void handle_create_group();
+    void handle_join_group();
+    void handle_leave_group();
+    void handle_disband_group();
+    void handle_invite_to_group();
+    void handle_remove_from_group();
+    void handle_search_group();
+    void handle_add_admin();
+    void handle_remove_admin();
+    void handle_get_relation_net();
+    void handle_download_file();
 };
 
 /* -------------- Data -------------- */
@@ -111,5 +218,3 @@ public:
         // 处理离线消息
     }
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef MESSAGE_HPP
-#define MESSAGE_HPP
+#pragma once
 
 #include <ctime>
 #include <string>
@@ -43,7 +42,5 @@ using ChatMessagePtr = std::shared_ptr<ChatMessage>;
 //ChatMessagePtr getChatMessagePtr(const MessagePtr& message);
 ChatMessagePtr getChatMessagePtr(
     const std::string& sender, const std::string& receiver,
-    const std::string& text = "", bool pin = false,
-    const ChatFilePtr& cfileptr = nullptr, size_t file_size);
-
-#endif
+    const std::string& text, bool pin,
+    const ChatFilePtr& cfileptr, size_t file_size);

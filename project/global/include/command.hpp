@@ -1,5 +1,4 @@
-#ifndef COMMAND_HPP
-#define COMMAND_HPP
+#pragma once
 
 #include "action.hpp"
 #include <memory>
@@ -44,5 +43,3 @@ data: {
 //         {"sender", sender},
 //         {"args", json::array()} // 空数组
 //     }) {}
-
-#endif

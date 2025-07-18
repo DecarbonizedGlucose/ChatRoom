@@ -1,4 +1,5 @@
 #include "../include/Socket.hpp"
+#include "../../global/include/logging.hpp"
 #include <stdexcept>
 #include <unistd.h>
 #include <fcntl.h>
@@ -27,6 +28,33 @@ Socket& Socket::operator=(Socket&& other) noexcept {
         other.fd = -1;
     }
     return *this;
+}
+
+Socket::~Socket() {
+    if (fd >= 0) {
+        close(fd);
+    }
+    fd = -1;
+}
+
+int Socket::get_fd() const {
+    return fd;
+}
+
+std::string Socket::get_ip() const {
+    return ip;
+}
+
+uint16_t Socket::get_port() const {
+    return port;
+}
+
+void Socket::set_ip(const std::string& ip) {
+    this->ip = ip;
+}
+
+void Socket::set_port(uint16_t port) {
+    this->port = port;
 }
 
 /* ----- DataSocket ----- */
@@ -72,8 +100,8 @@ ssize_t DataSocket::send_with_size() {
     return send(size);
 }
 
-bool DataSocket::send_protocol(std::string& proto) {
-    this->write_buf.assign(proto.begin(), proto.end());
+bool DataSocket::send_protocol(const std::string& proto) {
+    this->write_buf = proto;
     return send_with_size() > 0;
 }
 
@@ -97,13 +125,22 @@ bool DataSocket::receive_protocol(std::string& proto) {
 
 /* ----- AcceptedSocket ----- */
 
+AcceptedSocket::AcceptedSocket(int fd, bool nonblock) : DataSocket(fd, nonblock) {
+    if (fd < 0) {
+        log_error("Tried to create AcceptedSocket with invalid fd: {}", fd);
+        throw std::runtime_error("Failed to create AcceptedSocket");
+    }
+}
+
 /* ----- ConnectSocket ----- */
 
 bool CSocket::connect() {
     if (connected) {
-        return true; // Already connected
+        log_error("CSocket: Tried to connect twice");
+        return false;
     }
     if (fd < 0) {
+        log_error("CSocket: Invalid socket");
         return false; // Invalid socket
     }
     addr.sin_family = AF_INET;
@@ -115,18 +152,26 @@ bool CSocket::connect() {
         throw std::runtime_error("Failed to connect to " + ip + ":" + std::to_string(port) + " - " + std::string(strerror(errno)));
     }
     connected = true;
+    log_info("CSocket connected to {}:{}", ip, port);
     return true;
+}
+
+bool CSocket::is_connected() const {
+    return connected;
 }
 
 bool CSocket::disconnect() {
     if (!connected || fd < 0) {
-        return true; // Already disconnected
+        log_error("CSocket: Tried to disconnect without a valid connection");
+        return false;
     }
     if (close(fd) < 0) {
+        log_error("CSocket: Failed to close socket: {}", strerror(errno));
         throw std::runtime_error("Failed to close socket: " + std::string(strerror(errno)));
     }
     fd = -1;
     connected = false;
+    log_info("CSocket disconnected from {}:{}", ip, port);
     return true;
 }
 
@@ -134,6 +179,7 @@ bool CSocket::disconnect() {
 
 LSocket::ListenSocket(bool nonblock) : Socket(socket(AF_INET, SOCK_STREAM, 0), nonblock) {
     if (fd < 0) {
+        log_error("Tried to create ListenSocket with invalid fd: {}", fd);
         throw std::runtime_error("Failed to create socket");
     }
 }
@@ -141,6 +187,7 @@ LSocket::ListenSocket(bool nonblock) : Socket(socket(AF_INET, SOCK_STREAM, 0), n
 LSocket::ListenSocket(const std::string& ip, uint16_t port, bool nonblock)
     : Socket(socket(AF_INET, SOCK_STREAM, 0), nonblock), ip(ip), port(port) {
     if (fd < 0) {
+        log_error("Tried to create ListenSocket with invalid fd: {}", fd);
         throw std::runtime_error("Failed to create socket");
     }
 }
@@ -149,34 +196,46 @@ bool LSocket::bind() {
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0) {
+        log_error("Invalid IP address: {}:{}", ip, port);
         return false;
     }
     int opt = 1;
     // 端口复用
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        log_error("设置端口复用失败: {}", strerror(errno));
         return false;
     }
     if (::bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
+        log_error("Listen socket 绑定失败: {}", strerror(errno));
         return false;
     }
     this->binded = true;
+    log_info("ListenSocket 绑定到 {}:{}", ip, port);
     return true;
+}
+
+bool LSocket::isBinded() const {
+    return binded;
 }
 
 bool LSocket::listen() {
     if (::listen(fd, SOMAXCONN) < 0) {
+        log_error("Failed to listen on ListenSocket: {}", strerror(errno));
         return false;
     }
+    log_info("ListenSocket is now listening on {}:{}", ip, port);
     return true;
 }
 
-ASocketPtr LSocket::accept() {
+std::unique_ptr<ASocket> LSocket::accept() {
     if (!binded) {
         throw std::runtime_error("Socket is not binded");
     }
     int client_fd = ::accept(fd, nullptr, nullptr);
     if (client_fd < 0) {
+        log_error("Failed to accept connection: {}", strerror(errno));
         throw std::runtime_error("Failed to accept connection: " + std::string(strerror(errno)));
     }
-    return std::make_shared<ASocket>(client_fd);
+    log_info("ListenSocket accepted connection on fd: {}", client_fd);
+    return std::move(std::make_unique<ASocket>(client_fd));
 }

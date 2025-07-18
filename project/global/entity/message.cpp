@@ -10,8 +10,8 @@
 // }
 
 ChatMessagePtr getChatMessagePtr(const std::string& sender,
-    const std::string& receiver, const std::string& text = "",
-    bool pin = false, const ChatFilePtr& cfileptr = nullptr,
+    const std::string& receiver, const std::string& text,
+    bool pin, const ChatFilePtr& cfileptr,
     size_t file_size) {
     auto message = std::make_shared<ChatMessage>();
     message->set_sender(sender);

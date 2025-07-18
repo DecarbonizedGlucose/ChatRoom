@@ -1,5 +1,4 @@
-#ifndef DISPATCHER_HPP
-#define DISPATCHER_HPP
+#pragma once
 
 #include <memory>
 #include <unordered_map>
@@ -10,8 +9,15 @@
 #include "../../global/abstract/command.pb.h"
 #include "../../global/abstract/message.pb.h"
 #include "../../global/abstract/data.pb.h"
-#include "handler.hpp"
 #include "../database/redis.hpp"
+
+class TcpServer;
+class TcpServerConnection;
+class CommandHandler;
+class MessageHandler;
+class FileHandler;
+class SyncHandler;
+class OfflineMessageHandler;
 
 class Dispatcher {
 public:
@@ -23,8 +29,8 @@ public:
     ~Dispatcher();
 
     void add_server(TcpServer* server, int idx);
-    void dispatch_recv(const TcpServerConnectionPtr& conn);
-    void dispatch_send(const TcpServerConnectionPtr& conn);
+    void dispatch_recv(const TcpServerConnection* conn);
+    void dispatch_send(const TcpServerConnection* conn);
 
 private:
     CommandHandler* command_handler = nullptr;
@@ -33,5 +39,3 @@ private:
     SyncHandler* sync_handler = nullptr;
     OfflineMessageHandler* offline_message_handler = nullptr;
 };
-
-#endif

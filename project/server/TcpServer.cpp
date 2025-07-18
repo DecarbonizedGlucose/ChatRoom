@@ -1,20 +1,38 @@
 #include "include/TcpServer.hpp"
-#include <iostream>
+#include "../global/include/logging.hpp"
+#include "../../io/include/reactor.hpp"
+#include "database/redis.hpp"
 
-TcpServer::TcpServer(int idx) : idx(idx) {
-    pr = std::make_shared<reactor>();
-    listen_conn = std::make_shared<ListenSocket>();
+namespace set_addr_s {
+    Addr server_addr[3];
+    bool fetch_addr_from_config() {
+        set_addr_s::server_addr[0] = {"127.0.0.1", 9527};
+        set_addr_s::server_addr[1] = {"127.0.0.1", 9528};
+        set_addr_s::server_addr[2] = {"127.0.0.1", 9529};
+        log_info("模拟读取了所有socket地址{}:{}, {}:{}, {}:{}",
+                 set_addr_s::server_addr[0].first, set_addr_s::server_addr[0].second,
+                 set_addr_s::server_addr[1].first, set_addr_s::server_addr[1].second,
+                 set_addr_s::server_addr[2].first, set_addr_s::server_addr[2].second);
+        return true;
+    }
 }
 
-TcpServer::TcpServer(int idx, const std::string& ip, uint16_t port) : idx(idx) {
-    pr = std::make_shared<reactor>();
-    listen_conn = std::make_shared<ListenSocket>(ip, port);
+TcpServer::TcpServer(int idx) : idx(idx) {
+    pr = new reactor();
+    listen_conn = new ListenSocket(
+        set_addr_s::server_addr[idx].first,
+        set_addr_s::server_addr[idx].second
+    );
+}
+
+TcpServer::TcpServer(int idx, const std::string& ip, uint16_t port) : idx(idx) { // 这函数写的有点多余
+    pr = new reactor();
+    listen_conn = new ListenSocket(ip, port);
 }
 
 TcpServer::~TcpServer() {
-    listen_conn.reset();
-    pr.reset();
-    pool.reset();
+    delete listen_conn;
+    delete pr;
 }
 
 int TcpServer::get_lfd() const {
@@ -25,18 +43,15 @@ int TcpServer::get_efd() const {
     return pr ? pr->get_epoll_fd() : -1;
 }
 
-void TcpServer::init(std::shared_ptr<thread_pool> pool, RedisController* re, Dispatcher* disp) {
+void TcpServer::init(thread_pool* pool, RedisController* re, Dispatcher* disp) {
     this->pool = pool;
     this->disp = disp;
     disp->add_server(this, idx);
     // 监听不用write event, 更不用创建TcpServerConnection
     if (!(listen_conn->bind() && listen_conn->listen())) {
-        pr.reset();
-        pool.reset();
         throw std::runtime_error("Failed to start listening on " + listen_conn->get_ip() + ":" + std::to_string(listen_conn->get_port()) + ": " + strerror(errno));
     }
     event* read_event = new event(listen_conn->get_fd(), EPOLLIN | EPOLLET);
-    read_event->bind_with(pr->shared_from_this());
     if (!pr->add_event(read_event)) {
         delete read_event;
         throw std::runtime_error("Failed to add listening events to reactor: " + std::string(strerror(errno)));
@@ -89,23 +104,29 @@ void TcpServer::start() {
     }
 }
 
-void TcpServer::stop() {}
+void TcpServer::stop() {
+    running = false;
+    if (pr) {
+        delete pr;
+        pr = nullptr;
+    }
+    log_info("Tcp server {} stopped", idx);
+}
 
 void TcpServer::auto_accept() {
-    auto new_conn = listen_conn->accept();
-    if (!new_conn) {
-        std::cerr << "Failed to accept new connection: " << strerror(errno) << '\n';
+    auto new_sock = listen_conn->accept();
+    if (!new_sock) {
+        log_error("Failed to accept new connection: {}", strerror(errno));
         return;
     }
-    auto conn = std::make_shared<TcpServerConnection>(pr->shared_from_this(), disp);
-    event* read_event = new event(new_conn->get_fd(), EPOLLIN | EPOLLET, conn);
-    read_event->bind_with(pr->shared_from_this());
-    event* write_event = new event(new_conn->get_fd(), EPOLLOUT | EPOLLET, conn);
-    write_event->bind_with(pr->shared_from_this());
+    auto conn = new TcpServerConnection(pr, disp);
+    conn->socket = std::move(new_sock);
+    event* read_event = new event(new_sock->get_fd(), EPOLLIN | EPOLLET, conn);
+    event* write_event = new event(new_sock->get_fd(), EPOLLOUT | EPOLLET, conn);
     if (!pr->add_event(read_event) || !pr->add_event(write_event)) {
         delete read_event;
         delete write_event;
-        conn.reset();
+        delete conn;
         return;
     }
     read_event->add_to_reactor();

@@ -1,5 +1,4 @@
-#ifndef CONN_MANA_HPP
-#define CONN_MANA_HPP
+#pragma once
 
 #include "../../io/include/Socket.hpp"
 #include "../../io/include/reactor.hpp"
@@ -21,5 +20,3 @@ public:
 
 using CM = ConnectionManager;
 using UserEventMap = std::unordered_map<std::string, event*>;
-
-#endif

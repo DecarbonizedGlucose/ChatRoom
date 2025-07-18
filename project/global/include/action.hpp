@@ -1,5 +1,4 @@
-#ifndef ACTION_HPP
-#define ACTION_HPP
+#pragma once
 
 /*
  * enum class Action 描述了各种用户行为和系统操作
@@ -13,10 +12,10 @@ enum class Action {
     Sign_In,                      // 登录
     Sign_Out,                     // 登出
     Register,                     // 注册
+    Get_Veri_Code,                // 获取验证码
     Find_Password,                // 找回密码*
     Change_Password,              // 修改密码
     Change_Username,              // 修改用户名
-    Change_Email,                 // 修改邮箱*
     Authentication,               // 身份验证
 
     /*      私信行为      */
@@ -35,9 +34,9 @@ enum class Action {
     Add_Admin,                    // 添加管理员
     Remove_Admin,                 // 移除管理员
 
+    Get_Relation_Net,             // 获取关系网
+
     /*      消息行为      */
     Download_File,                // 下载文件
     
 };
-
-#endif

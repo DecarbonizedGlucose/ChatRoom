@@ -1,5 +1,4 @@
-#ifndef FILE_HPP
-#define FILE_HPP
+#pragma once
 
 #include <string>
 #include <memory>
@@ -35,5 +34,3 @@ FilePtr get_fileptr(const std::string& local_path);
 FilePtr make_fileptr(const std::string& local_path);
 
 ChatFilePtr getChatFilePtr(const FilePtr& file);
-
-#endif

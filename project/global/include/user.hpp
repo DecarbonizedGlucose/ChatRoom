@@ -1,5 +1,4 @@
-#ifndef USER_HPP
-#define USER_HPP
+#pragma once
 
 #include <string>
 #include <memory>
@@ -39,5 +38,3 @@ public:
 using US = User_Status;
 using UR = User_Role;
 using UserPtr = std::shared_ptr<User>;
-
-#endif

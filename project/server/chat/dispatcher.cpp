@@ -1,4 +1,5 @@
 #include "../include/dispatcher.hpp"
+#include "handler.hpp"
 
 Dispatcher::Dispatcher(RedisController* re) : redis_con(re) {
     message_handler = new MessageHandler(this);
@@ -23,7 +24,7 @@ void Dispatcher::add_server(TcpServer* server, int idx) {
     this->server[idx] = server;
 }
 
-void Dispatcher::dispatch_recv(const TcpServerConnectionPtr& conn) {
+void Dispatcher::dispatch_recv(const TcpServerConnection* conn) {
     std::string proto_str;
     // 读
     if (!conn->socket->receive_protocol(proto_str)) {
@@ -70,7 +71,7 @@ void Dispatcher::dispatch_recv(const TcpServerConnectionPtr& conn) {
     // std::cout << "type_url: " << any.type_url() << std::endl;
 }
 
-void Dispatcher::dispatch_send(const TcpServerConnectionPtr& conn) {
+void Dispatcher::dispatch_send(const TcpServerConnection* conn) {
     std::string proto_str;
     // 写
     if (!conn->socket->send_protocol(proto_str)) {

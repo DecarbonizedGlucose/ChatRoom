@@ -1,10 +1,7 @@
-#ifndef GROUP_HPP
-#define GROUP_HPP
+#pragma once
 
 #include "user.hpp"
 
 class Group {
     
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef SAFE_QUEUE_HPP
-#define SAFE_QUEUE_HPP
+#pragma once
 
 #include <mutex>
 #include <queue>
@@ -52,5 +51,3 @@ public:
         }
     }
 };
-
-#endif // SAFE_QUEUE_HPP
