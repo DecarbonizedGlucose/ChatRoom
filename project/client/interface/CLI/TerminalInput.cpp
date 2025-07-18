@@ -21,15 +21,31 @@ void TerminalInput::stop() {
     }
 }
 
-void TerminalInput::set_callback(Callback cb) {
+void TerminalInput::set_func(char ch, func cb) {
     std::lock_guard<std::mutex> lock(mtx);
-    on_enter_callback = std::move(cb);
+    key_cb[ch] = std::move(cb);
 }
 
 void TerminalInput::print_message(const std::string& msg) {
     std::lock_guard<std::mutex> lock(mtx);
     std::cout << "\r\033[K" << msg << "\n";  // 清除当前行后输出消息
     redraw_input_line();                      // 重新绘制输入行
+}
+
+void TerminalInput::wait() {
+    if (input_thread.joinable()) {
+        input_thread.join();
+    }
+}
+
+void TerminalInput::set_enter_callback(std::function<void(const std::string&)> cb) {
+    std::lock_guard<std::mutex> lock(mtx);
+    enter_cb = std::move(cb);
+}
+
+void TerminalInput::set_enable_display(bool enable) {
+    std::lock_guard<std::mutex> lock(mtx);
+    enable_display = enable;
 }
 
 void TerminalInput::redraw_input_line() {
@@ -48,21 +64,24 @@ void TerminalInput::input_loop() {
     while (running && std::cin.get(ch)) {
         std::lock_guard<std::mutex> lock(mtx);
 
-        if (ch == 127 || ch == 8) { // 退格
+        if (enable_display && (ch == 127 || ch == 8)) { // 退格
             if (!input_buffer.empty()) {
                 input_buffer.pop_back();
             }
-        } else if (ch == '\n' || ch == '\r') { // 回车提交
-            if (on_enter_callback) {
-                on_enter_callback(input_buffer);
-            }
-            input_buffer.clear();
-        } else if (isprint(ch)) {
+        } else if (key_cb.find(ch) != key_cb.end()) {
+            key_cb[ch]();
+        } else if (enable_display && isprint(ch)) {
             input_buffer += ch;
         }
-
-        redraw_input_line();
+        if (enable_display && (ch == '\n' || ch == '\r')) { // 回车提交
+            if (key_cb.find(ch) != key_cb.end()) {
+                enter_cb(input_buffer);
+            }
+            input_buffer.clear();
+        }
+        if (enable_display) {
+            redraw_input_line();
+        }
     }
-
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // 恢复终端模式
 }

@@ -1,6 +1,65 @@
 #include "../../include/CLI/winloop.hpp"
 #include <iostream>
+#include "../../include/CLI/TerminalInput.hpp"
 using namespace std;
+
+/* ---------- 暗黑逻辑学 ---------- */
+
+StartWin::StartWin() : running(true) {
+    input = new TerminalInput();
+    input->start(); // 开始监听输入
+}
+
+void StartWin::main_loop() {
+    input->set_func('1', [&]{
+        std::lock_guard<std::mutex> lock(mtx);
+        select = 1;
+        cv.notify_one();
+    });
+    input->set_func('2', [&]{
+        std::lock_guard<std::mutex> lock(mtx);
+        select = 2;
+        cv.notify_one();
+    });
+    input->set_func(27, [&]{ // ESC
+        std::lock_guard<std::mutex> lock(mtx);
+        select = -1;
+        cv.notify_one();
+    });
+    while (running) {
+        clear();
+        show_start_menu();
+        // 等待用户输入
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait(lock, [&] { return select != 0; });
+        switch (select) {
+            case 1: {
+                break;
+            }
+            case 2: {
+                break;
+            }
+            case -1: {
+                break;
+            }
+            default: {
+                // 你是？
+                continue;
+            }
+        }
+    }
+}
+
+void StartWin::regi_loop() {
+
+}
+
+void StartWin::clear() {
+    system("clear");
+}
+
+
+/* ---------- 纯输出部分 ---------- */
 
 void show_start_menu() {
     cout << "$ ----- Welcome to the Chat Room ----- $" << endl << endl;
