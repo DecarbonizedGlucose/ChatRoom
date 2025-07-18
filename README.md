@@ -16,13 +16,14 @@ sudo pacman -S abseil-cpp
 yay -S spdlog                                  # 日志
 yay -S sqlite                                  # sqlite
 ~~~
-<!-- debian/ubuntu:
+debian/ubuntu:
 ~~~sh
 sudo apt install openssl
 sudo apt install protobuf-compiler libprotobuf-dev
 sudo apt install libhiredis-dev libssl-dev
-sudo apt install # mysql ???
+sudo apt install libredis++-dev
+sudo apt install mysql-server mysql-common mysql-client
 sudo apt install libmysqlclient-dev
 sudo apt install nlohmann-json3-dev
 sudo apt-get install libcurl4-openssl-dev
-~~~ -->
+~~~
