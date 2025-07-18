@@ -31,6 +31,7 @@ TcpServer::TcpServer(int idx, const std::string& ip, uint16_t port) : idx(idx) {
 }
 
 TcpServer::~TcpServer() {
+    log_info("Tcp server {} is being destroyed", idx);
     delete listen_conn;
     delete pr;
 }
@@ -72,12 +73,18 @@ void TcpServer::start() {
             running = false;
             break; // Exit on error
         } else if (num_ready == 0) {
+            log_info("Epoll wait timed out");
             continue; // 超时，无事发生
         }
         // 轮询
         for (int i = 0; i < num_ready; ++i) {
             auto ev = pr->epoll_events[i];
             event* event_ptr = static_cast<event*>(ev.data.ptr);
+            if (event_ptr == nullptr) {
+                // 自唤醒
+                log_info("Epoll wakes self");
+                break;
+            }
             // 先拉出来listen_conn的事件
             if (event_ptr->get_sockfd() == listen_conn->get_fd()) {
                 this->pool->submit([this]() {
@@ -102,14 +109,12 @@ void TcpServer::start() {
             }
         }
     }
+    log_debug("Tcp server {} main loop exited", idx);
 }
 
 void TcpServer::stop() {
     running = false;
-    if (pr) {
-        delete pr;
-        pr = nullptr;
-    }
+    pr->wake();
     log_info("Tcp server {} stopped", idx);
 }
 

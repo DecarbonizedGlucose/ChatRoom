@@ -19,4 +19,5 @@ public:
     ~TopServer();
 
     void launch();
+    void stop();
 };

@@ -17,6 +17,7 @@ TopServer::TopServer() {
 }
 
 TopServer::~TopServer() {
+    log_info("TopServer destructor called, cleaning up resources");
     delete message_server;
     delete command_server;
     delete data_server;
@@ -42,5 +43,20 @@ void TopServer::launch() {
         data_server->start();
     });
     log_info("Data server submited to thread pool");
+}
+
+void TopServer::stop() {
+    log_info("Stopping TopServer and all associated servers");
+    if (message_server) {
+        message_server->stop();
+    }
+    if (command_server) {
+        command_server->stop();
+    }
+    if (data_server) {
+        data_server->stop();
+    }
+    pool->shutdown();
+    log_info("All servers stopped");
 }
 

@@ -28,5 +28,4 @@ void CommandHandler::handle_send_veri_code(std::string subj) {
         std::cerr << "初始化错误: " << e.what() << std::endl;
         return;
     }
-    
 }

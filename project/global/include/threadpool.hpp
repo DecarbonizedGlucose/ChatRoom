@@ -83,6 +83,7 @@ public:
 
     void stop() {
         pool_status = 2;
+        m_Condition.notify_all(); // 必须唤醒所有worker
         for (auto& worker : m_Workers) {
             if (worker.joinable()) {
                 worker.join();

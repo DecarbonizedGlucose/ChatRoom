@@ -1,4 +1,6 @@
 #include "../include/reactor.hpp"
+#include "../../global/include/logging.hpp"
+#include <sys/eventfd.h>
 
 event::event(int fd, int ev, TcpServerConnection* conn, std::function<void()> cb)
     : fd(fd), events(ev), conn(conn), call_back_func(cb), in_reactor(false), binded(false), pr(nullptr) {}
@@ -69,7 +71,13 @@ void event::set_sockfd(int new_fd) { fd = new_fd; }
 
 reactor::reactor() {
     epoll_fd = epoll_create1(0);
-    if (epoll_fd < 0) {
+    wake_fd = eventfd(0, EFD_NONBLOCK);
+    struct epoll_event ev = {0};
+    ev.events = EPOLLIN;
+    ev.data.ptr = nullptr;
+    if (epoll_fd < 0 || wake_fd < 0
+     || epoll_ctl(epoll_fd, EPOLL_CTL_ADD, wake_fd, &ev) < 0) {
+        log_error("创建epoll实例失败: {}", strerror(errno));
         throw std::runtime_error(std::string(__func__) + ": Failed to create epoll instance - " + strerror(errno) + '\n');
     }
     epoll_events = new epoll_event[max_events];
@@ -85,6 +93,7 @@ reactor::reactor(int max_events, int timeout)
 }
 
 reactor::~reactor() {
+    log_debug("reactor 析构: this={}, epoll_event={}", (void*)this, (void*)epoll_events);
     if (epoll_fd >= 0) {
         close(epoll_fd);
         epoll_fd = -1;
@@ -99,12 +108,22 @@ reactor::~reactor() {
 int reactor::wait() {
     int ret;
     do {
+        log_debug("reactor::wait : epoll_fd={}, epoll_events={}, max_events={}, epoll_timeout={}",
+                  epoll_fd, static_cast<const void*>(epoll_events), max_events, epoll_timeout);
         ret = epoll_wait(epoll_fd, epoll_events, max_events, epoll_timeout);
     } while (ret < 0 && errno == EINTR);
     if (ret < 0) {
         throw std::runtime_error(std::string(__func__) + ": Epoll wait failed\n");
     }
     return ret;
+}
+
+void reactor::wake() {
+    uint64_t u = 1;
+    if (::write(wake_fd, &u, sizeof(u)) < 0) {
+        log_error("reactor::wake: Failed to wake reactor - {}", strerror(errno));
+        throw std::runtime_error(std::string(__func__) + ": Failed to wake reactor - " + strerror(errno) + '\n');
+    }
 }
 
 bool reactor::add_event(event* ev) {

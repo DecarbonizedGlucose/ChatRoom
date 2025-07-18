@@ -202,11 +202,11 @@ bool LSocket::bind() {
     int opt = 1;
     // 端口复用
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        log_error("设置端口复用失败: {}", strerror(errno));
+        log_error("设置端口复用{}:{}失败: {}", ip, port, strerror(errno));
         return false;
     }
     if (::bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
-        log_error("Listen socket 绑定失败: {}", strerror(errno));
+        log_error("Listen socket 绑定{}:{}失败: {}", ip, port, strerror(errno));
         return false;
     }
     this->binded = true;

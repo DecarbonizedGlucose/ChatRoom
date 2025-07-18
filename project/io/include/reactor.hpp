@@ -52,13 +52,14 @@ public:
 class reactor {
 private:
     int epoll_fd = -1;
+    int wake_fd = -1;
     int max_events = 2048;
     int epoll_timeout = 1000;
 
 public:
     friend class event;
     std::unordered_map<int, event*> events;
-    epoll_event* epoll_events;
+    epoll_event* epoll_events = nullptr;
 
     reactor();
     reactor(int max_events, int timeout);
@@ -69,6 +70,7 @@ public:
     ~reactor();
 
     int wait();
+    void wake();
     bool add_event(event* ev);
     bool remove_event(event* ev);
     int get_epoll_fd() const;
