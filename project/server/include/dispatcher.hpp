@@ -9,7 +9,7 @@
 #include "../../global/abstract/command.pb.h"
 #include "../../global/abstract/message.pb.h"
 #include "../../global/abstract/data.pb.h"
-#include "../database/redis.hpp"
+#include "../include/redis.hpp"
 
 class TcpServer;
 class TcpServerConnection;

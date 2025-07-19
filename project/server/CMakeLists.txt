@@ -7,6 +7,8 @@ add_executable(server
     connection_manager.cpp
     chat/dispatcher.cpp
     chat/handler.cpp
+    database/redis.cpp
+    database/mysql.cpp
 )
 
 target_link_libraries(server

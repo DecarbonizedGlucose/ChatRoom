@@ -26,6 +26,35 @@ void TerminalInput::set_func(char ch, func cb) {
     key_cb[ch] = std::move(cb);
 }
 
+void TerminalInput::clear_func(char ch) {
+    std::lock_guard<std::mutex> lock(mtx);
+    auto it = key_cb.find(ch);
+    if (it != key_cb.end()) {
+        key_cb.erase(it);
+    }
+}
+
+void TerminalInput::clear_key_func() {
+    std::lock_guard<std::mutex> lock(mtx);
+    key_cb.clear();
+}
+
+void TerminalInput::clear_buffer() {
+    std::lock_guard<std::mutex> lock(mtx);
+    input_buffer.clear();
+}
+
+void TerminalInput::clear_enter_func() {
+    std::lock_guard<std::mutex> lock(mtx);
+    enter_cb = nullptr;
+}
+
+void TerminalInput::clear_all_func() {
+    std::lock_guard<std::mutex> lock(mtx);
+    key_cb.clear();
+    enter_cb = nullptr;
+}
+
 void TerminalInput::print_message(const std::string& msg) {
     std::lock_guard<std::mutex> lock(mtx);
     std::cout << "\r\033[K" << msg << "\n";  // 清除当前行后输出消息
@@ -46,6 +75,14 @@ void TerminalInput::set_enter_callback(std::function<void(const std::string&)> c
 void TerminalInput::set_enable_display(bool enable) {
     std::lock_guard<std::mutex> lock(mtx);
     enable_display = enable;
+}
+
+std::string TerminalInput::get_buffer() const {
+    return input_buffer;
+}
+
+bool TerminalInput::buffer_empty() const {
+    return input_buffer.empty();
 }
 
 void TerminalInput::redraw_input_line() {

@@ -1,7 +1,7 @@
 #include "include/TcpServer.hpp"
 #include "../global/include/logging.hpp"
 #include "../../io/include/reactor.hpp"
-#include "database/redis.hpp"
+#include "include/redis.hpp"
 
 namespace set_addr_s {
     Addr server_addr[3];

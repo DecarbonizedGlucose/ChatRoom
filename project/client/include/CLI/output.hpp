@@ -16,6 +16,10 @@ namespace ansi {
     constexpr const char* FG_BRIGHT_BLUE = "\033[94m";
     constexpr const char* FG_WHITE = "\033[97m";
     constexpr const char* FG_GRAY = "\033[90m";
+    constexpr const char* FG_RED = "\033[31m";
+    constexpr const char* FG_YELLOW = "\033[33m";
+    constexpr const char* FG_BRIGHT_RED = "\033[91m";
+    constexpr const char* FG_BRIGHT_YELLOW = "\033[93m";
 
     // 背景色
     constexpr const char* BG_RED = "\033[41m";
@@ -29,3 +33,10 @@ std::string style(const std::string& text, std::initializer_list<const char*> st
     result += text + ansi::RESET;
     return result;
 }
+
+// 一些固定用法
+
+void sclear();
+
+void print_input_sign();
+

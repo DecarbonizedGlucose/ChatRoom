@@ -1,5 +1,5 @@
 #include "../include/reactor.hpp"
-#include "../../global/include/logging.hpp"
+// #include "../../global/include/logging.hpp"
 #include <sys/eventfd.h>
 
 event::event(int fd, int ev, TcpServerConnection* conn, std::function<void()> cb)
@@ -108,8 +108,8 @@ reactor::~reactor() {
 int reactor::wait() {
     int ret;
     do {
-        log_debug("reactor::wait : epoll_fd={}, epoll_events={}, max_events={}, epoll_timeout={}",
-                  epoll_fd, static_cast<const void*>(epoll_events), max_events, epoll_timeout);
+        // log_debug("reactor::wait : epoll_fd={}, epoll_events={}, max_events={}, epoll_timeout={}",
+        //           epoll_fd, static_cast<const void*>(epoll_events), max_events, epoll_timeout);
         ret = epoll_wait(epoll_fd, epoll_events, max_events, epoll_timeout);
     } while (ret < 0 && errno == EINTR);
     if (ret < 0) {

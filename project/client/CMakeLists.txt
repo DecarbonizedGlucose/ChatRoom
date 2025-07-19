@@ -2,7 +2,10 @@
 add_executable(client
     clientmain.cpp
     TcpClient.cpp
+    TopClient.cpp
     interface/CLI/TerminalInput.cpp
+    interface/CLI/winloop.cpp
+    interface/CLI/output.cpp
 )
 
 target_link_libraries(client
@@ -19,7 +22,6 @@ target_link_libraries(client
 
 target_include_directories(client PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/chat
     ${CMAKE_CURRENT_SOURCE_DIR}/interface/CLI
     ${CMAKE_CURRENT_SOURCE_DIR}/../global/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../global/abstract
