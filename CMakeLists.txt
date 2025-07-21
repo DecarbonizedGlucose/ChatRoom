@@ -17,7 +17,27 @@ find_package(Protobuf REQUIRED)
 find_package(Threads REQUIRED)
 find_package(redis++ REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(MARIADB REQUIRED mariadb)
+
+# MariaDB / MySQL 兼容处理
+pkg_check_modules(MARIADB mariadb)
+
+if (NOT MARIADB_FOUND)
+    message(STATUS "MariaDB not found, trying MySQL...")
+
+    find_path(MYSQL_INCLUDE_DIR mysql/mysql.h)
+    find_library(MYSQL_LIBRARY NAMES mysqlclient)
+
+    if (MYSQL_INCLUDE_DIR AND MYSQL_LIBRARY)
+        message(STATUS "MySQL found")
+        set(MARIADB_INCLUDE_DIRS ${MYSQL_INCLUDE_DIR})
+        set(MARIADB_LIBRARIES ${MYSQL_LIBRARY})
+    else()
+        message(FATAL_ERROR "Neither MariaDB nor MySQL was found.")
+    endif()
+else()
+    set(MARIADB_LIBRARIES ${MARIADB_LIBRARIES})
+endif()
+
 find_package(nlohmann_json 3.2.0 REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 

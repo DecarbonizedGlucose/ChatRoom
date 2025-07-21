@@ -9,7 +9,7 @@ arch/manjaro:
 yay -S openssl
 yay -S protobuf                                # 序列化/反序列化
 yay -S redis-plus-plus                         # redis
-sudo pacman -S mariadb mariadb-connector-c     # mysql
+yay -S mysql-connector-c++                     # mysql
 sudo pacman -S nlohmann-json                   # json
 yay -S curl                                    # 邮件
 sudo pacman -S abseil-cpp
@@ -23,7 +23,7 @@ sudo apt install protobuf-compiler libprotobuf-dev
 sudo apt install libhiredis-dev libssl-dev
 sudo apt install libredis++-dev
 sudo apt install mysql-server mysql-common mysql-client
-sudo apt install libmysqlclient-dev
+sudo apt install libmysqlcppconn-dev
 sudo apt install nlohmann-json3-dev
 sudo apt-get install libcurl4-openssl-dev
 ~~~

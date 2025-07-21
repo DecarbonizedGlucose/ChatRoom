@@ -1,8 +1,8 @@
-#ifndef MYSQL_HPP
-#define MYSQL_HPP
+#pragma once
 
-#include <mysql/mysql.h>
+#include <mysql_driver.h>
+#include <mysql_connection.h>
+#include <cppconn/statement.h>
+#include <cppconn/prepared_statement.h>
+#include <cppconn/resultset.h>
 
-
-
-#endif
