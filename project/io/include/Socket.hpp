@@ -101,7 +101,7 @@ public:
     bool bind();
     bool listen();
     bool isBinded() const;
-    std::unique_ptr<AcceptedSocket> accept();
+    AcceptedSocket* accept();
 };
 
 using ASocket = AcceptedSocket;

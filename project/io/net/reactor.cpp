@@ -1,5 +1,5 @@
 #include "../include/reactor.hpp"
-// #include "../../global/include/logging.hpp"
+#include "../../global/include/logging.hpp"
 #include <sys/eventfd.h>
 
 event::event(int fd, int ev, TcpServerConnection* conn, std::function<void()> cb)

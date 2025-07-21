@@ -1,7 +1,8 @@
 #include "../include/dispatcher.hpp"
 #include "handler.hpp"
 
-Dispatcher::Dispatcher(RedisController* re) : redis_con(re) {
+Dispatcher::Dispatcher(RedisController* re, MySQLController* my)
+    : redis_con(re), mysql_con(my) {
     message_handler = new MessageHandler(this);
     command_handler = new CommandHandler(this);
     file_handler = new FileHandler(this);
@@ -47,7 +48,7 @@ void Dispatcher::dispatch_recv(const TcpServerConnection* conn) {
         CommandRequest cmd_req;
         any.UnpackTo(&cmd_req);
         // 命令单向发送
-        command_handler->handle_recv(cmd_req, proto_str);
+        command_handler->handle_recv(conn, cmd_req, proto_str);
     } else if (any.Is<FileChunk>()) {
         FileChunk file_chunk;
         any.UnpackTo(&file_chunk);
@@ -80,7 +81,7 @@ void Dispatcher::dispatch_send(const TcpServerConnection* conn) {
     }
     switch (conn->to_send_type) {
         case DataType::Message: {
-            message_handler->handle_send();
+            message_handler->handle_send(conn);
             break;
         }
         case DataType::FileChunk: {

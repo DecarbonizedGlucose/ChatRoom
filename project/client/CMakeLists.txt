@@ -3,9 +3,6 @@ add_executable(client
     clientmain.cpp
     TcpClient.cpp
     TopClient.cpp
-    interface/CLI/TerminalInput.cpp
-    interface/CLI/winloop.cpp
-    interface/CLI/output.cpp
 )
 
 target_link_libraries(client

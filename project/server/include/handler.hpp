@@ -24,7 +24,7 @@ public:
     MessageHandler(Dispatcher* dispatcher);
 
     void handle_recv(const ChatMessage& message, const std::string& ostr);
-    void handle_send();
+    void handle_send(const TcpServerConnection* conn);
 };
 
 /* -------------- Command -------------- */
@@ -33,13 +33,21 @@ class CommandHandler : public Handler {
 public:
     CommandHandler(Dispatcher* dispatcher);
 
-    void handle_recv(const CommandRequest& command, const std::string& ostr);
-    void handle_send(const CommandRequest& command, const std::string& ostr);
+    void handle_recv(
+        const TcpServerConnection* conn,
+        const CommandRequest& command,
+        const std::string& ostr);
+    void handle_send(const TcpServerConnection* conn);
 
 private:
     void handle_sign_in();
     void handle_sign_out();
-    void handle_register(const std::string& email, const std::string& code);
+    void handle_register(
+        const TcpServerConnection* conn,
+        const std::string& email,
+        const std::string& code,
+        std::string& user_ID,
+        std::string& user_password);
     void handle_send_veri_code(std::string subj);
     void handle_find_password();
     void handle_change_password();

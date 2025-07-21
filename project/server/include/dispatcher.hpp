@@ -10,6 +10,7 @@
 #include "../../global/abstract/message.pb.h"
 #include "../../global/abstract/data.pb.h"
 #include "../include/redis.hpp"
+#include "../include/mysql.hpp"
 
 class TcpServer;
 class TcpServerConnection;
@@ -24,8 +25,9 @@ public:
     //using Task = std::function<void()>;
     TcpServer* server[3];
     RedisController* redis_con = nullptr;
+    MySQLController* mysql_con = nullptr;
 
-    Dispatcher(RedisController* re);
+    Dispatcher(RedisController* re, MySQLController* my);
     ~Dispatcher();
 
     void add_server(TcpServer* server, int idx);

@@ -73,7 +73,7 @@ void TcpServer::start() {
             running = false;
             break; // Exit on error
         } else if (num_ready == 0) {
-            log_info("Epoll wait timed out");
+            //log_info("Epoll wait timed out");
             continue; // 超时，无事发生
         }
         // 轮询

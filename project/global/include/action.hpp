@@ -14,12 +14,14 @@ enum class Action {
     /*      账号系统      */
     Sign_In,                      // 登录 --password
     Sign_Out,                     // 登出
-    Register,                     // 注册 --veri-code
+    Register,                     // 注册 --veri-code --user_ID --password
     Get_Veri_Code,                // 获取验证码
     Find_Password,                // 找回密码* --veri-code
     Change_Password,              // 修改密码 --old-password --new-password
     Change_Username,              // 修改用户名
     Authentication,               // 身份验证 --veri-code
+    Refuse,                       // 拒绝
+    Accept,                       // 接受
 
     /*      私信行为      */
     Add_Friend,                   // 添加好友 --email

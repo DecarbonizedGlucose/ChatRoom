@@ -1,4 +1,5 @@
 #include "include/TopClient.hpp"
+#include "include/TcpClient.hpp"
 #include "../global/include/logging.hpp"
 
 int main() {

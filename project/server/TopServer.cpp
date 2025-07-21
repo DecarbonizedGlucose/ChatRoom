@@ -5,9 +5,15 @@
 #include "../global/include/logging.hpp"
 
 TopServer::TopServer() {
-    pool = std::make_unique<thread_pool>(20, 30);
+    pool = new thread_pool(20, 30);
     redis = new RedisController();
-    disp = new Dispatcher(redis);
+    mysql = new MySQLController(
+        "127.0.0.1",
+        "decglu",
+        "dGlucose77",
+        "chat_db"
+    );
+    disp = new Dispatcher(redis, mysql);
     message_server = new TcpServer(0);
     command_server = new TcpServer(1);
     data_server = new TcpServer(2);
@@ -23,14 +29,14 @@ TopServer::~TopServer() {
     delete data_server;
     delete disp;
     delete redis;
-    pool.reset();
+    delete pool;
 }
 
 void TopServer::launch() {
     pool->init();
-    message_server->init(pool.get(), redis, disp);
-    command_server->init(pool.get(), redis, disp);
-    data_server->init(pool.get(), redis, disp);
+    message_server->init(pool, redis, disp);
+    command_server->init(pool, redis, disp);
+    data_server->init(pool, redis, disp);
     pool->submit([this]() {
         message_server->start();
     });

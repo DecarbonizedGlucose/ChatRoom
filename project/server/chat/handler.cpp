@@ -15,7 +15,8 @@
 /* Handler base */
 Handler::Handler(Dispatcher* dispatcher) : disp(dispatcher) {}
 
-/* MessageHandler */
+/* ---------- MessageHandler ---------- */
+
 MessageHandler::MessageHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
 void MessageHandler::handle_recv(const ChatMessage& message, const std::string& ostr) {
@@ -32,6 +33,8 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
             auto send_conn = it->second;
             send_conn->socket->set_write_buf(ostr);
             send_conn->write_event->add_to_reactor();
+            // 这里没考虑群聊的情况 (for item in group)
+            // 需要改改
         } else {
             // 没找到连接,可能是用户离线了,或者是bug
             // 需要处理离线消息
@@ -39,14 +42,18 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
     }
 }
 
-void MessageHandler::handle_send() {
-    // 发送消息的实现
+void MessageHandler::handle_send(const TcpServerConnection* conn) {
+    conn->socket->send_with_size();
 }
 
-/* CommandHandler */
+/* ---------- CommandHandler ---------- */
+
 CommandHandler::CommandHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
-void CommandHandler::handle_recv(const CommandRequest& command, const std::string& ostr) {
+void CommandHandler::handle_recv(
+    const TcpServerConnection* conn,
+    const CommandRequest& command,
+    const std::string& ostr) {
     Action action = (Action)command.action();
     std::string subj = command.sender();
     auto args = command.args();
@@ -58,7 +65,7 @@ void CommandHandler::handle_recv(const CommandRequest& command, const std::strin
             break;
         }
         case Action::Register: {
-            handle_register(subj, args[0]);
+            handle_register(conn, subj, args[0], args[1], args[2]);
             break;
         }
         case Action::Get_Veri_Code: {
@@ -72,16 +79,54 @@ void CommandHandler::handle_recv(const CommandRequest& command, const std::strin
     }
 }
 
-void CommandHandler::handle_send(const CommandRequest& command, const std::string& ostr) {
-    // 发送命令的实现
+void CommandHandler::handle_send(const TcpServerConnection* conn) {
+    conn->socket->send_with_size();
 }
 
 void CommandHandler::handle_sign_in() {}
 
 void CommandHandler::handle_sign_out() {}
 
-void CommandHandler::handle_register(const std::string& email, const std::string& code) {
-    // mysql存取
+void CommandHandler::handle_register(
+    const TcpServerConnection* conn,
+    const std::string& email,
+    const std::string& code,
+    std::string& user_ID,
+    std::string& user_password) {
+    std::string err_msg;
+    bool email_exists = disp->mysql_con->do_email_exist(email);
+    bool user_ID_exists = disp->mysql_con->do_user_id_exist(user_ID);
+    if (!email_exists && !user_ID_exists) {
+        if (disp->mysql_con->insert_user(user_ID, email, user_password)) {
+            // 注册成功
+            // 通知他注册成功了
+            // ...
+            CommandRequest cmd;
+        cmd.set_action(static_cast<int>(Action::Accept));
+        cmd.set_args(0, "注册成功");
+        Envelope env;
+        env.mutable_payload()->PackFrom(cmd);
+        std::string env_out;
+        env.SerializeToString(&env_out);
+        // 注册事件
+        conn->socket->set_write_buf(env_out);
+        conn->write_event->add_to_reactor();
+            return;
+        }
+        err_msg = "注册失败，请稍后再试";
+    }
+    // 通知他不能注册(Refuse)
+    CommandRequest cmd;
+    cmd.set_action(static_cast<int>(Action::Refuse));
+    if (err_msg.empty()) err_msg = "邮箱或用户ID已存在";
+    cmd.set_args(0, err_msg);
+    Envelope env;
+    env.mutable_payload()->PackFrom(cmd);
+    std::string env_out;
+    env.SerializeToString(&env_out);
+    // 注册事件
+    conn->socket->set_write_buf(env_out);
+    conn->write_event->add_to_reactor();
 }
 
 void CommandHandler::handle_send_veri_code(std::string subj) {
@@ -148,7 +193,8 @@ void CommandHandler::handle_get_relation_net() {}
 
 void CommandHandler::handle_download_file() {}
 
-/* FileHandler */
+/* ---------- FileHandler ---------- */
+
 FileHandler::FileHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
 void FileHandler::handle_recv(const FileChunk& file_chunk, const std::string& ostr) {
@@ -159,14 +205,16 @@ void FileHandler::handle_send(const FileChunk& file_chunk, const std::string& os
     // 处理文件分片发送
 }
 
-/* SyncHandler */
+/* ---------- SyncHandler ---------- */
+
 SyncHandler::SyncHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
 void SyncHandler::handle_send(const SyncItem& sync_item, const std::string& ostr) {
     // 处理同步数据
 }
 
-/* OfflineMessageHandler */
+/* ---------- OfflineMessageHandler ---------- */
+
 OfflineMessageHandler::OfflineMessageHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
 void OfflineMessageHandler::handle_recv(const OfflineMessages& offline_messages, const std::string& ostr) {

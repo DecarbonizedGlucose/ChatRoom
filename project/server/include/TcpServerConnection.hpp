@@ -18,7 +18,7 @@ public:
     event* read_event = nullptr; // 读事件
     event* write_event = nullptr; // 写事件
     reactor* reactor_ptr = nullptr;
-    std::unique_ptr<ASocket> socket = nullptr; // 套接字
+    ASocket* socket = nullptr; // 套接字
     safe_queue<std::string> write_queue;
     Dispatcher* dispatcher = nullptr;
     std::chrono::steady_clock::time_point last_active;

@@ -4,26 +4,18 @@
 ### 功能
 ### 运行环境
 ### 构建
-arch/manjaro:
+#### 依赖(Arch系)
 ~~~sh
 yay -S openssl
-yay -S protobuf                                # 序列化/反序列化
+yay -S protobuf                                # proto
+ysy -S redis                                   # redis
 yay -S redis-plus-plus                         # redis
-yay -S mysql-connector-c++                     # mysql
+yay -S mariadb mariadb-clients                 # mariadb(mysql的分支)
+yay -S mariadb-connector-c                     # mysql
 sudo pacman -S nlohmann-json                   # json
 yay -S curl                                    # 邮件
 sudo pacman -S abseil-cpp
 yay -S spdlog                                  # 日志
 yay -S sqlite                                  # sqlite
-~~~
-debian/ubuntu:
-~~~sh
-sudo apt install openssl
-sudo apt install protobuf-compiler libprotobuf-dev
-sudo apt install libhiredis-dev libssl-dev
-sudo apt install libredis++-dev
-sudo apt install mysql-server mysql-common mysql-client
-sudo apt install libmysqlcppconn-dev
-sudo apt install nlohmann-json3-dev
-sudo apt-get install libcurl4-openssl-dev
+yay -S linenoise-ng                            # 命令行界面
 ~~~

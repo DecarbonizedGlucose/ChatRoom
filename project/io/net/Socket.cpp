@@ -227,7 +227,7 @@ bool LSocket::listen() {
     return true;
 }
 
-std::unique_ptr<ASocket> LSocket::accept() {
+ASocket* LSocket::accept() {
     if (!binded) {
         throw std::runtime_error("Socket is not binded");
     }
@@ -237,5 +237,11 @@ std::unique_ptr<ASocket> LSocket::accept() {
         throw std::runtime_error("Failed to accept connection: " + std::string(strerror(errno)));
     }
     log_info("ListenSocket accepted connection on fd: {}", client_fd);
-    return std::move(std::make_unique<ASocket>(client_fd));
+    ASocket* new_socket = new ASocket(client_fd);
+    if (new_socket == nullptr) {
+        log_error("Failed to create AcceptedSocket for fd: {}", client_fd);
+        close(client_fd);
+        throw std::runtime_error("Failed to create AcceptedSocket");
+    }
+    return new_socket;
 }
