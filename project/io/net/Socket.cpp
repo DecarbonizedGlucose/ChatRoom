@@ -102,7 +102,9 @@ ssize_t DataSocket::send_with_size() {
 
 bool DataSocket::send_protocol(const std::string& proto) {
     this->write_buf = proto;
-    return send_with_size() > 0;
+    ssize_t res = send_with_size();
+    log_info("Sent protocol of size {}: {}", write_buf.size(), proto);
+    return res > 0;
 }
 
 bool DataSocket::receive_protocol(std::string& proto) {
@@ -119,7 +121,8 @@ bool DataSocket::receive_protocol(std::string& proto) {
     if (received <= 0) {
         return false; // Failed to read message content
     }
-    proto.assign(read_buf.begin(), read_buf.end());
+    proto = read_buf;
+    log_info("Received protocol of size {}: {}", size, proto);
     return true;
 }
 
@@ -210,7 +213,7 @@ bool LSocket::bind() {
         return false;
     }
     this->binded = true;
-    log_info("ListenSocket 绑定到 {}:{}", ip, port);
+    log_info("ListenSocket bound {}:{}", ip, port);
     return true;
 }
 

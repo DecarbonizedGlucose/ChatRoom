@@ -1,8 +1,15 @@
 # 可执行文件：client
+
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIR})
+
 add_executable(client
     clientmain.cpp
     TcpClient.cpp
     TopClient.cpp
+    interface/CLI/winloop.cpp
+    interface/CLI/output.cpp
+    chat/main/CommManager.cpp
 )
 
 target_link_libraries(client
@@ -15,6 +22,16 @@ target_link_libraries(client
     nlohmann_json::nlohmann_json
     ${CURL_LIBRARIES}
     spdlog::spdlog_header_only
+    #${CURSES_LIBRARIES}
+    absl_base
+    absl_strings
+    absl_throw_delegate
+    absl_log_internal_check_op
+    absl_log_internal_message
+    absl_log_severity
+    absl_log_globals
+    absl_raw_logging_internal
+    absl_log_internal_nullguard
 )
 
 target_include_directories(client PRIVATE

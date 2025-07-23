@@ -4,6 +4,7 @@
 // #include "include/CLI/TerminalInput.hpp"
 // #include "include/CLI/winloop.hpp"
 #include "include/chat/main/CommManager.hpp"
+#include "include/CLI/winloop.hpp"
 
 TopClient::TopClient() {
     message_client = new TcpClient(
@@ -15,27 +16,31 @@ TopClient::TopClient() {
     data_client = new TcpClient(
         set_addr_c::client_addr[2].first,
         set_addr_c::client_addr[2].second);
-    pool = new thread_pool(6);
-    // comm_manager = new CommManager(this);
-    // input = new TerminalInput();
-    // start_win = new StartWin(input, comm_manager);
-    // main_win = new MainWin(input, comm_manager);
+    pool = new thread_pool(8);
+    comm = new CommManager(this);
+    winloop = new WinLoop(comm);
+}
+
+TopClient::~TopClient() {
+    delete message_client;
+    delete command_client;
+    delete data_client;
+    delete pool;
+    delete winloop;
 }
 
 void TopClient::launch() {
+    running = true;
     // 启动三个客户端
     message_client->start();
     command_client->start();
     data_client->start();
     // 初始化线程池
     pool->init();
-
-    while (running) {
-        // start_win->init();
-        // start_win->main_loop();
-        // main_win->init();
-        // main_win->main_loop();
-    }
+    // 启动命令行界面
+    winloop->run();
+    stop();
+    return;
 }
 
 void TopClient::stop() {
@@ -44,6 +49,7 @@ void TopClient::stop() {
     command_client->stop();
     data_client->stop();
     // 停止线程池
-    pool->stop();
+    pool->shutdown();
+    winloop->stop();
     running = false;
 }

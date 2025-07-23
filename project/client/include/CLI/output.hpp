@@ -25,18 +25,14 @@ namespace ansi {
     constexpr const char* BG_RED = "\033[41m";
 }
 
-std::string style(const std::string& text, std::initializer_list<const char*> styles) {
-    std::string result;
-    for (const auto& style : styles) {
-        result += style;
-    }
-    result += text + ansi::RESET;
-    return result;
-}
+std::string style(const std::string& text, std::initializer_list<const char*> styles);
 
 // 一些固定用法
 
 void sclear();
 
 void print_input_sign();
+
+
+using Style = std::initializer_list<const char*>;
 

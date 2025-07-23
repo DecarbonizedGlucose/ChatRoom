@@ -1,182 +1,256 @@
 #include "../../include/CLI/winloop.hpp"
 #include "../../include/CLI/output.hpp"
-#include "../../include/CLI/TerminalInput.hpp"
 #include "../../../global/include/logging.hpp"
 #include "../../include/chat/main/CommManager.hpp"
 #include "../../../global/include/action.hpp"
 #include <iostream>
 
-/* ---------- 暗黑逻辑学 ---------- */
+WinLoop::WinLoop(CommManager* comm) : current_page(UIPage::Start), comm(comm) {}
 
-StartWin::StartWin(TerminalInput* input, CommManager* comm)
-    : running(true), input(input), comm(comm) {}
-
-StartWin::~StartWin() {
-    running = false;
-    input->stop();
+WinLoop::~WinLoop() {
 }
 
-void StartWin::init() {
-    input->start(); // 开始监听输入
-}
-
-void StartWin::main_loop() {
-    while (running) {
-        select = 0;
-        input->clear_key_func();
-        input->set_func('1', [&]{
-            std::lock_guard<std::mutex> lock(mtx);
-            select = 1;
-            cv.notify_one();
-        });
-        input->set_func('2', [&]{
-            std::lock_guard<std::mutex> lock(mtx);
-            select = 2;
-            cv.notify_one();
-        });
-        input->set_func(27, [&]{ // ESC
-            std::lock_guard<std::mutex> lock(mtx);
-            select = -1;
-            cv.notify_one();
-        });
-        sclear();
-        show_start_menu();
-        // 等待用户输入
-        std::unique_lock<std::mutex> lock(mtx);
-        cv.wait(lock, [&] { return select != 0; });
-        switch (select) {
-            case 1: {
+void WinLoop::run() {
+    running = true;
+    while (running) { // 状态机比那循环嵌套好看多了
+        switch (current_page) {
+            case UIPage::Start:
+                start_loop();
+                break;
+            case UIPage::Login:
                 login_loop();
                 break;
-            }
-            case 2: {
-                regi_loop();
+            case UIPage::Register:
+                register_loop();
                 break;
-            }
-            case -1: {
+            case UIPage::Main:
+                main_loop();
                 break;
-            }
-            default: {
-                // 你是？
-                // 理论上这块不应该被触发
-                log_error("Unexpected selection: {}", select);
-                continue;
-            }
+            case UIPage::Message:
+                message_loop();
+                break;
+            case UIPage::Contacts:
+                contacts_loop();
+                break;
+            case UIPage::About:
+                about_loop();
+                break;
+            case UIPage::Exit:
+                running = false;
+                break;
+            default:
+                log_error("Unknown page state: {}", static_cast<int>(current_page));
         }
-        if (!running) { break; }
     }
 }
 
-void StartWin::login_loop() {
-    while (running) {
-        select = 0;
-        input->clear_key_func();
-        input->set_enable_display(true);
-        input->set_enter_callback([&](const std::string& email) { // 第一次回调
-            // 配合handler::login_handler
-        });
-        input->set_func(27, [&]{ // ESC
-            std::lock_guard<std::mutex> lock(mtx);
-            select = -1;
-            cv.notify_one();
-        });
+void WinLoop::stop() {
+    running = false;
+}
+
+/* ---------- 页面处理 ---------- */
+
+void WinLoop::start_loop() {
+    sclear();
+    draw_start();
+    handle_start_input();
+}
+
+void WinLoop::login_loop() {
+    while (1) {
         sclear();
-        std::cout << style("Please enter your Email:", {ansi::BOLD, ansi::FG_GRAY}) << std::endl;
-        print_input_sign();
-        {
-            std::unique_lock<std::mutex> lock(mtx);
-            cv.wait(lock, [&]{ return !input->buffer_empty(); }); // 等待输入
+        draw_login(1);
+        std::string email, password;
+        std::getline(std::cin, email);
+        if (email.empty()) { // 返回
+            switch_to(UIPage::Start);
+            return;
         }
-        input->set_enter_callback([&](const std::string& password) { // 第二次回调
-            // 配合handler::login_handler
-        });
-        input->clear_buffer();
-        std::cout << style("Please enter your Password:", {ansi::BOLD, ansi::FG_GRAY}) << std::endl;
-        print_input_sign();
-        {
-            std::unique_lock<std::mutex> lock(mtx);
-            cv.wait(lock, [&]{ return !input->buffer_empty(); }); // 等待输入
+        draw_login(2);
+        std::getline(std::cin, password);
+        if (email.empty() || password.empty()) {
+            std::cout << "Email or password cannot be empty." << std::endl;
+            pause();
+            continue;
         }
-        // 服务器传来登录结果
-        // ...
-        // ...
-        if (!running || select == -1) { break; }
+        // 传给服务器
+        comm->handle_send_command(Action::Sign_In, email, {password});
+        // 读取服务器响应
+        CommandRequest resp = comm->handle_receive_command();
+        if (resp.action() == static_cast<int>(Action::Accept)) {
+            std::cout << "登录成功！" << std::endl;
+            switch_to(UIPage::Main);
+            return;
+        } else { // Refused
+            std::cout << "登录失败" << resp.args(0) << std::endl;
+            pause();
+            continue;
+        }
     }
 }
 
-void StartWin::regi_loop() {
-    while (running) {
-        select = 0;
-        input->clear_key_func();
-        input->set_enable_display(true);
-        input->set_enter_callback([&](const std::string& email) { // 第一次回调
-            // 配合handler::regi_handler
-            // 发送验证码
-            comm->handle_send_command(Action::Get_Veri_Code, email, {});
-        });
-        input->set_func(27, [&]{ // ESC
-            std::lock_guard<std::mutex> lock(mtx);
-            select = -1;
-            cv.notify_one();
-        });
+void WinLoop::register_loop() {
+    while (1) {
         sclear();
-        std::cout << style("Please enter your Email:", {ansi::BOLD, ansi::FG_GRAY}) << std::endl;
-        print_input_sign();
-        {
-            std::unique_lock<std::mutex> lock(mtx);
-            cv.wait(lock, [&]{ return select!=0 || !input->buffer_empty(); }); // 等待输入
+        std::string email, veri_code, username, password;
+        draw_register(1);
+        std::getline(std::cin, email);
+        if (email.empty()) { // 返回
+            switch_to(UIPage::Start);
+            return;
         }
-        if (select == -1) { break; }
-        // 提取邮箱
-        std::string email = input->get_buffer();
-        std::cout << style("Please enter the verification code sent to your Email:", {ansi::BOLD, ansi::FG_GRAY}) << std::endl;
-        print_input_sign();
-        input->clear_buffer();
-        {
-            std::unique_lock<std::mutex> lock(mtx);
-            cv.wait(lock, [&]{ return select!=0 || !input->buffer_empty(); }); // 等待输入
+        // 发送验证码请求
+        comm->handle_send_command(Action::Get_Veri_Code, email, {});
+        log_info("Sent veri code request");
+        // 读取服务器响应
+        CommandRequest resp = comm->handle_receive_command();
+        log_info("Received veri code response");
+        if (resp.action() != static_cast<int>(Action::Accept)) {
+            std::cout << "邮箱已存在。" << std::endl;
+            pause();
+            continue;
         }
-        if (select == -1) { break; }
-        // 提取验证码
-        std::string code = input->get_buffer();
-        // 提交注册信息
-        comm->handle_send_command(Action::Register, email, {code});
-        // 服务器回应
-        // ...
-        if (!running || select == -1) { break; }
+        draw_register(2);
+        std::getline(std::cin, veri_code);
+        if (veri_code.empty()) {
+            std::cout << "验证码不能为空。" << std::endl;
+            pause();
+            continue;
+        }
+        // 发送验证码
+        comm->handle_send_command(Action::Authentication, email, {veri_code});
+        // 读取服务器响应
+        CommandRequest auth_resp = comm->handle_receive_command();
+        if (auth_resp.action() != static_cast<int>(Action::Accept)) {
+            std::cout << "身份验证失败：" << auth_resp.args(0) << std::endl;
+            pause();
+            continue;
+        }
+        draw_register(3);
+        std::getline(std::cin, username);
+        if (username.empty()) {
+            std::cout << "用户名不能为空。" << std::endl;
+            pause();
+            continue;
+        }
+        draw_register(4);
+        std::getline(std::cin, password);
+        if (password.empty()) {
+            std::cout << "密码不能为空。" << std::endl;
+            pause();
+            continue;
+        }
+        // 发送注册请求
+        comm->handle_send_command(Action::Register, email, {username, password});
+        log_info("Sent registration request");
+        // 读取服务器响应
+        CommandRequest reg_resp = comm->handle_receive_command();
+        log_info("Received registration response");
+        if (reg_resp.action() == static_cast<int>(Action::Accept)) {
+            log_info("Successfully registered");
+            std::cout << "注册成功！" << std::endl;
+            switch_to(UIPage::Main);
+            return;
+        } else {
+            log_info("Registration failed: {}", reg_resp.args(0));
+            std::cout << reg_resp.args(0) << std::endl;
+            pause();
+            continue;
+        }
     }
 }
 
-/* ---------- 纯UI部分 ---------- */
+void WinLoop::main_loop() {}
 
-void show_start_menu() {
-    std::cout << "$ ----- Welcome to the Chat Room ----- $" << std::endl << std::endl;
-    std::cout << "               " << style("[1]", {ansi::FG_BRIGHT_BLUE}) << " Log in" << std::endl << std::endl;
-    std::cout << "              " << style("[2]", {ansi::FG_BRIGHT_BLUE}) << " Register" << std::endl;
+void WinLoop::message_loop() {}
+
+void WinLoop::contacts_loop() {}
+
+void WinLoop::about_loop() {
+
 }
 
-void show_register_menu() {
-    //std::cout << "Please register to continue." << std::endl;
+/* ---------- 菜单选择 ---------- */
+
+void WinLoop::handle_start_input() {
+    std::string input;
+    std::getline(std::cin, input);
+    if (input == "1") {
+        switch_to(UIPage::Login);
+    } else if (input == "2") {
+        switch_to(UIPage::Register);
+    } else if (input == "0") {
+        switch_to(UIPage::Exit);
+    } else {
+        log_error("Invalid input: {}", input);
+    }
 }
 
-void show_login_menu() {
-    //std::cout << "Please log in to your account." << std::endl;
+/* ---------- tools ---------- */
+
+void WinLoop::sclear() {
+    system("clear"); // 或者 system("cls") 在 Windows 上
 }
 
-void show_main_menu() {
-    // 需要展示未读消息数
+void WinLoop::pause() {
+    std::cout << "按任意键继续...";
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 }
 
-void show_message_list() {
-    //std::cout << "Message List:" << std::endl;
+void WinLoop::switch_to(UIPage page) {
+    current_page = page;
 }
 
-void show_contacts_list() {
-    //std::cout << "Contacts List:" << std::endl;
+/* ---------- 渲染 ---------- */
+
+void draw_start() {
+    std::cout << "-$-    欢迎来到聊天室 -$-" << std::endl;
+    std::cout << "         [1] 登录" << std::endl;
+    std::cout << "         [2] 注册" << std::endl;
+    std::cout << "         [0] 退出" << std::endl;
+    print_input_sign();
 }
 
-void show_about_info() {
-    std::cout << "Chat Room Client" << std::endl;
-    std::cout << "Author : decglu" << std::endl;
-    std::cout << "Repo : https://github.com/DecarbonizedGlucose/ChatRoom.git" << std::endl;
+void draw_login(int idx) {
+    switch (idx) {
+        case 1:
+            std::cout << "         -$- 登    录 -$-" << std::endl;
+            std::cout << "请输入邮箱和密码。" << std::endl;
+            std::cout << "（直接回车返回）" << std::endl;
+            std::cout << "邮箱";
+            print_input_sign();
+            break;
+        case 2:
+            std::cout << "密码";
+            print_input_sign();
+            break;
+    }
+}
+
+void draw_register(int idx) {
+    switch (idx) {
+        case 1:
+            std::cout << "          -$- 注    册 -$-" << std::endl;
+            std::cout << "请输入邮箱、验证码、用户名和密码。" << std::endl;
+            std::cout << "（直接回车返回）" << std::endl;
+            std::cout << "邮箱";
+            print_input_sign();
+            break;
+        case 2:
+            std::cout << "请注意查收验证码。验证码5分钟内有效。" << std::endl;
+            std::cout << "验证码";
+            print_input_sign();
+            break;
+        case 3:
+            std::cout << "用户名";
+            print_input_sign();
+            break;
+        case 4:
+            std::cout << "密码";
+            print_input_sign();
+            break;
+    }
+}
+
+void draw_main() {
 }

@@ -6,6 +6,7 @@ class thread_pool;
 // class StartWin;
 // class MainWin;
 class CommManager;
+class WinLoop;
 
 class TopClient {
 public:
@@ -13,10 +14,12 @@ public:
     TcpClient* command_client;
     TcpClient* data_client;
     thread_pool* pool;
-    // TerminalInput* input;
-    // CommManager* comm_manager;
+    CommManager* comm;
+    WinLoop* winloop;
 
     TopClient();
+    ~TopClient();
+
     void launch();
     void stop();
 

@@ -10,6 +10,7 @@ class CommandRequest;
 class FileChunk;
 class SyncItem;
 class OfflineMessages;
+enum class Action;
 
 class Handler {
 public:
@@ -45,14 +46,19 @@ private:
     void handle_register(
         const TcpServerConnection* conn,
         const std::string& email,
-        const std::string& code,
         std::string& user_ID,
         std::string& user_password);
-    void handle_send_veri_code(std::string subj);
+    void handle_send_veri_code(
+        const TcpServerConnection* conn,
+        std::string subj);
     void handle_find_password();
     void handle_change_password();
     void handle_change_username();
-    void handle_authentication();
+    void handle_authentication(
+        const TcpServerConnection* conn,
+        const std::string& email,
+        const std::string& veri_code
+    );
     void handle_add_friend();
     void handle_remove_friend();
     void handle_search_person();
@@ -92,3 +98,15 @@ public:
 
     void handle_recv(const OfflineMessages& offline_messages, const std::string& ostr);
 };
+
+/* ---------- proto简单获取 ---------- */
+
+CommandRequest create_command_request(
+    Action action,
+    const std::string& sender,
+    std::initializer_list<std::string> args);
+
+std::string create_proto_cmd(
+    Action action,
+    /* const std::string sender, */
+    std::initializer_list<std::string> args);

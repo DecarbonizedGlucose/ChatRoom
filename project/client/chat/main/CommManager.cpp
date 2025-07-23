@@ -9,9 +9,9 @@
 #include "../../../global/include/threadpool.hpp"
 
 CommManager::CommManager(TopClient* client) : top_client(client) {
-    clients[0] = top_client->message_client.get();
-    clients[1] = top_client->command_client.get();
-    clients[2] = top_client->data_client.get();
+    clients[0] = top_client->message_client;
+    clients[1] = top_client->command_client;
+    clients[2] = top_client->data_client;
 }
 
 /* ---------- Input & Output ---------- */
@@ -42,6 +42,16 @@ auto CommManager::send_async(int idx, const std::string& proto) {
 
 /* ---------- Handlers ---------- */
 
+CommandRequest CommManager::handle_receive_command() {
+    Envelope env;
+    std::string proto;
+    clients[1]->socket->receive_protocol(proto);
+    env.ParseFromString(proto);
+    CommandRequest cmd;
+    env.payload().UnpackTo(&cmd);
+    return cmd;
+}
+
 void CommManager::handle_send_command(Action action, const std::string& sender, std::initializer_list<std::string> args) {
     CommandRequest cmd;
     cmd.set_action(static_cast<int>(action));
@@ -52,9 +62,9 @@ void CommManager::handle_send_command(Action action, const std::string& sender, 
     google::protobuf::Any any;
     any.PackFrom(cmd);
     Envelope env;
-    //env.set_user_id(""); // 保留接口。这里可以写email
+    env.set_user_id(""); // 保留接口。这里可以写email
     env.mutable_payload()->PackFrom(any);
     std::string env_out;
     env.SerializeToString(&env_out);
-    send_async(1, env_out);
+    send(1, env_out);
 }

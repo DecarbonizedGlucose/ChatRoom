@@ -17,6 +17,7 @@ find_package(Protobuf REQUIRED)
 find_package(Threads REQUIRED)
 find_package(redis++ REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(Curses REQUIRED)
 
 # MariaDB / MySQL 兼容处理
 pkg_check_modules(MARIADB mariadb)

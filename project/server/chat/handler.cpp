@@ -65,11 +65,11 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Register: {
-            handle_register(conn, subj, args[0], args[1], args[2]);
+            handle_register(conn, subj, args[0], args[1]);
             break;
         }
         case Action::Get_Veri_Code: {
-            handle_send_veri_code(subj);
+            handle_send_veri_code(conn, subj);
             break;
         }
         // ... 其它 case ...
@@ -90,24 +90,18 @@ void CommandHandler::handle_sign_out() {}
 void CommandHandler::handle_register(
     const TcpServerConnection* conn,
     const std::string& email,
-    const std::string& code,
     std::string& user_ID,
     std::string& user_password) {
     std::string err_msg;
-    bool email_exists = disp->mysql_con->do_email_exist(email);
     bool user_ID_exists = disp->mysql_con->do_user_id_exist(user_ID);
-    if (!email_exists && !user_ID_exists) {
+    if (!user_ID_exists) {
         if (disp->mysql_con->insert_user(user_ID, email, user_password)) {
             // 注册成功
             // 通知他注册成功了
             // ...
             CommandRequest cmd;
-        cmd.set_action(static_cast<int>(Action::Accept));
-        cmd.set_args(0, "注册成功");
-        Envelope env;
-        env.mutable_payload()->PackFrom(cmd);
-        std::string env_out;
-        env.SerializeToString(&env_out);
+        auto env_out = create_proto_cmd(
+            Action::Accept, {"注册成功"});
         // 注册事件
         conn->socket->set_write_buf(env_out);
         conn->write_event->add_to_reactor();
@@ -118,7 +112,7 @@ void CommandHandler::handle_register(
     // 通知他不能注册(Refuse)
     CommandRequest cmd;
     cmd.set_action(static_cast<int>(Action::Refuse));
-    if (err_msg.empty()) err_msg = "邮箱或用户ID已存在";
+    if (err_msg.empty()) err_msg = "用户名已存在";
     cmd.set_args(0, err_msg);
     Envelope env;
     env.mutable_payload()->PackFrom(cmd);
@@ -129,7 +123,23 @@ void CommandHandler::handle_register(
     conn->write_event->add_to_reactor();
 }
 
-void CommandHandler::handle_send_veri_code(std::string subj) {
+void CommandHandler::handle_send_veri_code(
+    const TcpServerConnection* conn,
+    std::string subj) {
+    bool email_exists = disp->mysql_con->do_email_exist(subj);
+    if (email_exists) {
+        auto env_out = create_proto_cmd(
+            Action::Refuse, {"邮箱已存在"});
+        conn->socket->set_write_buf(env_out);
+        conn->write_event->add_to_reactor();
+        return;
+    } else {
+        auto env_out = create_proto_cmd(
+            Action::Accept, {});
+        conn->socket->set_write_buf(env_out);
+        conn->write_event->add_to_reactor();
+        return;
+    }
     const std::string qq_email = "decglu@qq.com";
     const std::string auth_code = "gowkltdykhdmgehh";
     try {
@@ -163,7 +173,27 @@ void CommandHandler::handle_change_password() {}
 
 void CommandHandler::handle_change_username() {}
 
-void CommandHandler::handle_authentication() {}
+void CommandHandler::handle_authentication(
+    const TcpServerConnection* conn,
+    const std::string& email,
+    const std::string& veri_code) {
+    std::string msg;
+    // redis
+    bool suc;
+    if (suc) {
+        // 可以注册
+        auto env_out = create_proto_cmd(
+            Action::Accept, {"身份验证成功"});
+        conn->socket->set_write_buf(env_out);
+        conn->write_event->add_to_reactor();
+    } else {
+        // 不能注册
+        auto env_out = create_proto_cmd(
+            Action::Refuse, {"验证码错误"});
+        conn->socket->set_write_buf(env_out);
+        conn->write_event->add_to_reactor();
+    }
+}
 
 void CommandHandler::handle_add_friend() {}
 
@@ -219,4 +249,32 @@ OfflineMessageHandler::OfflineMessageHandler(Dispatcher* dispatcher) : Handler(d
 
 void OfflineMessageHandler::handle_recv(const OfflineMessages& offline_messages, const std::string& ostr) {
     // 处理离线消息
+}
+
+/* ---------- proto ---------- */
+
+CommandRequest create_command_request(
+    Action action,
+    const std::string& sender,
+    std::initializer_list<std::string> args) {
+    CommandRequest cmd;
+    cmd.set_action(static_cast<int>(action));
+    cmd.set_sender(sender);
+    for (const auto& arg : args) {
+        cmd.add_args(arg);
+    }
+    return cmd;
+}
+
+std::string create_proto_cmd(
+    Action action,
+    std::initializer_list<std::string> args) {
+    auto cmd = create_command_request(action, "", args);
+    google::protobuf::Any any;
+    any.PackFrom(cmd);
+    Envelope env;
+    env.mutable_payload()->PackFrom(any);
+    std::string env_out;
+    env.SerializeToString(&env_out);
+    return env_out;
 }
