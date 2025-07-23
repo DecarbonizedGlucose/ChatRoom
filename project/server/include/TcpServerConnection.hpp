@@ -37,4 +37,8 @@ public:
     std::string get_user_email() const {
         return user_Email;
     }
+
+    void set_send_type(DataType type) {
+        to_send_type = type;
+    }
 };

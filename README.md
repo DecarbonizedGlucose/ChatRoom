@@ -4,18 +4,27 @@
 ### 功能
 ### 运行环境
 ### 构建
-#### 依赖(Arch系)
+#### 依赖(Ubuntu/Debian系)
 ~~~sh
-yay -S openssl
-yay -S protobuf                                # proto
-ysy -S redis                                   # redis
-yay -S redis-plus-plus                         # redis
-yay -S mariadb mariadb-clients                 # mariadb(mysql的分支)
-yay -S mariadb-connector-c                     # mysql
-sudo pacman -S nlohmann-json                   # json
-yay -S curl                                    # 邮件
-sudo pacman -S abseil-cpp
-yay -S spdlog                                  # 日志
-yay -S sqlite                                  # sqlite
-yay -S linenoise-ng                            # 命令行界面
+sudo apt install -y \
+  libcurl4-openssl-dev \
+  libssl-dev \
+  protobuf-compiler \
+  libprotobuf-dev \
+  libmysqlclient-dev \
+  nlohmann-json3-dev \
+  libspdlog-dev \
+  libabsl-dev \
+  libncurses-dev \
+  libhiredis-dev \
+  build-essential
+
+# redis++ 需要手动编译安装
+cd /tmp
+git clone https://github.com/sewenew/redis-plus-plus.git
+cd redis-plus-plus
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+sudo make install
 ~~~

@@ -1,12 +1,8 @@
 #include "../../include/chat/main/CommManager.hpp"
-#include <google/protobuf/message.h>
 #include "../../include/TopClient.hpp"
 #include "../../include/TcpClient.hpp"
-#include "../../../global/abstract/envelope.pb.h"
-#include "../../../global/abstract/message.pb.h"
-#include "../../../global/abstract/command.pb.h"
-#include "../../../global/abstract/data.pb.h"
 #include "../../../global/include/threadpool.hpp"
+#include "../../../global/abstract/datatypes.hpp"
 
 CommManager::CommManager(TopClient* client) : top_client(client) {
     clients[0] = top_client->message_client;
@@ -43,28 +39,12 @@ auto CommManager::send_async(int idx, const std::string& proto) {
 /* ---------- Handlers ---------- */
 
 CommandRequest CommManager::handle_receive_command() {
-    Envelope env;
     std::string proto;
     clients[1]->socket->receive_protocol(proto);
-    env.ParseFromString(proto);
-    CommandRequest cmd;
-    env.payload().UnpackTo(&cmd);
-    return cmd;
+    return get_command_request(proto);
 }
 
 void CommManager::handle_send_command(Action action, const std::string& sender, std::initializer_list<std::string> args) {
-    CommandRequest cmd;
-    cmd.set_action(static_cast<int>(action));
-    cmd.set_sender(sender);
-    for (const auto& arg : args) {
-        cmd.add_args(arg);
-    }
-    google::protobuf::Any any;
-    any.PackFrom(cmd);
-    Envelope env;
-    env.set_user_id(""); // 保留接口。这里可以写email
-    env.mutable_payload()->PackFrom(any);
-    std::string env_out;
-    env.SerializeToString(&env_out);
+    std::string env_out = create_command_string(action, sender, args);
     send(1, env_out);
 }

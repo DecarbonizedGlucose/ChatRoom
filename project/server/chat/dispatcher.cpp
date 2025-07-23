@@ -26,69 +26,60 @@ void Dispatcher::add_server(TcpServer* server, int idx) {
     this->server[idx] = server;
 }
 
-void Dispatcher::dispatch_recv(const TcpServerConnection* conn) {
+void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
     std::string proto_str;
     // 读
-    if (!conn->socket->receive_protocol(proto_str)) {
-        log_error("Failed to receive data from connection");
-        close(conn->socket->get_fd());
-        log_info("Closed connection due to read failure");
-        return;
+    while (conn->socket->receive_protocol_with_state(proto_str)) {
+        log_debug("Received data from connection");
+        std::cout << "Received data: " << std::hex << proto_str << std::endl;
+        // 转写
+        Envelope env;
+        if (!env.ParseFromString(proto_str)) {
+            log_error("Failed to parse Envelope from received data");
+            return;
+        }
+        const google::protobuf::Any& any = env.payload();
+        std::cout << "分发器测试类型[" << any.type_url() << "]" << std::endl;
+        if (any.Is<ChatMessage>()) {
+            ChatMessage chat_msg;
+            any.UnpackTo(&chat_msg);
+            // 消息接收
+            message_handler->handle_recv(chat_msg, proto_str);
+        } else if (any.Is<CommandRequest>()) {
+            CommandRequest cmd_req;
+            any.UnpackTo(&cmd_req);
+            // 命令单向发送
+            command_handler->handle_recv(conn, cmd_req, proto_str);
+        } else if (any.Is<FileChunk>()) {
+            FileChunk file_chunk;
+            any.UnpackTo(&file_chunk);
+            // 文件分片
+            file_handler->handle_recv(file_chunk, proto_str);
+        // } else if (any.Is<SyncItem>()) {
+        //     SyncItem sync_item;
+        //     any.UnpackTo(&sync_item);
+        //     // 同步数据
+        //     sync_handler->handle_recv(sync_item, proto_str);
+        // } else if (any.Is<OfflineMessages>()) {
+        //     OfflineMessages offline_msgs;
+        //     any.UnpackTo(&offline_msgs);
+        //     // 离线消息
+        //     offline_message_handler->handle_recv(offline_msgs, proto_str);
+        } else {
+            log_error("Unknown payload type");
+            continue;
+        }
     }
-    log_debug("Received data from connection");
-    std::cout << "Received data: " << std::hex << proto_str << std::endl;
-    // 转写
-    Envelope env;
-    if (!env.ParseFromString(proto_str)) {
-        log_error("Failed to parse Envelope from received data");
-        return;
-    }
-    google::protobuf::Any any = env.payload();
-    if (any.Is<ChatMessage>()) {
-        ChatMessage chat_msg;
-        any.UnpackTo(&chat_msg);
-        // 消息接收
-        message_handler->handle_recv(chat_msg, proto_str);
-    } else if (any.Is<CommandRequest>()) {
-        CommandRequest cmd_req;
-        any.UnpackTo(&cmd_req);
-        // 命令单向发送
-        command_handler->handle_recv(conn, cmd_req, proto_str);
-    } else if (any.Is<FileChunk>()) {
-        FileChunk file_chunk;
-        any.UnpackTo(&file_chunk);
-        // 文件分片
-        file_handler->handle_recv(file_chunk, proto_str);
-    // } else if (any.Is<SyncItem>()) {
-    //     SyncItem sync_item;
-    //     any.UnpackTo(&sync_item);
-    //     // 同步数据
-    //     sync_handler->handle_recv(sync_item, proto_str);
-    // } else if (any.Is<OfflineMessages>()) {
-    //     OfflineMessages offline_msgs;
-    //     any.UnpackTo(&offline_msgs);
-    //     // 离线消息
-    //     offline_message_handler->handle_recv(offline_msgs, proto_str);
-    } else {
-        log_error("Unknown payload type");
-        return;
-    }
-    // 查看any里实际是什么
-    // std::cout << "type_url: " << any.type_url() << std::endl;
 }
 
-void Dispatcher::dispatch_send(const TcpServerConnection* conn) {
-    std::string proto_str;
-    // 写
-    if (!conn->socket->send_protocol(proto_str)) {
-        log_error("Failed to send data to connection");
-        close(conn->socket->get_fd());
-        log_info("Closed connection due to write failure");
-        return;
-    }
+void Dispatcher::dispatch_send(TcpServerConnection* conn) {
     switch (conn->to_send_type) {
         case DataType::Message: {
             message_handler->handle_send(conn);
+            break;
+        }
+        case DataType::Command: {
+            command_handler->handle_send(conn);
             break;
         }
         case DataType::FileChunk: {

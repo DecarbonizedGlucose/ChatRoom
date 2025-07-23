@@ -53,6 +53,12 @@ protected:
     std::mutex read_mutex;
     std::mutex write_mutex;
 
+    // 分包状态
+    enum RecvPhase { READING_SIZE, READING_PAYLOAD };
+    RecvPhase recv_phase = READING_SIZE;
+    size_t expected_size = 0;
+    std::string packet_buf; // 用于拼接半包/粘包
+
 public:
     explicit DataSocket(int fd, bool nonblock = false) : Socket(fd, nonblock) {}
 
@@ -64,6 +70,9 @@ public:
     ssize_t send_with_size();
     bool send_protocol(const std::string& proto);
     bool receive_protocol(std::string& proto);
+
+    // 新增：事件内循环读，自动处理粘包/半包
+    bool receive_protocol_with_state(std::string& proto);
 };
 
 class AcceptedSocket : public DataSocket {

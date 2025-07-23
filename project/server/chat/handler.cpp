@@ -1,15 +1,10 @@
 #include "../include/handler.hpp"
 #include "../include/email.hpp"
-#include <google/protobuf/message.h>
-#include "../../global/abstract/envelope.pb.h"
-#include "../../global/abstract/command.pb.h"
-#include "../../global/abstract/message.pb.h"
-#include "../../global/abstract/data.pb.h"
-#include "../../global/include/action.hpp"
 #include "../include/TcpServerConnection.hpp"
 #include "../include/TcpServer.hpp"
 #include "../include/dispatcher.hpp"
 #include "../../global/include/logging.hpp"
+#include "../../global/abstract/datatypes.hpp"
 #include <iostream>
 
 /* Handler base */
@@ -42,7 +37,7 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
     }
 }
 
-void MessageHandler::handle_send(const TcpServerConnection* conn) {
+void MessageHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
 }
 
@@ -51,7 +46,7 @@ void MessageHandler::handle_send(const TcpServerConnection* conn) {
 CommandHandler::CommandHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
 void CommandHandler::handle_recv(
-    const TcpServerConnection* conn,
+    TcpServerConnection* conn,
     const CommandRequest& command,
     const std::string& ostr) {
     Action action = (Action)command.action();
@@ -79,8 +74,9 @@ void CommandHandler::handle_recv(
     }
 }
 
-void CommandHandler::handle_send(const TcpServerConnection* conn) {
+void CommandHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
+    log_info("CommandHandler::handle_send called");
 }
 
 void CommandHandler::handle_sign_in() {}
@@ -88,7 +84,7 @@ void CommandHandler::handle_sign_in() {}
 void CommandHandler::handle_sign_out() {}
 
 void CommandHandler::handle_register(
-    const TcpServerConnection* conn,
+    TcpServerConnection* conn,
     const std::string& email,
     std::string& user_ID,
     std::string& user_password) {
@@ -100,48 +96,38 @@ void CommandHandler::handle_register(
             // 通知他注册成功了
             // ...
             CommandRequest cmd;
-        auto env_out = create_proto_cmd(
-            Action::Accept, {"注册成功"});
-        // 注册事件
-        conn->socket->set_write_buf(env_out);
-        conn->write_event->add_to_reactor();
+            auto env_out = create_command_string(
+                Action::Accept, email, {"注册成功"});
+            // 注册事件
+            conn->socket->set_write_buf(env_out);
+            conn->write_event->add_to_reactor();
             return;
         }
         err_msg = "注册失败，请稍后再试";
     }
     // 通知他不能注册(Refuse)
-    CommandRequest cmd;
-    cmd.set_action(static_cast<int>(Action::Refuse));
     if (err_msg.empty()) err_msg = "用户名已存在";
-    cmd.set_args(0, err_msg);
-    Envelope env;
-    env.mutable_payload()->PackFrom(cmd);
-    std::string env_out;
-    env.SerializeToString(&env_out);
+    std::string env_out = create_command_string(
+        Action::Refuse, email, {err_msg});
     // 注册事件
     conn->socket->set_write_buf(env_out);
     conn->write_event->add_to_reactor();
 }
 
 void CommandHandler::handle_send_veri_code(
-    const TcpServerConnection* conn,
+    TcpServerConnection* conn,
     std::string subj) {
     bool email_exists = disp->mysql_con->do_email_exist(subj);
     if (email_exists) {
-        auto env_out = create_proto_cmd(
-            Action::Refuse, {"邮箱已存在"});
-        conn->socket->set_write_buf(env_out);
-        conn->write_event->add_to_reactor();
-        return;
-    } else {
-        auto env_out = create_proto_cmd(
-            Action::Accept, {});
+        auto env_out = create_command_string(
+            Action::Refuse, subj, {"邮箱已存在"});
         conn->socket->set_write_buf(env_out);
         conn->write_event->add_to_reactor();
         return;
     }
     const std::string qq_email = "decglu@qq.com";
     const std::string auth_code = "gowkltdykhdmgehh";
+    std::string veri_code = std::to_string(rand() % 900000 + 100000); // 生成6位随机验证码
     try {
         QQMailSender sender;
         sender.init(qq_email, auth_code);
@@ -150,14 +136,25 @@ void CommandHandler::handle_send_veri_code(
             {subj},
             "尊敬的用户：\n\n"
             "欢迎注册我们的聊天室(チャットルーム)服务！\n"
-            "您的验证码是：114514\n\n"
+            "您的验证码是：" + veri_code + "\n\n"
             "请勿将此验证码分享给他人。\n"
-            "此验证码10分钟后失效。\n\n"
+            "此验证码5分钟后失效。\n\n"
             "感谢您的支持！\n"
             "聊天室团队"
         );
         if (sender.send()) {
             log_info("=== 邮件发送成功！===");
+            // 将验证码存入Redis
+            if (disp->redis_con->set_veri_code(subj, veri_code)) {
+                log_info("验证码已存入Redis");
+                // 发送成功，通知客户端
+                auto env_out = create_command_string(
+                    Action::Accept, subj, {});
+                conn->socket->set_write_buf(env_out);
+                conn->write_event->add_to_reactor();
+            } else {
+                log_error("!!! 无法存储验证码到Redis !!!");
+            }
         } else {
             log_error("!!! 邮件发送失败: " + sender.get_error() + " !!!");
         }
@@ -165,6 +162,10 @@ void CommandHandler::handle_send_veri_code(
         std::cerr << "初始化错误: " << e.what() << std::endl;
         return;
     }
+    auto env_out = create_command_string(
+        Action::Refuse, subj, {"暂时无法使用验证服务"});
+    conn->socket->set_write_buf(env_out);
+    conn->write_event->add_to_reactor();
 }
 
 void CommandHandler::handle_find_password() {}
@@ -174,7 +175,7 @@ void CommandHandler::handle_change_password() {}
 void CommandHandler::handle_change_username() {}
 
 void CommandHandler::handle_authentication(
-    const TcpServerConnection* conn,
+    TcpServerConnection* conn,
     const std::string& email,
     const std::string& veri_code) {
     std::string msg;
@@ -182,14 +183,14 @@ void CommandHandler::handle_authentication(
     bool suc;
     if (suc) {
         // 可以注册
-        auto env_out = create_proto_cmd(
-            Action::Accept, {"身份验证成功"});
+        auto env_out = create_command_string(
+            Action::Accept, email, {"身份验证成功"});
         conn->socket->set_write_buf(env_out);
         conn->write_event->add_to_reactor();
     } else {
         // 不能注册
-        auto env_out = create_proto_cmd(
-            Action::Refuse, {"验证码错误"});
+        auto env_out = create_command_string(
+            Action::Refuse, email, {"验证码错误"});
         conn->socket->set_write_buf(env_out);
         conn->write_event->add_to_reactor();
     }
@@ -249,32 +250,4 @@ OfflineMessageHandler::OfflineMessageHandler(Dispatcher* dispatcher) : Handler(d
 
 void OfflineMessageHandler::handle_recv(const OfflineMessages& offline_messages, const std::string& ostr) {
     // 处理离线消息
-}
-
-/* ---------- proto ---------- */
-
-CommandRequest create_command_request(
-    Action action,
-    const std::string& sender,
-    std::initializer_list<std::string> args) {
-    CommandRequest cmd;
-    cmd.set_action(static_cast<int>(action));
-    cmd.set_sender(sender);
-    for (const auto& arg : args) {
-        cmd.add_args(arg);
-    }
-    return cmd;
-}
-
-std::string create_proto_cmd(
-    Action action,
-    std::initializer_list<std::string> args) {
-    auto cmd = create_command_request(action, "", args);
-    google::protobuf::Any any;
-    any.PackFrom(cmd);
-    Envelope env;
-    env.mutable_payload()->PackFrom(any);
-    std::string env_out;
-    env.SerializeToString(&env_out);
-    return env_out;
 }

@@ -97,14 +97,23 @@ ssize_t DataSocket::send_with_size() {
     }
     size_t size = write_buf.size();
     ssize_t sent = ::write_size_to(fd, &size);
+    // debug
+    // std::cout << "Debug发送大小: " << std::dec << size << std::endl;
+    // for (unsigned char c : write_buf) {
+    //     std::cout << std::hex << (int)c << " ";
+    // } std::cout << std::endl;
     return send(size);
 }
 
 bool DataSocket::send_protocol(const std::string& proto) {
-    this->write_buf = proto;
+    set_write_buf(proto);
     ssize_t res = send_with_size();
-    log_info("Sent protocol of size {}: {}", write_buf.size(), proto);
-    return res > 0;
+    if (res <= 0) {
+        log_error("Failed to send protocol: {}", strerror(errno));
+        return false; // Failed to send or no data
+    }
+    // log_info("Sent protocol of size {}", write_buf.size());
+    return true;
 }
 
 bool DataSocket::receive_protocol(std::string& proto) {
@@ -114,15 +123,58 @@ bool DataSocket::receive_protocol(std::string& proto) {
     size_t size = 0;
     ssize_t received = ::read_size_from(fd, &size);
     if (received <= 0) {
-        return false; // Failed to read size or no data
+        log_error("Failed to read size from socket: {}", strerror(errno));
+        return false;
     }
-    read_buf.resize(size);
-    received = receive(size);
-    if (received <= 0) {
-        return false; // Failed to read message content
+    std::string tmp;
+    ssize_t total = 0;
+    while (total < size) {
+        char buf[4096];
+        ssize_t n = ::read(fd, buf, std::min(sizeof(buf), size - total));
+        if (n <= 0) return false;
+        tmp.append(buf, n);
+        total += n;
     }
-    proto = read_buf;
-    log_info("Received protocol of size {}: {}", size, proto);
+    proto = tmp;
+    // debug
+    // std::cout << "Debug收到大小: " << std::dec << proto.size() << std::endl;
+    // for (unsigned char c : proto) {
+    //     std::cout << std::hex << (int)c << " ";
+    // } std::cout << std::endl;
+    return true;
+}
+
+bool DataSocket::receive_protocol_with_state(std::string& proto) {
+    if (fd < 0) return false;
+    // 1. 事件内循环读到EAGAIN，拼接到packet_buf
+    char tmp[4096];
+    while (true) {
+        ssize_t n = ::read(fd, tmp, sizeof(tmp));
+        if (n > 0) {
+            packet_buf.append(tmp, n);
+        } else if (n == 0) {
+            // 对端关闭
+            return false;
+        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            break;
+        } else {
+            // 错误
+            return false;
+        }
+    }
+    // 2. 拆包
+    if (packet_buf.size() < 4) return false; // 长度帧不够
+    uint32_t net_len;
+    memcpy(&net_len, packet_buf.data(), 4);
+    size_t expected_size = ntohl(net_len);
+    if (packet_buf.size() < 4 + expected_size) return false; // 包体不够
+    proto = packet_buf.substr(4, expected_size);
+    packet_buf.erase(0, 4 + expected_size);
+    // debug
+    // std::cout << "Debug收到大小: " << std::dec << proto.size() << std::endl;
+    // for (unsigned char c : proto) {
+    //     std::cout << std::hex << (int)c << " ";
+    // } std::cout << std::endl;
     return true;
 }
 
@@ -240,7 +292,7 @@ ASocket* LSocket::accept() {
         throw std::runtime_error("Failed to accept connection: " + std::string(strerror(errno)));
     }
     log_info("ListenSocket accepted connection on fd: {}", client_fd);
-    ASocket* new_socket = new ASocket(client_fd);
+    ASocket* new_socket = new ASocket(client_fd, true);
     if (new_socket == nullptr) {
         log_error("Failed to create AcceptedSocket for fd: {}", client_fd);
         close(client_fd);

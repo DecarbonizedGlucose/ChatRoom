@@ -105,7 +105,8 @@ void WinLoop::register_loop() {
         // 读取服务器响应
         CommandRequest resp = comm->handle_receive_command();
         log_info("Received veri code response");
-        if (resp.action() != static_cast<int>(Action::Accept)) {
+        int action_ = resp.action();
+        if (action_ != static_cast<int>(Action::Accept)) {
             std::cout << "邮箱已存在。" << std::endl;
             pause();
             continue;

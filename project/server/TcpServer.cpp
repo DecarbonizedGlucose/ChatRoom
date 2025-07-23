@@ -21,7 +21,8 @@ TcpServer::TcpServer(int idx) : idx(idx) {
     pr = new reactor();
     listen_conn = new ListenSocket(
         set_addr_s::server_addr[idx].first,
-        set_addr_s::server_addr[idx].second
+        set_addr_s::server_addr[idx].second,
+        true
     );
 }
 
@@ -95,13 +96,18 @@ void TcpServer::start() {
             // 区分读写，分发事件
             if (ev.events & EPOLLIN) {
                 // 读事件
+                log_info("Reactor read event at fd {}", event_ptr->get_sockfd());
+                event_ptr->remove_from_reactor();
                 pool->submit([event_ptr]() {
                     event_ptr->conn->dispatcher \
                     ->dispatch_recv(event_ptr->conn);
+                    event_ptr->add_to_reactor();
                 });
             }
             else {
                 // 写事件
+                log_info("Reactor write event at fd {}", event_ptr->get_sockfd());
+                event_ptr->remove_from_reactor();
                 pool->submit([event_ptr]() {
                     event_ptr->conn->dispatcher \
                     ->dispatch_send(event_ptr->conn);
@@ -126,6 +132,12 @@ void TcpServer::auto_accept() {
     }
     auto conn = new TcpServerConnection(pr, disp);
     conn->socket = std::move(new_sock);
+    if (idx == 1) {
+        conn->set_send_type(DataType::Command);
+    } else if (idx == 0) {
+        conn->set_send_type(DataType::Message);
+    }
+    // 其他的动态设定
     event* read_event = new event(new_sock->get_fd(), EPOLLIN | EPOLLET, conn);
     event* write_event = new event(new_sock->get_fd(), EPOLLOUT | EPOLLET, conn);
     if (!pr->add_event(read_event) || !pr->add_event(write_event)) {
@@ -134,6 +146,8 @@ void TcpServer::auto_accept() {
         delete conn;
         return;
     }
+    conn->read_event = read_event;
+    conn->write_event = write_event;
     read_event->add_to_reactor();
     write_event->add_to_reactor();
     //user_connections[conn->get_user_id()] = conn;

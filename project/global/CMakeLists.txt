@@ -7,6 +7,7 @@ add_library(global STATIC
     abstract/message.pb.cc
     entity/message.cpp
     entity/file.cpp
+    abstract/datatypes.cpp
 )
 
 target_link_libraries(global PUBLIC

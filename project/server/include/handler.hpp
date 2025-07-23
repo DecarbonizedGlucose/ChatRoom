@@ -25,7 +25,7 @@ public:
     MessageHandler(Dispatcher* dispatcher);
 
     void handle_recv(const ChatMessage& message, const std::string& ostr);
-    void handle_send(const TcpServerConnection* conn);
+    void handle_send(TcpServerConnection* conn);
 };
 
 /* -------------- Command -------------- */
@@ -35,27 +35,27 @@ public:
     CommandHandler(Dispatcher* dispatcher);
 
     void handle_recv(
-        const TcpServerConnection* conn,
+        TcpServerConnection* conn,
         const CommandRequest& command,
         const std::string& ostr);
-    void handle_send(const TcpServerConnection* conn);
+    void handle_send(TcpServerConnection* conn);
 
 private:
     void handle_sign_in();
     void handle_sign_out();
     void handle_register(
-        const TcpServerConnection* conn,
+        TcpServerConnection* conn,
         const std::string& email,
         std::string& user_ID,
         std::string& user_password);
     void handle_send_veri_code(
-        const TcpServerConnection* conn,
+        TcpServerConnection* conn,
         std::string subj);
     void handle_find_password();
     void handle_change_password();
     void handle_change_username();
     void handle_authentication(
-        const TcpServerConnection* conn,
+        TcpServerConnection* conn,
         const std::string& email,
         const std::string& veri_code
     );
@@ -98,15 +98,3 @@ public:
 
     void handle_recv(const OfflineMessages& offline_messages, const std::string& ostr);
 };
-
-/* ---------- proto简单获取 ---------- */
-
-CommandRequest create_command_request(
-    Action action,
-    const std::string& sender,
-    std::initializer_list<std::string> args);
-
-std::string create_proto_cmd(
-    Action action,
-    /* const std::string sender, */
-    std::initializer_list<std::string> args);

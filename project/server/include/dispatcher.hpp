@@ -4,11 +4,7 @@
 #include <unordered_map>
 #include <functional>
 #include "TcpServer.hpp"
-#include <google/protobuf/message.h>
-#include "../../global/abstract/envelope.pb.h"
-#include "../../global/abstract/command.pb.h"
-#include "../../global/abstract/message.pb.h"
-#include "../../global/abstract/data.pb.h"
+#include "../../global/abstract/datatypes.hpp"
 #include "../include/redis.hpp"
 #include "../include/mysql.hpp"
 
@@ -31,8 +27,8 @@ public:
     ~Dispatcher();
 
     void add_server(TcpServer* server, int idx);
-    void dispatch_recv(const TcpServerConnection* conn);
-    void dispatch_send(const TcpServerConnection* conn);
+    void dispatch_recv(TcpServerConnection* conn);
+    void dispatch_send(TcpServerConnection* conn);
 
 private:
     CommandHandler* command_handler = nullptr;

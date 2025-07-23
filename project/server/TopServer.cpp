@@ -34,6 +34,10 @@ TopServer::~TopServer() {
 
 void TopServer::launch() {
     pool->init();
+    if (!mysql->connect()) {
+        log_error("Failed to connect to MySQL");
+        return;
+    }
     message_server->init(pool, redis, disp);
     command_server->init(pool, redis, disp);
     data_server->init(pool, redis, disp);
@@ -63,6 +67,7 @@ void TopServer::stop() {
         data_server->stop();
     }
     pool->shutdown();
+    mysql->disconnect();
     log_info("All servers stopped");
 }
 

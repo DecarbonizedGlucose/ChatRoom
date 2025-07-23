@@ -43,7 +43,7 @@ void event::add_to_reactor() {
     ev.events = events;
     ev.data.ptr = this;
     if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_ADD, fd, &ev) < 0) {
-        throw std::runtime_error(std::string(__func__) + ": Failed to add event to reactor - " + strerror(errno) + '\n');
+        throw std::runtime_error(std::string(__func__) + ": Failed to add event to reactor - " + strerror(errno));
     }
     in_reactor = true;
 }
@@ -53,7 +53,7 @@ void event::remove_from_reactor() {
         throw std::runtime_error(std::string(__func__) + ": No condition to remove event from reactor\n");
     }
     if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_DEL, fd, nullptr) < 0) {
-        throw std::runtime_error(std::string(__func__) + ": Failed to remove event from reactor - " + strerror(errno) + '\n');
+        throw std::runtime_error(std::string(__func__) + ": Failed to remove event from reactor - " + strerror(errno));
     }
     in_reactor = false;
 }

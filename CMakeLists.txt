@@ -1,3 +1,9 @@
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Debug)
+endif()
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g")
 cmake_minimum_required(VERSION 3.10)
 project(ChatRoom)
 
@@ -19,24 +25,16 @@ find_package(redis++ REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(Curses REQUIRED)
 
-# MariaDB / MySQL 兼容处理
-pkg_check_modules(MARIADB mariadb)
+# MySQL 配置
+find_path(MYSQL_INCLUDE_DIR mysql/mysql.h)
+find_library(MYSQL_LIBRARY NAMES mysqlclient)
 
-if (NOT MARIADB_FOUND)
-    message(STATUS "MariaDB not found, trying MySQL...")
-
-    find_path(MYSQL_INCLUDE_DIR mysql/mysql.h)
-    find_library(MYSQL_LIBRARY NAMES mysqlclient)
-
-    if (MYSQL_INCLUDE_DIR AND MYSQL_LIBRARY)
-        message(STATUS "MySQL found")
-        set(MARIADB_INCLUDE_DIRS ${MYSQL_INCLUDE_DIR})
-        set(MARIADB_LIBRARIES ${MYSQL_LIBRARY})
-    else()
-        message(FATAL_ERROR "Neither MariaDB nor MySQL was found.")
-    endif()
+if (MYSQL_INCLUDE_DIR AND MYSQL_LIBRARY)
+    message(STATUS "MySQL found")
+    set(MYSQL_INCLUDE_DIRS ${MYSQL_INCLUDE_DIR})
+    set(MYSQL_LIBRARIES ${MYSQL_LIBRARY})
 else()
-    set(MARIADB_LIBRARIES ${MARIADB_LIBRARIES})
+    message(FATAL_ERROR "MySQL was not found.")
 endif()
 
 find_package(nlohmann_json 3.2.0 REQUIRED)
@@ -53,7 +51,7 @@ include_directories(
     ${Protobuf_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
-    ${MARIADB_INCLUDE_DIRS}
+    ${MYSQL_INCLUDE_DIRS}
     ${REDIS++_INCLUDE_DIRS}
     ${HIREDIS_INCLUDE_DIRS}
     ${nlohmann_json_INCLUDE_DIRS}
@@ -66,6 +64,3 @@ add_subdirectory(project/client)
 
 set(CMAKE_BUILD_TYPE Debug)
 
-# 关闭优化，确保加上调试信息
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-set(CMAKE_C_FLAGS_DEBUG "-g -O0")

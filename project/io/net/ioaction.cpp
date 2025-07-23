@@ -1,44 +1,48 @@
 #include "../include/ioaction.hpp"
 #include <cerrno>
 #include <cstdio>
+#include <cstdint>
+#include <arpa/inet.h>
 
-ssize_t read_size_from(int fd, const size_t* const datasize) {
+ssize_t read_size_from(int fd, size_t* datasize) {
     if (fd < 0 || !datasize) {
         return -1;
     }
-    ssize_t n;
-again:
-    n = read(fd, (size_t*)datasize, sizeof(size_t));
-    if (n == -1) {
-        if (errno == EINTR) {
-            goto again;
-        }
-        else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return 0;
-        }
-        else {
+    uint32_t net_len = 0;
+    char* ptr = reinterpret_cast<char*>(&net_len);
+    size_t total = 0;
+    while (total < sizeof(net_len)) {
+        ssize_t n = read(fd, ptr + total, sizeof(net_len) - total);
+        if (n == -1) {
+            if (errno == EINTR) continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
             return -1;
         }
+        if (n == 0) return 0;
+        total += static_cast<size_t>(n);
     }
-    return n;
+    printf("raw size bytes: ");
+    for (int i = 0; i < 4; ++i) printf("%02x ", ((unsigned char*)ptr)[i]);
+    printf("\n");
+    *datasize = static_cast<size_t>(ntohl(net_len));
+    return static_cast<ssize_t>(total);
 }
 
 ssize_t write_size_to(int fd, size_t* const datasize) {
-    ssize_t n;
-again:
-    n = write(fd, (size_t*)datasize, sizeof(size_t));
-    if (n == -1) {
-        if (errno == EINTR) {
-            goto again;
-        }
-        else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return 0;
-        }
-        else {
+    uint32_t net_len = htonl(static_cast<uint32_t>(*datasize));
+    char* ptr = reinterpret_cast<char*>(&net_len);
+    size_t total = 0;
+    while (total < sizeof(net_len)) {
+        ssize_t n = write(fd, ptr + total, sizeof(net_len) - total);
+        if (n == -1) {
+            if (errno == EINTR) continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
             return -1;
         }
+        if (n == 0) return 0;
+        total += static_cast<size_t>(n);
     }
-    return n;
+    return static_cast<ssize_t>(total);
 }
 
 ssize_t read_from(int fd, std::string& buf, size_t size) {
@@ -55,7 +59,7 @@ ssize_t read_from(int fd, std::string& buf, size_t size) {
         }
         n = read(fd, tmp, to_read);
         if (n == -1) {
-            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (errno == EINTR) {
                 continue;
             } else {
                 return -1;
@@ -69,7 +73,7 @@ ssize_t read_from(int fd, std::string& buf, size_t size) {
             break;
         }
     }
-    return total;
+    return (ssize_t)total;
 }
 
 ssize_t write_to(int fd, const std::string& buf, size_t size) {

@@ -15,7 +15,7 @@ target_link_libraries(server
     global
     io
     ${CURL_LIBRARIES}
-    ${MARIADB_LINK_LIBRARIES}
+    ${MYSQL_LIBRARIES}
     redis++::redis++
     Threads::Threads
     OpenSSL::SSL
@@ -34,9 +34,6 @@ target_link_libraries(server
     spdlog::spdlog_header_only
 )
 
-# 添加链接目录
-target_link_directories(server PRIVATE ${MARIADB_LIBRARY_DIRS})
-
 target_include_directories(server PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../global/include
@@ -47,7 +44,7 @@ target_include_directories(server PRIVATE
     ${Protobuf_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIR}
-    ${MARIADB_INCLUDE_DIRS}
+    ${MYSQL_INCLUDE_DIRS}
     ${REDIS++_INCLUDE_DIRS}
     ${HIREDIS_INCLUDE_DIRS}
     ${nlohmann_json_INCLUDE_DIRS}
