@@ -1,12 +1,16 @@
 #include "../include/mysql.hpp"
+#include "../../global/include/logging.hpp"
 #include <iostream>
+#include <algorithm>
+#include <cctype>
 
 MySQLController::MySQLController(const std::string& host,
                                  const std::string& user,
                                  const std::string& password,
                                  const std::string& dbname,
                                  unsigned int port)
-    : conn(nullptr), host(host), user(user), password(password), dbname(dbname), port(port) {}
+    : conn(nullptr), host(host), user(user),
+    password(password), dbname(dbname), port(port) {}
 
 MySQLController::~MySQLController() {
     disconnect();
@@ -18,7 +22,7 @@ bool MySQLController::connect() {
 
     if (!mysql_real_connect(conn, host.c_str(), user.c_str(), password.c_str(),
                             dbname.c_str(), port, nullptr, 0)) {
-        std::cerr << "MySQL connection failed: " << mysql_error(conn) << std::endl;
+        log_error("MySQL connection failed: " + std::string(mysql_error(conn)));
         return false;
     }
     return true;
@@ -62,56 +66,22 @@ std::vector<std::vector<std::string>> MySQLController::query(const std::string& 
     return result;
 }
 
-bool MySQLController::register_user(const std::string& username, const std::string& password_hash) {
-    std::string sql = "INSERT INTO users (username, password) VALUES ('" + username + "', '" + password_hash + "');";
-    return execute(sql);
-}
-
-bool MySQLController::check_user(const std::string& username, const std::string& password_hash) {
-    std::string sql = "SELECT * FROM users WHERE username='" + username + "' AND password='" + password_hash + "';";
-    auto rows = query(sql);
-    return !rows.empty();
-}
-
-bool MySQLController::insert_message(const std::string& sender, const std::string& receiver,
-                                     const std::string& content, int64_t timestamp) {
-    std::string sql = "INSERT INTO messages (sender, receiver, content, timestamp) VALUES ('" +
-                      sender + "', '" + receiver + "', '" + content + "', " + std::to_string(timestamp) + ");";
-    return execute(sql);
-}
-
-std::vector<std::tuple<std::string, std::string, std::string, int64_t>>
-MySQLController::get_messages(const std::string& user1, const std::string& user2, size_t limit) {
-    std::vector<std::tuple<std::string, std::string, std::string, int64_t>> messages;
-    std::string sql = "SELECT sender, receiver, content, timestamp FROM messages WHERE ";
-    sql += "(sender='" + user1 + "' AND receiver='" + user2 + "') OR (sender='" + user2 + "' AND receiver='" + user1 + "') ";
-    sql += "ORDER BY timestamp DESC LIMIT " + std::to_string(limit) + ";";
-
-    auto rows = query(sql);
-    for (const auto& row : rows) {
-        if (row.size() >= 4) {
-            messages.emplace_back(row[0], row[1], row[2], std::stoll(row[3]));
-        }
-    }
-    return messages;
-}
-
-bool MySQLController::insert_file(const std::string& hash, const std::string& filename, size_t size) {
-    std::string sql = "INSERT INTO files (hash, filename, size) VALUES ('" +
-                      hash + "', '" + filename + "', " + std::to_string(size) + ");";
-    return execute(sql);
-}
-
-bool MySQLController::file_exists(const std::string& hash) {
-    std::string sql = "SELECT hash FROM files WHERE hash='" + hash + "';";
-    auto rows = query(sql);
-    return !rows.empty();
+std::string MySQLController::normalize_email(const std::string& email) const {
+    std::string normalized = email;
+    // 转换为小写
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    // 去除前后空格
+    normalized.erase(0, normalized.find_first_not_of(" \t\n\r\f\v"));
+    normalized.erase(normalized.find_last_not_of(" \t\n\r\f\v") + 1);
+    return normalized;
 }
 
 /* ---------- 用户系统---------- */
 
 bool MySQLController::do_email_exist(const std::string& email) {
-    std::string query = "SELECT COUNT(*) FROM users WHERE user_email = '" + email + "';";
+    std::string query = "SELECT COUNT(*) FROM users WHERE user_email = '"
+        + normalize_email(email) + "';";
     if (mysql_query(conn, query.c_str())) {
         std::cerr << "Email check failed: " << mysql_error(conn) << std::endl;
         return false; // 查询失败
@@ -145,8 +115,46 @@ bool MySQLController::do_user_id_exist(const std::string& user_ID) {
 bool MySQLController::insert_user(
     const std::string& user_ID,
     const std::string& email,
-    const std::string& user_password) {
-    std::string sql = "INSERT INTO users (user_id, user_email, user_password) VALUES ('" +
-                      user_ID + "', '" + email + "', '" + user_password + "');";
+    const std::string& password_hash) {
+    std::string sql = "INSERT INTO users (user_id, user_email, password_hash) VALUES ('" +
+                      user_ID + "', '" + normalize_email(email)
+                      + "','" + password_hash + "');";
     return execute(sql);
 }
+
+bool MySQLController::check_user_pswd(const std::string& email, const std::string& password_hash) {
+    std::string sql = "SELECT COUNT(*) FROM users WHERE user_email='"
+        + normalize_email(email) + "' AND password_hash='" + password_hash + "';";
+    if (mysql_query(conn, sql.c_str())) {
+        std::cerr << "Password check failed: " << mysql_error(conn) << std::endl;
+        return false;
+    }
+    MYSQL_RES* res = mysql_store_result(conn);
+    if (!res) return false;
+    MYSQL_ROW row = mysql_fetch_row(res);
+    bool exists = (row && std::stoi(row[0]) > 0);
+    mysql_free_result(res);
+    return exists;
+}
+
+void MySQLController::update_user_last_active(const std::string& email) {
+    std::string sql = "UPDATE users SET last_active = NOW() WHERE user_email = '"
+        + normalize_email(email) + "';";
+    execute(sql);
+}
+
+std::string MySQLController::get_user_id_from_email(const std::string& email) {
+    std::string sql = "SELECT user_id FROM users WHERE user_email = '"
+        + normalize_email(email) + "';";
+    auto rows = query(sql);
+    if (!rows.empty() && rows[0].size() > 0) {
+        return rows[0][0];
+    }
+    return "";
+}
+
+/* ---------- 好友 & 群组 ---------- */
+
+/* ---------- 聊天记录 ---------- */
+
+/* ---------- 文件 ---------- */

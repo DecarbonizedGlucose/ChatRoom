@@ -2,6 +2,8 @@
 #include "handler.hpp"
 #include "../../global/include/logging.hpp"
 
+using RecvState = DataSocket::RecvState;
+
 Dispatcher::Dispatcher(RedisController* re, MySQLController* my)
     : redis_con(re), mysql_con(my) {
     message_handler = new MessageHandler(this);
@@ -29,17 +31,27 @@ void Dispatcher::add_server(TcpServer* server, int idx) {
 void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
     std::string proto_str;
     // 读
-    while (conn->socket->receive_protocol_with_state(proto_str)) {
+    while (1) {
+        RecvState state = conn->socket->receive_protocol_with_state(proto_str);
+        if (state == RecvState::NoMoreData) {
+            break;
+        } else if (state == RecvState::Disconnected) {
+            conn->socket->disconnect();
+            return; // 连接断开
+        } else if (state == RecvState::Error) {
+            log_error("Error receiving data from connection (fd: {})", conn->socket->get_fd());
+            return; // 处理错误
+        }
         log_debug("Received data from connection");
-        std::cout << "Received data: " << std::hex << proto_str << std::endl;
+        //std::cout << "Received data: " << std::hex << proto_str << std::endl;
         // 转写
         Envelope env;
         if (!env.ParseFromString(proto_str)) {
             log_error("Failed to parse Envelope from received data");
-            return;
+            break;
         }
         const google::protobuf::Any& any = env.payload();
-        std::cout << "分发器测试类型[" << any.type_url() << "]" << std::endl;
+        //std::cout << "分发器测试类型[" << any.type_url() << "]" << std::endl;
         if (any.Is<ChatMessage>()) {
             ChatMessage chat_msg;
             any.UnpackTo(&chat_msg);
@@ -70,6 +82,8 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
             continue;
         }
     }
+    conn->read_event->add_to_reactor();
+    log_debug("Read event added to reactor (fd:{})", conn->read_event->get_sockfd());
 }
 
 void Dispatcher::dispatch_send(TcpServerConnection* conn) {

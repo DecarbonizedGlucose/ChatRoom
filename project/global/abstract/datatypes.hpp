@@ -39,7 +39,8 @@ std::string create_command_string(
     const std::string& sender,
     std::initializer_list<std::string> args);
 
-CommandRequest get_command_request(std::string& proto_str);
+// trans string to CommandRequest
+CommandRequest get_command_request(const std::string& proto_str);
 
 /* ---------- FileChunk ---------- */
 

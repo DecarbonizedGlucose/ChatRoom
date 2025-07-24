@@ -18,6 +18,10 @@ private:
 public:
     CommManager(TopClient* client);
 
+    std::string user_ID;
+    std::string password_hash;
+    std::string email;
+
 /* ---------- Input & Output ---------- */
     std::string read(int idx);
     auto read_async(int idx);

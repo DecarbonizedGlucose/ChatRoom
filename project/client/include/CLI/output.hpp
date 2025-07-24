@@ -33,6 +33,7 @@ void sclear();
 
 void print_input_sign();
 
+std::string selnum(int num);
 
 using Style = std::initializer_list<const char*>;
 

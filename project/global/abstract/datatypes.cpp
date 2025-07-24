@@ -21,7 +21,7 @@ std::string get_command_string(const CommandRequest& cmd) {
     any.PackFrom(cmd);
     Envelope env;
     env.mutable_payload()->CopyFrom(any); // 只用 CopyFrom，不要 PackFrom
-    std::cout << "打包测试类型[" << env.payload().type_url() << "]" << std::endl; // 调试输出
+    //std::cout << "打包测试类型[" << env.payload().type_url() << "]" << std::endl; // 调试输出
     std::string env_out;
     env.SerializeToString(&env_out);
     return env_out;
@@ -35,7 +35,7 @@ std::string create_command_string(
     return get_command_string(cmd);
 }
 
-CommandRequest get_command_request(std::string& proto_str) {
+CommandRequest get_command_request(const std::string& proto_str) {
     Envelope env;
     if (!env.ParseFromString(proto_str)) {
         throw std::runtime_error("Failed to parse Envelope from received data");
@@ -45,6 +45,6 @@ CommandRequest get_command_request(std::string& proto_str) {
     if (!any.UnpackTo(&cmd)) {
         throw std::runtime_error("Failed to unpack Any to CommandRequest");
     }
-    std::cout << "解包测试类型[" << any.type_url() << "]" << std::endl; // 调试输出
+    //std::cout << "解包测试类型[" << any.type_url() << "]" << std::endl; // 调试输出
     return cmd;
 }

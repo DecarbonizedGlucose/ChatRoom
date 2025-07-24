@@ -144,8 +144,8 @@ bool DataSocket::receive_protocol(std::string& proto) {
     return true;
 }
 
-bool DataSocket::receive_protocol_with_state(std::string& proto) {
-    if (fd < 0) return false;
+DataSocket::RecvState DataSocket::receive_protocol_with_state(std::string& proto) {
+    if (fd < 0) return RecvState::Error; // Invalid socket
     // 1. 事件内循环读到EAGAIN，拼接到packet_buf
     char tmp[4096];
     while (true) {
@@ -154,20 +154,20 @@ bool DataSocket::receive_protocol_with_state(std::string& proto) {
             packet_buf.append(tmp, n);
         } else if (n == 0) {
             // 对端关闭
-            return false;
+            return RecvState::Disconnected;
         } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
             break;
         } else {
             // 错误
-            return false;
+            return RecvState::Error;
         }
     }
     // 2. 拆包
-    if (packet_buf.size() < 4) return false; // 长度帧不够
+    if (packet_buf.size() < 4) return RecvState::Error; // 长度帧不够
     uint32_t net_len;
     memcpy(&net_len, packet_buf.data(), 4);
     size_t expected_size = ntohl(net_len);
-    if (packet_buf.size() < 4 + expected_size) return false; // 包体不够
+    if (packet_buf.size() < 4 + expected_size) return RecvState::NoMoreData; // 包体不够
     proto = packet_buf.substr(4, expected_size);
     packet_buf.erase(0, 4 + expected_size);
     // debug
@@ -175,7 +175,7 @@ bool DataSocket::receive_protocol_with_state(std::string& proto) {
     // for (unsigned char c : proto) {
     //     std::cout << std::hex << (int)c << " ";
     // } std::cout << std::endl;
-    return true;
+    return RecvState::Success;
 }
 
 /* ----- AcceptedSocket ----- */
@@ -185,6 +185,25 @@ AcceptedSocket::AcceptedSocket(int fd, bool nonblock) : DataSocket(fd, nonblock)
         log_error("Tried to create AcceptedSocket with invalid fd: {}", fd);
         throw std::runtime_error("Failed to create AcceptedSocket");
     }
+}
+
+bool AcceptedSocket::disconnect() {
+    if (!connected || fd < 0) {
+        log_error("AcceptedSocket: Tried to disconnect without a valid connection");
+        return false;
+    }
+    if (close(fd) < 0) {
+        log_error("AcceptedSocket: Failed to close socket: {}", strerror(errno));
+        throw std::runtime_error("Failed to close socket: " + std::string(strerror(errno)));
+    }
+    fd = -1;
+    connected = false;
+    log_info("AcceptedSocket disconnected");
+    return true;
+}
+
+bool AcceptedSocket::is_connected() const {
+    return connected;
 }
 
 /* ----- ConnectSocket ----- */

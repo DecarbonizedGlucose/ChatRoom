@@ -72,13 +72,25 @@ public:
     bool receive_protocol(std::string& proto);
 
     // 新增：事件内循环读，自动处理粘包/半包
-    bool receive_protocol_with_state(std::string& proto);
+    enum class RecvState{
+        Success,
+        NoMoreData,
+        Disconnected,
+        Error
+    };
+    RecvState receive_protocol_with_state(std::string& proto);
 };
 
 class AcceptedSocket : public DataSocket {
+private:
+    bool connected = true;
+
 public:
     AcceptedSocket() = delete;
     explicit AcceptedSocket(int fd, bool nonblock = false);
+
+    bool disconnect();
+    bool is_connected() const;
 };
 
 class ConnectSocket : public DataSocket {

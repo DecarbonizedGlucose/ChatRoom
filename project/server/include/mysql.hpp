@@ -12,6 +12,9 @@ private:
     std::string host, user, password, dbname;
     unsigned int port;
 
+    // 邮箱标准化处理
+    std::string normalize_email(const std::string& email) const;
+
 public:
     MySQLController(const std::string& host,
              const std::string& user,
@@ -29,26 +32,20 @@ public:
     bool execute(const std::string& query);
     std::vector<std::vector<std::string>> query(const std::string& sql);
 
-    // 用户操作
-    bool register_user(const std::string& username, const std::string& password_hash);
-    bool check_user(const std::string& username, const std::string& password_hash);
-
-    // 聊天记录
-    bool insert_message(const std::string& sender, const std::string& receiver,
-                        const std::string& content, int64_t timestamp);
-
-    std::vector<std::tuple<std::string, std::string, std::string, int64_t>>
-    get_messages(const std::string& user1, const std::string& user2, size_t limit = 50);
-
-    // 文件记录
-    bool insert_file(const std::string& hash, const std::string& filename, size_t size);
-    bool file_exists(const std::string& hash);
-
 /* ---------- 用户系统---------- */
     bool do_email_exist(const std::string& email);
     bool do_user_id_exist(const std::string& user_ID);
     bool insert_user(
         const std::string& user_ID,
         const std::string& email,
-        const std::string& user_password);
+        const std::string& password_hash);
+    bool check_user_pswd(const std::string& email, const std::string& password_hash);
+    void update_user_last_active(const std::string& email);
+    std::string get_user_id_from_email(const std::string& email);
+
+/* ---------- 好友 & 群组 ---------- */
+
+/* ---------- 聊天记录 ---------- */
+
+/* ---------- 文件 ---------- */
 };

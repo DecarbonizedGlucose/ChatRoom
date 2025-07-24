@@ -17,3 +17,7 @@ void sclear() {
 void print_input_sign() {
     std::cout << style("=> ", {ansi::FG_BRIGHT_RED, ansi::BOLD});
 }
+
+std::string selnum(int num) {
+    return style("[" + std::to_string(num) + "]", {ansi::FG_BRIGHT_BLUE, ansi::BOLD});
+}

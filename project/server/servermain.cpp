@@ -5,6 +5,8 @@
 #include <istream>
 
 int main() {
+    spdlog::set_level(spdlog::level::debug);
+    std::srand(std::time(nullptr));
     set_addr_s::fetch_addr_from_config();
     TopServer server;
     server.launch();

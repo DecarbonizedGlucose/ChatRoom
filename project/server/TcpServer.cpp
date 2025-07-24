@@ -98,10 +98,10 @@ void TcpServer::start() {
                 // 读事件
                 log_info("Reactor read event at fd {}", event_ptr->get_sockfd());
                 event_ptr->remove_from_reactor();
+                log_debug("Read event removed from reactor (fd:{})", event_ptr->get_sockfd());
                 pool->submit([event_ptr]() {
                     event_ptr->conn->dispatcher \
                     ->dispatch_recv(event_ptr->conn);
-                    event_ptr->add_to_reactor();
                 });
             }
             else {

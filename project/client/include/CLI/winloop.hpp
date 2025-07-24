@@ -19,7 +19,7 @@ enum class UIPage {
     Main,
     Message,
     Contacts,
-    About,
+    My,
     Exit
 };
 
@@ -34,7 +34,6 @@ public:
 private:
     // 处理用户输入(仅选择)
     void handle_start_input();
-    void handle_register_input();
     void handle_main_input();
     // 各个页面
     void start_loop();
@@ -43,7 +42,9 @@ private:
     void main_loop();
     void message_loop();
     void contacts_loop();
-    void about_loop();
+    void my_loop();
+    // 无界面功能
+    void log_out();
     // 页面跳转
     void switch_to(UIPage page);
     // 工具函数

@@ -41,7 +41,10 @@ public:
     void handle_send(TcpServerConnection* conn);
 
 private:
-    void handle_sign_in();
+    void handle_sign_in(
+        TcpServerConnection* conn,
+        const std::string& email,
+        const std::string& password);
     void handle_sign_out();
     void handle_register(
         TcpServerConnection* conn,
@@ -57,8 +60,9 @@ private:
     void handle_authentication(
         TcpServerConnection* conn,
         const std::string& email,
-        const std::string& veri_code
-    );
+        const std::string& veri_code);
+    void handle_accept();
+    void handle_refuse();
     void handle_add_friend();
     void handle_remove_friend();
     void handle_search_person();

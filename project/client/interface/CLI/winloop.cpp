@@ -5,6 +5,11 @@
 #include "../../../global/include/action.hpp"
 #include <iostream>
 
+std::string hash_password(const std::string& password) {
+    // 这里可以使用更安全的哈希函数
+    return std::to_string(std::hash<std::string>{}(password));
+}
+
 WinLoop::WinLoop(CommManager* comm) : current_page(UIPage::Start), comm(comm) {}
 
 WinLoop::~WinLoop() {
@@ -32,8 +37,8 @@ void WinLoop::run() {
             case UIPage::Contacts:
                 contacts_loop();
                 break;
-            case UIPage::About:
-                about_loop();
+            case UIPage::My:
+                my_loop();
                 break;
             case UIPage::Exit:
                 running = false;
@@ -51,9 +56,11 @@ void WinLoop::stop() {
 /* ---------- 页面处理 ---------- */
 
 void WinLoop::start_loop() {
-    sclear();
-    draw_start();
-    handle_start_input();
+    while (1) {
+        sclear();
+        draw_start();
+        handle_start_input();
+    }
 }
 
 void WinLoop::login_loop() {
@@ -73,8 +80,9 @@ void WinLoop::login_loop() {
             pause();
             continue;
         }
+        auto password_hash = hash_password(password);
         // 传给服务器
-        comm->handle_send_command(Action::Sign_In, email, {password});
+        comm->handle_send_command(Action::Sign_In, email, {password_hash});
         // 读取服务器响应
         CommandRequest resp = comm->handle_receive_command();
         if (resp.action() == static_cast<int>(Action::Accept)) {
@@ -107,7 +115,7 @@ void WinLoop::register_loop() {
         log_info("Received veri code response");
         int action_ = resp.action();
         if (action_ != static_cast<int>(Action::Accept)) {
-            std::cout << "邮箱已存在。" << std::endl;
+            std::cout << resp.args(0) << std::endl;
             pause();
             continue;
         }
@@ -136,13 +144,14 @@ void WinLoop::register_loop() {
         }
         draw_register(4);
         std::getline(std::cin, password);
-        if (password.empty()) {
+        if (password.empty()) { // 后面有空把这优化一下
             std::cout << "密码不能为空。" << std::endl;
             pause();
             continue;
         }
+        std::string password_hash = hash_password(password);
         // 发送注册请求
-        comm->handle_send_command(Action::Register, email, {username, password});
+        comm->handle_send_command(Action::Register, email, {username, password_hash});
         log_info("Sent registration request");
         // 读取服务器响应
         CommandRequest reg_resp = comm->handle_receive_command();
@@ -150,7 +159,10 @@ void WinLoop::register_loop() {
         if (reg_resp.action() == static_cast<int>(Action::Accept)) {
             log_info("Successfully registered");
             std::cout << "注册成功！" << std::endl;
-            switch_to(UIPage::Main);
+            comm->user_ID = username;
+            comm->email = email;
+            comm->password_hash = password_hash;
+            switch_to(UIPage::Start);
             return;
         } else {
             log_info("Registration failed: {}", reg_resp.args(0));
@@ -161,14 +173,59 @@ void WinLoop::register_loop() {
     }
 }
 
-void WinLoop::main_loop() {}
+void WinLoop::main_loop() {
+    while (1) {
+        sclear();
+        draw_main();
+        std::string input;
+        std::getline(std::cin, input);
+        if (input == "1") {
+            switch_to(UIPage::Message);
+        } else if (input == "2") {
+            switch_to(UIPage::Contacts);
+        } else if (input == "3") {
+            switch_to(UIPage::My);
+        } else if (input == "0") {
+            switch_to(UIPage::Exit);
+            return;
+        } else {
+            log_error("Invalid input: {}", input);
+        }
+    }
+}
 
-void WinLoop::message_loop() {}
+void WinLoop::message_loop() {
+    sclear();
+    std::cout << "消息列表功能尚未实现。" << std::endl;
+    std::cout << "按任意键返回主菜单..." << std::endl;
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    pause();
+    switch_to(UIPage::Main);
+    return;
+}
 
-void WinLoop::contacts_loop() {}
+void WinLoop::contacts_loop() {
+    sclear();
+    std::cout << "联系人功能尚未实现。" << std::endl;
+    std::cout << "按任意键返回主菜单..." << std::endl;
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    pause();
+    switch_to(UIPage::Main);
+    return;
+}
 
-void WinLoop::about_loop() {
+void WinLoop::my_loop() {
+    sclear();
+    std::cout << "关于功能尚未实现。" << std::endl;
+    std::cout << "按任意键返回主菜单..." << std::endl;
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    pause();
+    switch_to(UIPage::Main);
+    return;
+}
 
+void WinLoop::log_out() {
+    comm->handle_send_command(Action::Sign_Out, comm->email, {});
 }
 
 /* ---------- 菜单选择 ---------- */
@@ -183,7 +240,28 @@ void WinLoop::handle_start_input() {
     } else if (input == "0") {
         switch_to(UIPage::Exit);
     } else {
-        log_error("Invalid input: {}", input);
+        std::cout << "无效的输入，请重新选择。" << std::endl;
+        pause();
+    }
+}
+
+void WinLoop::handle_main_input() {
+    std::string input;
+    std::getline(std::cin, input);
+    if (input == "1") {
+        switch_to(UIPage::Message);
+    } else if (input == "2") {
+        switch_to(UIPage::Contacts);
+    } else if (input == "3") {
+        switch_to(UIPage::My);
+    } else if (input == "0") {
+        // 退出登录
+
+        std::cout << "正在退出登录..." << std::endl;
+        switch_to(UIPage::Exit);
+    } else {
+        std::cout << "无效的输入，请重新选择。" << std::endl;
+        pause();
     }
 }
 
@@ -205,53 +283,65 @@ void WinLoop::switch_to(UIPage page) {
 /* ---------- 渲染 ---------- */
 
 void draw_start() {
-    std::cout << "-$-    欢迎来到聊天室 -$-" << std::endl;
-    std::cout << "         [1] 登录" << std::endl;
-    std::cout << "         [2] 注册" << std::endl;
-    std::cout << "         [0] 退出" << std::endl;
+    std::cout << "-$-    欢迎来到聊天室    -$-" << std::endl;
+    std::cout << "         " + selnum(1) + " 登录" << std::endl;
+    std::cout << "         " + selnum(2) + " 注册" << std::endl;
+    std::cout << "         " + selnum(0) + " 退出" << std::endl;
     print_input_sign();
 }
 
 void draw_login(int idx) {
     switch (idx) {
-        case 1:
+        case 1: {
             std::cout << "         -$- 登    录 -$-" << std::endl;
             std::cout << "请输入邮箱和密码。" << std::endl;
             std::cout << "（直接回车返回）" << std::endl;
             std::cout << "邮箱";
             print_input_sign();
             break;
-        case 2:
+        }
+        case 2: {
             std::cout << "密码";
             print_input_sign();
             break;
+        }
     }
 }
 
 void draw_register(int idx) {
     switch (idx) {
-        case 1:
+        case 1: {
             std::cout << "          -$- 注    册 -$-" << std::endl;
             std::cout << "请输入邮箱、验证码、用户名和密码。" << std::endl;
             std::cout << "（直接回车返回）" << std::endl;
             std::cout << "邮箱";
             print_input_sign();
             break;
-        case 2:
+        }
+        case 2: {
             std::cout << "请注意查收验证码。验证码5分钟内有效。" << std::endl;
             std::cout << "验证码";
             print_input_sign();
             break;
-        case 3:
+        }
+        case 3: {
             std::cout << "用户名";
             print_input_sign();
             break;
-        case 4:
+        }
+        case 4: {
             std::cout << "密码";
             print_input_sign();
             break;
+        }
     }
 }
 
 void draw_main() {
+    std::cout << "-$-    欢迎来到聊天室    -$-" << std::endl;
+    std::cout << "       " + selnum(1) + " 消息列表" << std::endl;
+    std::cout << "       " + selnum(2) + " 联系人" << std::endl;
+    std::cout << "       " + selnum(3) + " 我的" << std::endl;
+    std::cout << "       " + selnum(0) + " 退出" << std::endl;
+    print_input_sign();
 }

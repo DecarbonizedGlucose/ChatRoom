@@ -122,3 +122,126 @@ cc ---> cs ---> ds ---> dc
 - 获取群聊基本信息
 - 文件hash校验
 
+## 聊天室数据库设计与消息系统整理
+
+### ✅ 用户信息表
+```sql
+CREATE TABLE users (
+    user_id VARCHAR(30) PRIMARY KEY NOT NULL,
+    user_email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash CHAR(60) NOT NULL,
+    last_active TIMESTAMP NULL,
+    status ENUM('active', 'offline') DEFAULT 'offline'
+);
+```
+
+### ✅ 好友列表表
+```sql
+CREATE TABLE friends (
+    user_id VARCHAR(30) NOT NULL,
+    friend_id VARCHAR(30) NOT NULL,
+    is_blocked BOOLEAN DEFAULT FALSE,
+    PRIMARY KEY(user_id, friend_id),
+    FOREIGN KEY(user_id) REFERENCES users(user_id),
+    FOREIGN KEY(friend_id) REFERENCES users(user_id)
+);
+```
+
+### ✅ 群组表（群元数据）
+```sql
+CREATE TABLE chat_groups (
+    group_id VARCHAR(30) PRIMARY KEY NOT NULL,
+    group_name VARCHAR(255) NOT NULL,
+    owner_id VARCHAR(30) NOT NULL,
+    FOREIGN KEY(owner_id) REFERENCES users(user_id)
+);
+```
+
+### ✅ 群成员表（群聊成员）
+```sql
+CREATE TABLE group_members (
+    group_id VARCHAR(30) NOT NULL,
+    user_id VARCHAR(30) NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE,
+    PRIMARY KEY(group_id, user_id),
+    FOREIGN KEY(group_id) REFERENCES chat_groups(group_id),
+    FOREIGN KEY(user_id) REFERENCES users(user_id)
+);
+```
+
+- **群主=群表中 owner_id**，成员表不再单独存储是否为群主，避免冗余。
+
+---
+
+### ✅ 如何查找：
+
+**从某个用户查找好友列表：**
+```sql
+SELECT friend_id, is_blocked FROM friends
+WHERE user_id = 'xxx';
+```
+
+**从某个用户查找所在群：**
+```sql
+SELECT group_id FROM group_members
+WHERE user_id = 'xxx';
+```
+
+**从群ID查找所有群成员：**
+```sql
+SELECT user_id, is_admin FROM group_members
+WHERE group_id = 'group123';
+```
+
+**查找群主：**
+```sql
+SELECT owner_id FROM groups
+WHERE group_id = 'group123';
+```
+
+### ✅ 聊天记录数据库表（统一）
+```sql
+CREATE TABLE chat_messages (
+    message_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sender_id VARCHAR(30) NOT NULL,
+    receiver_id VARCHAR(30) NOT NULL,
+    is_group BOOLEAN NOT NULL,
+    timestamp BIGINT NOT NULL,
+    text TEXT,
+    pin BOOLEAN DEFAULT FALSE,
+    file_name VARCHAR(255),
+    file_size BIGINT,
+    file_hash VARCHAR(128),
+    FOREIGN KEY (sender_id) REFERENCES users(user_id)
+);
+```
+
+---
+
+### ✅ 查询示例
+
+**私聊：**
+```sql
+SELECT * FROM chat_messages
+WHERE is_group = FALSE
+  AND ((sender_id = 'userA' AND receiver_id = 'userB') OR
+       (sender_id = 'userB' AND receiver_id = 'userA'))
+ORDER BY timestamp ASC
+LIMIT 100;
+```
+
+**群聊：**
+```sql
+SELECT * FROM chat_messages
+WHERE is_group = TRUE
+  AND receiver_id = 'group123'
+ORDER BY timestamp ASC
+LIMIT 100;
+```
+
+---
+
+### ✅ 优化建议
+- 为 `(receiver_id, is_group, timestamp)` 建复合索引。
+- 文件内容存在本地或云端，数据库仅存元数据。
+- 可拆分活跃消息表和归档表，支持分区。
