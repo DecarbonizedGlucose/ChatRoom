@@ -70,17 +70,7 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
             any.UnpackTo(&file_chunk);
             // 文件分片
             file_handler->handle_recv(file_chunk, proto_str);
-        // } else if (any.Is<SyncItem>()) {
-        //     SyncItem sync_item;
-        //     any.UnpackTo(&sync_item);
-        //     // 同步数据
-        //     sync_handler->handle_recv(sync_item, proto_str);
-        // } else if (any.Is<OfflineMessages>()) {
-        //     OfflineMessages offline_msgs;
-        //     any.UnpackTo(&offline_msgs);
-        //     // 离线消息
-        //     offline_message_handler->handle_recv(offline_msgs, proto_str);
-        } else {
+        } else { // 剩下的不用服务器收
             log_error("Unknown payload type");
             continue;
         }

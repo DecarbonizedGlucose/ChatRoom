@@ -21,4 +21,5 @@ public:
     void add_conn(TcpServerConnection* conn, int server_index);
     void remove_user(std::string user_ID);
     bool user_exists(std::string user_ID);
+    TcpServerConnection* get_connection(const std::string& user_ID, int server_index = 0);
 };

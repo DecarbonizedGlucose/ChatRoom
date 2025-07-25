@@ -6,7 +6,10 @@
 #include "../../global/include/logging.hpp"
 #include "../../global/abstract/datatypes.hpp"
 #include "../include/connection_manager.hpp"
+#include <nlohmann/json.hpp>
 #include <iostream>
+
+using json = nlohmann::json;
 
 /* Handler base */
 Handler::Handler(Dispatcher* dispatcher) : disp(dispatcher) {}
@@ -108,7 +111,6 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Invite_To_Group: {
-
             handle_invite_to_group();
             break;
         }
@@ -129,7 +131,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Get_Relation_Net: {
-            handle_get_relation_net();
+            handle_get_relation_net(subj);
             break;
         }
         case Action::Download_File: {
@@ -334,7 +336,60 @@ void CommandHandler::handle_add_admin() {}
 
 void CommandHandler::handle_remove_admin() {}
 
-void CommandHandler::handle_get_relation_net() {}
+void CommandHandler::handle_get_relation_net(const std::string& user_ID) {
+    log_debug("handle_get_relation_net called for user: {}", user_ID);
+    // 构建完整关系网数据的JSON
+    json relation_data;
+    // 获取好友列表（包含屏蔽状态）
+    auto friends_with_status = disp->mysql_con->get_friends_with_block_status(user_ID);
+    json friends_array = json::array();
+    for (const auto& [friend_id, is_blocked] : friends_with_status) {
+        json friend_info;
+        friend_info["id"] = friend_id;
+        friend_info["blocked"] = is_blocked;
+        friends_array.push_back(friend_info);
+    }
+    relation_data["friends"] = friends_array;
+    // 获取群组列表
+    auto group_list = disp->mysql_con->get_user_groups(user_ID);
+    json groups_array = json::array();
+    for (const auto& group_id : group_list) {
+        json group_info;
+        group_info["id"] = group_id;
+        group_info["name"] = disp->mysql_con->get_group_name(group_id);
+        group_info["owner"] = disp->mysql_con->get_group_owner(group_id);
+        // 获取群成员（包含管理员状态）
+        auto members_with_admin = disp->mysql_con->get_group_members_with_admin_status(group_id);
+        json members_array = json::array();
+        for (const auto& [member_id, is_admin] : members_with_admin) {
+            json member_info;
+            member_info["id"] = member_id;
+            member_info["is_admin"] = is_admin;
+            members_array.push_back(member_info);
+        }
+        group_info["members"] = members_array;
+        groups_array.push_back(group_info);
+    }
+    relation_data["groups"] = groups_array;
+    // 创建SyncItem进行全量关系网同步
+    auto sync_str = create_sync_string(
+        SyncItem::RELATION_NET_FULL,
+        user_ID,
+        relation_data.dump()
+    );
+    auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
+    if (data_conn) {
+        data_conn->socket->set_write_buf(sync_str);
+        data_conn->write_event->add_to_reactor();
+        data_conn->set_send_type(DataType::SyncItem);
+        log_info("Full relation network sent to user: {}", user_ID);
+    } else {
+        log_error("Data connection not found for user: {}", user_ID);
+    }
+    log_debug("Full relation network data prepared for user: {}", user_ID);
+}
+
+void CommandHandler::handle_update_relation_net(const std::string& user_ID) {}
 
 void CommandHandler::handle_download_file() {}
 

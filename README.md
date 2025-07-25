@@ -17,8 +17,14 @@ sudo apt install -y \
   libabsl-dev \
   libncurses-dev \
   libhiredis-dev \
-  build-essential
+  build-essential \
+  libsqlite3-dev
 
+# SQLiteCpp 需要手动编译安装
+cd /tmp
+git clone https://github.com/SRombauts/SQLiteCpp.git
+cd SQLiteCpp && mkdir build && cd build
+cmake .. && make && sudo make install
 # redis++ 需要手动编译安装
 cd /tmp
 git clone https://github.com/sewenew/redis-plus-plus.git

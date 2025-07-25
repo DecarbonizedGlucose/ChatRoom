@@ -62,16 +62,24 @@ template<> ::SyncItem* Arena::CreateMaybeMessage<::SyncItem>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 
 enum SyncItem_SyncType : int {
-  SyncItem_SyncType_FRIEND_UPDATE = 0,
-  SyncItem_SyncType_GROUP_UPDATE = 1,
-  SyncItem_SyncType_BE_KICKED = 2,
-  SyncItem_SyncType_FRIEND_REQUEST = 3,
+  SyncItem_SyncType_FRIEND_ADD = 0,
+  SyncItem_SyncType_FRIEND_REMOVE = 1,
+  SyncItem_SyncType_FRIEND_BLOCK = 2,
+  SyncItem_SyncType_FRIEND_UNBLOCK = 3,
+  SyncItem_SyncType_GROUP_CREATE = 10,
+  SyncItem_SyncType_GROUP_JOIN = 11,
+  SyncItem_SyncType_GROUP_LEAVE = 12,
+  SyncItem_SyncType_GROUP_KICK = 13,
+  SyncItem_SyncType_GROUP_DISBAND = 14,
+  SyncItem_SyncType_GROUP_ADMIN_ADD = 15,
+  SyncItem_SyncType_GROUP_ADMIN_REMOVE = 16,
+  SyncItem_SyncType_RELATION_NET_FULL = 100,
   SyncItem_SyncType_SyncItem_SyncType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   SyncItem_SyncType_SyncItem_SyncType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool SyncItem_SyncType_IsValid(int value);
-constexpr SyncItem_SyncType SyncItem_SyncType_SyncType_MIN = SyncItem_SyncType_FRIEND_UPDATE;
-constexpr SyncItem_SyncType SyncItem_SyncType_SyncType_MAX = SyncItem_SyncType_FRIEND_REQUEST;
+constexpr SyncItem_SyncType SyncItem_SyncType_SyncType_MIN = SyncItem_SyncType_FRIEND_ADD;
+constexpr SyncItem_SyncType SyncItem_SyncType_SyncType_MAX = SyncItem_SyncType_RELATION_NET_FULL;
 constexpr int SyncItem_SyncType_SyncType_ARRAYSIZE = SyncItem_SyncType_SyncType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* SyncItem_SyncType_descriptor();
@@ -459,14 +467,30 @@ class SyncItem final :
   // nested types ----------------------------------------------------
 
   typedef SyncItem_SyncType SyncType;
-  static constexpr SyncType FRIEND_UPDATE =
-    SyncItem_SyncType_FRIEND_UPDATE;
-  static constexpr SyncType GROUP_UPDATE =
-    SyncItem_SyncType_GROUP_UPDATE;
-  static constexpr SyncType BE_KICKED =
-    SyncItem_SyncType_BE_KICKED;
-  static constexpr SyncType FRIEND_REQUEST =
-    SyncItem_SyncType_FRIEND_REQUEST;
+  static constexpr SyncType FRIEND_ADD =
+    SyncItem_SyncType_FRIEND_ADD;
+  static constexpr SyncType FRIEND_REMOVE =
+    SyncItem_SyncType_FRIEND_REMOVE;
+  static constexpr SyncType FRIEND_BLOCK =
+    SyncItem_SyncType_FRIEND_BLOCK;
+  static constexpr SyncType FRIEND_UNBLOCK =
+    SyncItem_SyncType_FRIEND_UNBLOCK;
+  static constexpr SyncType GROUP_CREATE =
+    SyncItem_SyncType_GROUP_CREATE;
+  static constexpr SyncType GROUP_JOIN =
+    SyncItem_SyncType_GROUP_JOIN;
+  static constexpr SyncType GROUP_LEAVE =
+    SyncItem_SyncType_GROUP_LEAVE;
+  static constexpr SyncType GROUP_KICK =
+    SyncItem_SyncType_GROUP_KICK;
+  static constexpr SyncType GROUP_DISBAND =
+    SyncItem_SyncType_GROUP_DISBAND;
+  static constexpr SyncType GROUP_ADMIN_ADD =
+    SyncItem_SyncType_GROUP_ADMIN_ADD;
+  static constexpr SyncType GROUP_ADMIN_REMOVE =
+    SyncItem_SyncType_GROUP_ADMIN_REMOVE;
+  static constexpr SyncType RELATION_NET_FULL =
+    SyncItem_SyncType_RELATION_NET_FULL;
   static inline bool SyncType_IsValid(int value) {
     return SyncItem_SyncType_IsValid(value);
   }
@@ -495,10 +519,26 @@ class SyncItem final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kContentFieldNumber = 2,
+    kTargetIdFieldNumber = 2,
+    kContentFieldNumber = 3,
+    kTimestampFieldNumber = 4,
     kTypeFieldNumber = 1,
   };
-  // string content = 2;
+  // string target_id = 2;
+  void clear_target_id();
+  const std::string& target_id() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_target_id(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_target_id();
+  PROTOBUF_NODISCARD std::string* release_target_id();
+  void set_allocated_target_id(std::string* target_id);
+  private:
+  const std::string& _internal_target_id() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_target_id(const std::string& value);
+  std::string* _internal_mutable_target_id();
+  public:
+
+  // string content = 3;
   void clear_content();
   const std::string& content() const;
   template <typename ArgT0 = const std::string&, typename... ArgT>
@@ -510,6 +550,15 @@ class SyncItem final :
   const std::string& _internal_content() const;
   inline PROTOBUF_ALWAYS_INLINE void _internal_set_content(const std::string& value);
   std::string* _internal_mutable_content();
+  public:
+
+  // int64 timestamp = 4;
+  void clear_timestamp();
+  int64_t timestamp() const;
+  void set_timestamp(int64_t value);
+  private:
+  int64_t _internal_timestamp() const;
+  void _internal_set_timestamp(int64_t value);
   public:
 
   // .SyncItem.SyncType type = 1;
@@ -529,7 +578,9 @@ class SyncItem final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr target_id_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr content_;
+    int64_t timestamp_;
     int type_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
@@ -1038,7 +1089,57 @@ inline void SyncItem::set_type(::SyncItem_SyncType value) {
   // @@protoc_insertion_point(field_set:SyncItem.type)
 }
 
-// string content = 2;
+// string target_id = 2;
+inline void SyncItem::clear_target_id() {
+  _impl_.target_id_.ClearToEmpty();
+}
+inline const std::string& SyncItem::target_id() const {
+  // @@protoc_insertion_point(field_get:SyncItem.target_id)
+  return _internal_target_id();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void SyncItem::set_target_id(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.target_id_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:SyncItem.target_id)
+}
+inline std::string* SyncItem::mutable_target_id() {
+  std::string* _s = _internal_mutable_target_id();
+  // @@protoc_insertion_point(field_mutable:SyncItem.target_id)
+  return _s;
+}
+inline const std::string& SyncItem::_internal_target_id() const {
+  return _impl_.target_id_.Get();
+}
+inline void SyncItem::_internal_set_target_id(const std::string& value) {
+  
+  _impl_.target_id_.Set(value, GetArenaForAllocation());
+}
+inline std::string* SyncItem::_internal_mutable_target_id() {
+  
+  return _impl_.target_id_.Mutable(GetArenaForAllocation());
+}
+inline std::string* SyncItem::release_target_id() {
+  // @@protoc_insertion_point(field_release:SyncItem.target_id)
+  return _impl_.target_id_.Release();
+}
+inline void SyncItem::set_allocated_target_id(std::string* target_id) {
+  if (target_id != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.target_id_.SetAllocated(target_id, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.target_id_.IsDefault()) {
+    _impl_.target_id_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:SyncItem.target_id)
+}
+
+// string content = 3;
 inline void SyncItem::clear_content() {
   _impl_.content_.ClearToEmpty();
 }
@@ -1086,6 +1187,26 @@ inline void SyncItem::set_allocated_content(std::string* content) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:SyncItem.content)
+}
+
+// int64 timestamp = 4;
+inline void SyncItem::clear_timestamp() {
+  _impl_.timestamp_ = int64_t{0};
+}
+inline int64_t SyncItem::_internal_timestamp() const {
+  return _impl_.timestamp_;
+}
+inline int64_t SyncItem::timestamp() const {
+  // @@protoc_insertion_point(field_get:SyncItem.timestamp)
+  return _internal_timestamp();
+}
+inline void SyncItem::_internal_set_timestamp(int64_t value) {
+  
+  _impl_.timestamp_ = value;
+}
+inline void SyncItem::set_timestamp(int64_t value) {
+  _internal_set_timestamp(value);
+  // @@protoc_insertion_point(field_set:SyncItem.timestamp)
 }
 
 // -------------------------------------------------------------------

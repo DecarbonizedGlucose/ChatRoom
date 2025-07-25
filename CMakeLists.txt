@@ -24,6 +24,7 @@ find_package(Threads REQUIRED)
 find_package(redis++ REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(Curses REQUIRED)
+find_package(SQLiteCpp REQUIRED)
 
 # MySQL 配置
 find_path(MYSQL_INCLUDE_DIR mysql/mysql.h)

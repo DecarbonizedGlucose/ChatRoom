@@ -42,7 +42,9 @@ struct FileChunkDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 FileChunkDefaultTypeInternal _FileChunk_default_instance_;
 PROTOBUF_CONSTEXPR SyncItem::SyncItem(
     ::_pbi::ConstantInitialized): _impl_{
-    /*decltype(_impl_.content_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+    /*decltype(_impl_.target_id_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.content_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.timestamp_)*/int64_t{0}
   , /*decltype(_impl_.type_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct SyncItemDefaultTypeInternal {
@@ -93,7 +95,9 @@ const uint32_t TableStruct_data_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
   ~0u,  // no _weak_field_map_
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::SyncItem, _impl_.type_),
+  PROTOBUF_FIELD_OFFSET(::SyncItem, _impl_.target_id_),
   PROTOBUF_FIELD_OFFSET(::SyncItem, _impl_.content_),
+  PROTOBUF_FIELD_OFFSET(::SyncItem, _impl_.timestamp_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::OfflineMessages, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -105,7 +109,7 @@ const uint32_t TableStruct_data_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
 static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::FileChunk)},
   { 14, -1, -1, sizeof(::SyncItem)},
-  { 22, -1, -1, sizeof(::OfflineMessages)},
+  { 24, -1, -1, sizeof(::OfflineMessages)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -119,20 +123,24 @@ const char descriptor_table_protodef_data_2eproto[] PROTOBUF_SECTION_VARIABLE(pr
   "k\022\017\n\007file_id\030\001 \001(\t\022\020\n\010filename\030\002 \001(\t\022\014\n\004"
   "data\030\003 \001(\014\022\023\n\013chunk_index\030\004 \001(\r\022\024\n\014total"
   "_chunks\030\005 \001(\r\022\025\n\ris_last_chunk\030\006 \001(\010\022\021\n\t"
-  "sender_id\030\007 \001(\t\022\023\n\013receiver_id\030\010 \001(\t\"\221\001\n"
+  "sender_id\030\007 \001(\t\022\023\n\013receiver_id\030\010 \001(\t\"\323\002\n"
   "\010SyncItem\022 \n\004type\030\001 \001(\0162\022.SyncItem.SyncT"
-  "ype\022\017\n\007content\030\002 \001(\t\"R\n\010SyncType\022\021\n\rFRIE"
-  "ND_UPDATE\020\000\022\020\n\014GROUP_UPDATE\020\001\022\r\n\tBE_KICK"
-  "ED\020\002\022\022\n\016FRIEND_REQUEST\020\003\"1\n\017OfflineMessa"
-  "ges\022\036\n\010messages\030\001 \003(\0132\014.ChatMessageb\006pro"
-  "to3"
+  "ype\022\021\n\ttarget_id\030\002 \001(\t\022\017\n\007content\030\003 \001(\t\022"
+  "\021\n\ttimestamp\030\004 \001(\003\"\355\001\n\010SyncType\022\016\n\nFRIEN"
+  "D_ADD\020\000\022\021\n\rFRIEND_REMOVE\020\001\022\020\n\014FRIEND_BLO"
+  "CK\020\002\022\022\n\016FRIEND_UNBLOCK\020\003\022\020\n\014GROUP_CREATE"
+  "\020\n\022\016\n\nGROUP_JOIN\020\013\022\017\n\013GROUP_LEAVE\020\014\022\016\n\nG"
+  "ROUP_KICK\020\r\022\021\n\rGROUP_DISBAND\020\016\022\023\n\017GROUP_"
+  "ADMIN_ADD\020\017\022\026\n\022GROUP_ADMIN_REMOVE\020\020\022\025\n\021R"
+  "ELATION_NET_FULL\020d\"1\n\017OfflineMessages\022\036\n"
+  "\010messages\030\001 \003(\0132\014.ChatMessageb\006proto3"
   ;
 static const ::_pbi::DescriptorTable* const descriptor_table_data_2eproto_deps[1] = {
   &::descriptor_table_message_2eproto,
 };
 static ::_pbi::once_flag descriptor_table_data_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_data_2eproto = {
-    false, false, 403, descriptor_table_protodef_data_2eproto,
+    false, false, 597, descriptor_table_protodef_data_2eproto,
     "data.proto",
     &descriptor_table_data_2eproto_once, descriptor_table_data_2eproto_deps, 1, 3,
     schemas, file_default_instances, TableStruct_data_2eproto::offsets,
@@ -155,6 +163,14 @@ bool SyncItem_SyncType_IsValid(int value) {
     case 1:
     case 2:
     case 3:
+    case 10:
+    case 11:
+    case 12:
+    case 13:
+    case 14:
+    case 15:
+    case 16:
+    case 100:
       return true;
     default:
       return false;
@@ -162,10 +178,18 @@ bool SyncItem_SyncType_IsValid(int value) {
 }
 
 #if (__cplusplus < 201703) && (!defined(_MSC_VER) || (_MSC_VER >= 1900 && _MSC_VER < 1912))
-constexpr SyncItem_SyncType SyncItem::FRIEND_UPDATE;
-constexpr SyncItem_SyncType SyncItem::GROUP_UPDATE;
-constexpr SyncItem_SyncType SyncItem::BE_KICKED;
-constexpr SyncItem_SyncType SyncItem::FRIEND_REQUEST;
+constexpr SyncItem_SyncType SyncItem::FRIEND_ADD;
+constexpr SyncItem_SyncType SyncItem::FRIEND_REMOVE;
+constexpr SyncItem_SyncType SyncItem::FRIEND_BLOCK;
+constexpr SyncItem_SyncType SyncItem::FRIEND_UNBLOCK;
+constexpr SyncItem_SyncType SyncItem::GROUP_CREATE;
+constexpr SyncItem_SyncType SyncItem::GROUP_JOIN;
+constexpr SyncItem_SyncType SyncItem::GROUP_LEAVE;
+constexpr SyncItem_SyncType SyncItem::GROUP_KICK;
+constexpr SyncItem_SyncType SyncItem::GROUP_DISBAND;
+constexpr SyncItem_SyncType SyncItem::GROUP_ADMIN_ADD;
+constexpr SyncItem_SyncType SyncItem::GROUP_ADMIN_REMOVE;
+constexpr SyncItem_SyncType SyncItem::RELATION_NET_FULL;
 constexpr SyncItem_SyncType SyncItem::SyncType_MIN;
 constexpr SyncItem_SyncType SyncItem::SyncType_MAX;
 constexpr int SyncItem::SyncType_ARRAYSIZE;
@@ -669,11 +693,21 @@ SyncItem::SyncItem(const SyncItem& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   SyncItem* const _this = this; (void)_this;
   new (&_impl_) Impl_{
-      decltype(_impl_.content_){}
+      decltype(_impl_.target_id_){}
+    , decltype(_impl_.content_){}
+    , decltype(_impl_.timestamp_){}
     , decltype(_impl_.type_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.target_id_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.target_id_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_target_id().empty()) {
+    _this->_impl_.target_id_.Set(from._internal_target_id(), 
+      _this->GetArenaForAllocation());
+  }
   _impl_.content_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.content_.Set("", GetArenaForAllocation());
@@ -682,7 +716,9 @@ SyncItem::SyncItem(const SyncItem& from)
     _this->_impl_.content_.Set(from._internal_content(), 
       _this->GetArenaForAllocation());
   }
-  _this->_impl_.type_ = from._impl_.type_;
+  ::memcpy(&_impl_.timestamp_, &from._impl_.timestamp_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.type_) -
+    reinterpret_cast<char*>(&_impl_.timestamp_)) + sizeof(_impl_.type_));
   // @@protoc_insertion_point(copy_constructor:SyncItem)
 }
 
@@ -691,10 +727,16 @@ inline void SyncItem::SharedCtor(
   (void)arena;
   (void)is_message_owned;
   new (&_impl_) Impl_{
-      decltype(_impl_.content_){}
+      decltype(_impl_.target_id_){}
+    , decltype(_impl_.content_){}
+    , decltype(_impl_.timestamp_){int64_t{0}}
     , decltype(_impl_.type_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
+  _impl_.target_id_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.target_id_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   _impl_.content_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.content_.Set("", GetArenaForAllocation());
@@ -712,6 +754,7 @@ SyncItem::~SyncItem() {
 
 inline void SyncItem::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.target_id_.Destroy();
   _impl_.content_.Destroy();
 }
 
@@ -725,8 +768,11 @@ void SyncItem::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  _impl_.target_id_.ClearToEmpty();
   _impl_.content_.ClearToEmpty();
-  _impl_.type_ = 0;
+  ::memset(&_impl_.timestamp_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.type_) -
+      reinterpret_cast<char*>(&_impl_.timestamp_)) + sizeof(_impl_.type_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -745,13 +791,31 @@ const char* SyncItem::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx)
         } else
           goto handle_unusual;
         continue;
-      // string content = 2;
+      // string target_id = 2;
       case 2:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_target_id();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "SyncItem.target_id"));
+        } else
+          goto handle_unusual;
+        continue;
+      // string content = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
           auto str = _internal_mutable_content();
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "SyncItem.content"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 timestamp = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
+          _impl_.timestamp_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -791,14 +855,30 @@ uint8_t* SyncItem::_InternalSerialize(
       1, this->_internal_type(), target);
   }
 
-  // string content = 2;
+  // string target_id = 2;
+  if (!this->_internal_target_id().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_target_id().data(), static_cast<int>(this->_internal_target_id().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "SyncItem.target_id");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_target_id(), target);
+  }
+
+  // string content = 3;
   if (!this->_internal_content().empty()) {
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
       this->_internal_content().data(), static_cast<int>(this->_internal_content().length()),
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
       "SyncItem.content");
     target = stream->WriteStringMaybeAliased(
-        2, this->_internal_content(), target);
+        3, this->_internal_content(), target);
+  }
+
+  // int64 timestamp = 4;
+  if (this->_internal_timestamp() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(4, this->_internal_timestamp(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
@@ -817,11 +897,23 @@ size_t SyncItem::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  // string content = 2;
+  // string target_id = 2;
+  if (!this->_internal_target_id().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_target_id());
+  }
+
+  // string content = 3;
   if (!this->_internal_content().empty()) {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
         this->_internal_content());
+  }
+
+  // int64 timestamp = 4;
+  if (this->_internal_timestamp() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_timestamp());
   }
 
   // .SyncItem.SyncType type = 1;
@@ -848,8 +940,14 @@ void SyncItem::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTO
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
+  if (!from._internal_target_id().empty()) {
+    _this->_internal_set_target_id(from._internal_target_id());
+  }
   if (!from._internal_content().empty()) {
     _this->_internal_set_content(from._internal_content());
+  }
+  if (from._internal_timestamp() != 0) {
+    _this->_internal_set_timestamp(from._internal_timestamp());
   }
   if (from._internal_type() != 0) {
     _this->_internal_set_type(from._internal_type());
@@ -874,10 +972,19 @@ void SyncItem::InternalSwap(SyncItem* other) {
   auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.target_id_, lhs_arena,
+      &other->_impl_.target_id_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.content_, lhs_arena,
       &other->_impl_.content_, rhs_arena
   );
-  swap(_impl_.type_, other->_impl_.type_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(SyncItem, _impl_.type_)
+      + sizeof(SyncItem::_impl_.type_)
+      - PROTOBUF_FIELD_OFFSET(SyncItem, _impl_.timestamp_)>(
+          reinterpret_cast<char*>(&_impl_.timestamp_),
+          reinterpret_cast<char*>(&other->_impl_.timestamp_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata SyncItem::GetMetadata() const {

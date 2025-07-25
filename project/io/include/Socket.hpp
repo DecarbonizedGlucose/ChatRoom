@@ -44,6 +44,7 @@ public:
     uint16_t get_port() const;
     void set_ip(const std::string& ip);
     void set_port(uint16_t port);
+    void set_nonblocking(bool nonblock = true);
 };
 
 class DataSocket : public Socket {

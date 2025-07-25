@@ -74,4 +74,22 @@ CommandRequest get_command_request(const std::string& proto_str);
 
 /* ---------- SyncItem ----------*/
 
+SyncItem create_sync_item(
+    SyncItem::SyncType type,
+    const std::string& target_id,
+    const std::string& content,
+    std::time_t timestamp = 0
+);
+
+std::string get_sync_string(const SyncItem& item);
+
+std::string create_sync_string(
+    SyncItem::SyncType type,
+    const std::string& target_id,
+    const std::string& content,
+    std::time_t timestamp = 0
+);
+
+SyncItem get_sync_item(const std::string& proto_str);
+
 /* ---------- OfflineMessages ---------- */

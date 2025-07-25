@@ -18,6 +18,10 @@ WinLoop::WinLoop(CommManager* comm, thread_pool* pool)
 WinLoop::~WinLoop() {
 }
 
+void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
+
+}
+
 void WinLoop::run() {
     running = true;
     while (running) { // 状态机比那循环嵌套好看多了
@@ -61,7 +65,7 @@ void WinLoop::stop() {
 void WinLoop::start_loop() {
     while (1) {
         sclear();
-        draw_start();
+        draw_start(output_mutex);
         handle_start_input();
     }
 }
@@ -69,14 +73,14 @@ void WinLoop::start_loop() {
 void WinLoop::login_loop() {
     while (1) {
         sclear();
-        draw_login(1);
+        draw_login(output_mutex, 1);
         std::string email, password;
         std::getline(std::cin, email);
         if (email.empty()) { // 返回
             switch_to(UIPage::Start);
             return;
         }
-        draw_login(2);
+        draw_login(output_mutex, 2);
         std::getline(std::cin, password);
         if (email.empty() || password.empty()) {
             std::cout << "Email or password cannot be empty." << std::endl;
@@ -85,13 +89,14 @@ void WinLoop::login_loop() {
         }
         auto password_hash = hash_password(password);
         // 传给服务器
-        comm->handle_send_command(Action::Sign_In, email, {password_hash});
+        comm->handle_send_command(Action::Sign_In, email, {password_hash}, false);
         // 读取服务器响应
-        CommandRequest resp = comm->handle_receive_command();
+        CommandRequest resp = comm->handle_receive_command(false);
         if (resp.action() == static_cast<int>(Action::Accept)) {
             std::cout << "登录成功！" << std::endl;
+            comm->email = email;
             // 向服务器发送身份信息
-            comm->user_ID = resp.args(0);
+            main_init();
             switch_to(UIPage::Main);
             return;
         } else { // Refused
@@ -106,17 +111,17 @@ void WinLoop::register_loop() {
     while (1) {
         sclear();
         std::string email, veri_code, username, password;
-        draw_register(1);
+        draw_register(output_mutex, 1);
         std::getline(std::cin, email);
         if (email.empty()) { // 返回
             switch_to(UIPage::Start);
             return;
         }
         // 发送验证码请求
-        comm->handle_send_command(Action::Get_Veri_Code, email, {});
+        comm->handle_send_command(Action::Get_Veri_Code, email, {}, false);
         log_info("Sent veri code request");
         // 读取服务器响应
-        CommandRequest resp = comm->handle_receive_command();
+        CommandRequest resp = comm->handle_receive_command(false);
         log_info("Received veri code response");
         int action_ = resp.action();
         if (action_ != static_cast<int>(Action::Accept)) {
@@ -124,7 +129,7 @@ void WinLoop::register_loop() {
             pause();
             continue;
         }
-        draw_register(2);
+        draw_register(output_mutex, 2);
         std::getline(std::cin, veri_code);
         if (veri_code.empty()) {
             std::cout << "验证码不能为空。" << std::endl;
@@ -132,22 +137,22 @@ void WinLoop::register_loop() {
             continue;
         }
         // 发送验证码
-        comm->handle_send_command(Action::Authentication, email, {veri_code});
+        comm->handle_send_command(Action::Authentication, email, {veri_code}, false);
         // 读取服务器响应
-        CommandRequest auth_resp = comm->handle_receive_command();
+        CommandRequest auth_resp = comm->handle_receive_command(false);
         if (auth_resp.action() != static_cast<int>(Action::Accept)) {
             std::cout << "身份验证失败：" << auth_resp.args(0) << std::endl;
             pause();
             continue;
         }
-        draw_register(3);
+        draw_register(output_mutex, 3);
         std::getline(std::cin, username);
         if (username.empty()) {
             std::cout << "用户名不能为空。" << std::endl;
             pause();
             continue;
         }
-        draw_register(4);
+        draw_register(output_mutex, 4);
         std::getline(std::cin, password);
         if (password.empty()) { // 后面有空把这优化一下
             std::cout << "密码不能为空。" << std::endl;
@@ -156,18 +161,14 @@ void WinLoop::register_loop() {
         }
         std::string password_hash = hash_password(password);
         // 发送注册请求
-        comm->handle_send_command(Action::Register, email, {username, password_hash});
+        comm->handle_send_command(Action::Register, email, {username, password_hash}, false);
         log_info("Sent registration request");
         // 读取服务器响应
-        CommandRequest reg_resp = comm->handle_receive_command();
+        CommandRequest reg_resp = comm->handle_receive_command(false);
         log_info("Received registration response");
         if (reg_resp.action() == static_cast<int>(Action::Accept)) {
             log_info("Successfully registered");
             std::cout << "注册成功！" << std::endl;
-            comm->user_ID = username;
-            comm->email = email;
-            comm->password_hash = password_hash;
-            main_init();
             switch_to(UIPage::Start);
             return;
         } else {
@@ -181,27 +182,40 @@ void WinLoop::register_loop() {
 
 void WinLoop::main_init() {
     std::cout << "正在初始化数据..." << std::endl;
+    // 用户email和ID写入SQLite
+    // ...
     // tcp连接认证
     comm->handle_send_id();
+    // 拉取聊天记录
+    // ...
+    // 拉取关系网
+    // ...
     // Message, Command循环读，Data适时读, 所有通道适时写
     pool->submit([&]{
-        while (1) {
-            std::string proto = comm->read(0);
-            if (proto.empty()) {
-                log_error("Message client disconnected");
-                break;
-            }
-            auto msg = get_chat_message(proto);
+        comm->clients[0]->socket->set_nonblocking();
+        while (this->running) {
+            auto msg = comm->handle_receive_message();
+            pool->submit([this, msg](){
+                comm->handle_manage_message(msg);
+            });
         }
     });
-
-
+    pool->submit([&]{
+        comm->clients[1]->socket->set_nonblocking();
+        while (this->running) {
+            auto cmd = comm->handle_receive_command();
+            pool->submit([this, cmd](){
+                comm->handle_manage_command(cmd);
+            });
+        }
+    });
+    std::cout << "数据初始化完成。" << std::endl;
 }
 
 void WinLoop::main_loop() {
     while (1) {
         sclear();
-        draw_main();
+        draw_main(output_mutex, comm->user_ID);
         std::string input;
         std::getline(std::cin, input);
         if (input == "1") {
@@ -287,7 +301,7 @@ void WinLoop::handle_main_input() {
 /* ---------- tools ---------- */
 
 void WinLoop::sclear() {
-    system("clear"); // 或者 system("cls") 在 Windows 上
+    system("clear");
 }
 
 void WinLoop::pause() {
@@ -301,7 +315,8 @@ void WinLoop::switch_to(UIPage page) {
 
 /* ---------- 渲染 ---------- */
 
-void draw_start() {
+void draw_start(std::mutex& mtx) {
+    std::lock_guard<std::mutex> lock(mtx);
     std::cout << "-$-    欢迎来到聊天室    -$-" << std::endl;
     std::cout << "         " + selnum(1) + " 登录" << std::endl;
     std::cout << "         " + selnum(2) + " 注册" << std::endl;
@@ -309,7 +324,8 @@ void draw_start() {
     print_input_sign();
 }
 
-void draw_login(int idx) {
+void draw_login(std::mutex& mtx, int idx) {
+    std::lock_guard<std::mutex> lock(mtx);
     switch (idx) {
         case 1: {
             std::cout << "         -$- 登    录 -$-" << std::endl;
@@ -327,7 +343,8 @@ void draw_login(int idx) {
     }
 }
 
-void draw_register(int idx) {
+void draw_register(std::mutex& mtx, int idx) {
+    std::lock_guard<std::mutex> lock(mtx);
     switch (idx) {
         case 1: {
             std::cout << "          -$- 注    册 -$-" << std::endl;
@@ -356,11 +373,12 @@ void draw_register(int idx) {
     }
 }
 
-void draw_main() {
-    std::cout << "-$-    欢迎来到聊天室    -$-" << std::endl;
-    std::cout << "       " + selnum(1) + " 消息列表" << std::endl;
-    std::cout << "       " + selnum(2) + " 联系人" << std::endl;
-    std::cout << "       " + selnum(3) + " 我的" << std::endl;
-    std::cout << "       " + selnum(0) + " 退出" << std::endl;
+void draw_main(std::mutex& mtx, const std::string& user_ID) {
+    std::lock_guard<std::mutex> lock(mtx);
+    std::cout << "-$- Dear " + user_ID + ", 欢迎来到聊天室 -$-" << std::endl;
+    std::cout << selnum(1) + " 消息列表" << std::endl;
+    std::cout << selnum(2) + " 联系人" << std::endl;
+    std::cout << selnum(3) + " 我的" << std::endl;
+    std::cout << selnum(0) + " 退出登录 && 退出程序" << std::endl;
     print_input_sign();
 }

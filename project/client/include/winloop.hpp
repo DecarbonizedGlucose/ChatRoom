@@ -7,10 +7,12 @@ class ChatMessage;
 #include <memory>
 #include <string>
 #include <functional>
+#include <mutex>
 #include "output.hpp"
 
 class CommManager;
 class thread_pool;
+class CommandRequest;
 
 // 页面状态枚举
 enum class UIPage {
@@ -31,6 +33,9 @@ public:
 
     void run();
     void stop();
+    void dispatch_cmd(const CommandRequest& cmd);
+
+    bool running = false;
 
 private:
     // 处理用户输入(仅选择)
@@ -54,14 +59,15 @@ private:
     void pause();
 
     UIPage current_page;
-    bool running = false;
 
     CommManager* comm = nullptr; // 通信管理器
     thread_pool* pool = nullptr; // 线程池
+
+    std::mutex output_mutex;
 };
 
 // 页面渲染
-void draw_start();
-void draw_login(int idx);
-void draw_register(int idx);
-void draw_main();
+void draw_start(std::mutex& mtx);
+void draw_login(std::mutex& mtx, int idx);
+void draw_register(std::mutex& mtx, int idx);
+void draw_main(std::mutex& mtx, const std::string& user_ID);

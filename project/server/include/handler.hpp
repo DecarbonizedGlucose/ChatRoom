@@ -75,7 +75,8 @@ private:
     void handle_search_group();
     void handle_add_admin();
     void handle_remove_admin();
-    void handle_get_relation_net();
+    void handle_get_relation_net(const std::string& user_ID);
+    void handle_update_relation_net(const std::string& user_ID);
     void handle_download_file();
 };
 

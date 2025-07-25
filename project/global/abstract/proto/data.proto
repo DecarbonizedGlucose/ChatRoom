@@ -3,9 +3,9 @@ syntax = "proto3";
 import "message.proto";
 
 message FileChunk {
-  string file_id = 1;               // 文件唯一标识（可使用UUID）
-  string filename = 2;             // 原始文件名
-  bytes data = 3;                  // 实际数据内容（建议 64KB 以下）
+  string file_id = 1;             // 文件唯一标识（可使用UUID）
+  string filename = 2;            // 原始文件名
+  bytes data = 3;                 // 实际数据内容（建议 64KB 以下）
 
   uint32 chunk_index = 4;         // 当前分片序号（从0开始）
   uint32 total_chunks = 5;        // 总分片数量
@@ -14,17 +14,31 @@ message FileChunk {
   string receiver_id = 8;
 }
 
-// 不到啊，AI补的
 message SyncItem {
   enum SyncType {
-    FRIEND_UPDATE = 0;
-    GROUP_UPDATE = 1;
-    BE_KICKED = 2;
-    FRIEND_REQUEST = 3;
+    // 好友相关操作
+    FRIEND_ADD = 0;           // 添加好友
+    FRIEND_REMOVE = 1;        // 删除好友
+    FRIEND_BLOCK = 2;         // 屏蔽好友
+    FRIEND_UNBLOCK = 3;       // 取消屏蔽好友
+
+    // 群组相关操作
+    GROUP_CREATE = 10;        // 创建群组
+    GROUP_JOIN = 11;          // 加入群组
+    GROUP_LEAVE = 12;         // 离开群组
+    GROUP_KICK = 13;          // 被踢出群组
+    GROUP_DISBAND = 14;       // 群组解散
+    GROUP_ADMIN_ADD = 15;     // 添加管理员
+    GROUP_ADMIN_REMOVE = 16;  // 移除管理员
+
+    // 批量同步（用于用户上线时的全量同步）
+    RELATION_NET_FULL = 100;  // 完整关系网
   }
 
   SyncType type = 1;
-  string content = 2; // JSON或protobuf序列化的结构，或直接写字段
+  string target_id = 2;       // 操作目标ID（好友ID或群组ID）
+  string content = 3;         // 详细数据（JSON格式）
+  int64 timestamp = 4;        // 操作时间戳
 }
 
 message OfflineMessages {

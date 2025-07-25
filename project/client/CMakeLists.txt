@@ -10,6 +10,7 @@ add_executable(client
     interface/winloop.cpp
     interface/output.cpp
     chat/CommManager.cpp
+    chat/sqlite.cpp
 )
 
 target_link_libraries(client
@@ -32,6 +33,8 @@ target_link_libraries(client
     absl_log_globals
     absl_raw_logging_internal
     absl_log_internal_nullguard
+    SQLiteCpp
+    sqlite3
 )
 
 target_include_directories(client PRIVATE

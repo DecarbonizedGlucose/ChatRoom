@@ -27,3 +27,11 @@ bool ConnectionManager::user_exists(std::string user_ID) {
     }
     return exists;
 }
+
+TcpServerConnection* ConnectionManager::get_connection(const std::string& user_ID, int server_index) {
+    auto it = user_connections.find(user_ID);
+    if (it != user_connections.end() && it->second[server_index]) {
+        return it->second[server_index];
+    }
+    return nullptr; // 没有找到连接
+}

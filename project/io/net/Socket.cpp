@@ -57,6 +57,18 @@ void Socket::set_port(uint16_t port) {
     this->port = port;
 }
 
+void Socket::set_nonblocking(bool nonblock) {
+    if (nonblock) {
+        if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0) {
+            log_error("Failed to set socket to non-blocking: {}", strerror(errno));
+        }
+    } else {
+        if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) & ~O_NONBLOCK) < 0) {
+            log_error("Failed to set socket to blocking: {}", strerror(errno));
+        }
+    }
+}
+
 /* ----- DataSocket ----- */
 
 void DataSocket::get_read_buf(std::string& buf) {

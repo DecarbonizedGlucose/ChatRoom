@@ -3,6 +3,8 @@
 #include <iostream>
 #include <ctime>
 
+/* ---------- ChatMessage ---------- */
+
 ChatMessage create_chat_message(
     const std::string& sender,
     const std::string& receiver,
@@ -68,6 +70,8 @@ ChatMessage get_chat_message(const std::string& proto_str) {
     return msg;
 }
 
+/* ---------- CommandRequest ---------- */
+
 CommandRequest create_command(
     Action action,
     const std::string& sender,
@@ -115,3 +119,49 @@ CommandRequest get_command_request(const std::string& proto_str) {
     //std::cout << "解包测试类型[" << any.type_url() << "]" << std::endl; // 调试输出
     return cmd;
 }
+
+/* ---------- FileChunk ---------- */
+
+/* ---------- SyncItem ---------- */
+
+SyncItem create_sync_item(
+    SyncItem::SyncType type,
+    const std::string& target_id,
+    const std::string& content,
+    std::time_t timestamp
+) {
+    SyncItem item;
+    item.set_type(type);
+    item.set_target_id(target_id);
+    item.set_content(content);
+    if (timestamp == 0) {
+        timestamp = std::time(nullptr); // 如果没有提供时间戳，使用当前时间
+    }
+    item.set_timestamp(timestamp);
+    return item;
+}
+
+std::string get_sync_string(const SyncItem& item) {
+    google::protobuf::Any any;
+    any.PackFrom(item);
+    Envelope env;
+    env.mutable_payload()->CopyFrom(any);
+    std::string env_out;
+    env.SerializeToString(&env_out);
+    return env_out;
+}
+
+SyncItem get_sync_item(const std::string& proto_str) {
+    Envelope env;
+    if (!env.ParseFromString(proto_str)) {
+        throw std::runtime_error("Failed to parse Envelope from received data");
+    }
+    const google::protobuf::Any& any = env.payload();
+    SyncItem item;
+    if (!any.UnpackTo(&item)) {
+        throw std::runtime_error("Failed to unpack Any to SyncItem");
+    }
+    return item;
+}
+
+/* ---------- OfflineMessage ---------- */

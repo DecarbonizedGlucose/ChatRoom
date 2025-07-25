@@ -42,6 +42,7 @@ enum class Action {
     Remove_Admin,                 // 移除管理员 --email --number
 
     Get_Relation_Net,             // 获取关系网
+    Update_Relation_Net,          // 更新关系网 这个似乎轮不到客户端发送
 
     /*      消息行为      */
     Download_File,                // 下载文件 --file-hash
