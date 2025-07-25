@@ -1,10 +1,8 @@
 #include "include/TopClient.hpp"
 #include "include/TcpClient.hpp"
 #include "../global/include/threadpool.hpp"
-// #include "include/CLI/TerminalInput.hpp"
-// #include "include/CLI/winloop.hpp"
-#include "include/chat/main/CommManager.hpp"
-#include "include/CLI/winloop.hpp"
+#include "include/CommManager.hpp"
+#include "include/winloop.hpp"
 
 TopClient::TopClient() {
     message_client = new TcpClient(
@@ -18,7 +16,7 @@ TopClient::TopClient() {
         set_addr_c::client_addr[2].second);
     pool = new thread_pool(8);
     comm = new CommManager(this);
-    winloop = new WinLoop(comm);
+    winloop = new WinLoop(comm, pool);
 }
 
 TopClient::~TopClient() {

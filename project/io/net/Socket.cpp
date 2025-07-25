@@ -188,9 +188,12 @@ AcceptedSocket::AcceptedSocket(int fd, bool nonblock) : DataSocket(fd, nonblock)
 }
 
 bool AcceptedSocket::disconnect() {
-    if (!connected || fd < 0) {
+    if (fd < 0) {
         log_error("AcceptedSocket: Tried to disconnect without a valid connection");
         return false;
+    }
+    if (!connected) {
+        return true;
     }
     if (close(fd) < 0) {
         log_error("AcceptedSocket: Failed to close socket: {}", strerror(errno));
@@ -235,9 +238,12 @@ bool CSocket::is_connected() const {
 }
 
 bool CSocket::disconnect() {
-    if (!connected || fd < 0) {
+    if (fd < 0) {
         log_error("CSocket: Tried to disconnect without a valid connection");
         return false;
+    }
+    if (!connected) {
+        return true;
     }
     if (close(fd) < 0) {
         log_error("CSocket: Failed to close socket: {}", strerror(errno));

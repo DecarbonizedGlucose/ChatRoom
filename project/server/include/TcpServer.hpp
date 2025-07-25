@@ -2,14 +2,13 @@
 
 #include "../../global/include/threadpool.hpp"
 #include "../../global/include/command.hpp"
-#include "connection_manager.hpp"
 #include <functional>
-#include <unordered_map>
 #include "TcpServerConnection.hpp"
 
 class Dispatcher;
 class reactor;
 class RedisController;
+class ListenSocket;
 
 namespace set_addr_s {
     using Addr = std::pair<std::string, uint16_t>;
@@ -26,8 +25,7 @@ private:
     bool running = false;
 
 public:
-    // 连接池进程内放着，用户在线状态存到redis中
-    std::unordered_map<std::string, TcpServerConnection*> user_connections; // 用户连接池, user_Email -> TcpServerConnection
+
     Dispatcher* disp = nullptr; // 分发器, 事件分发到这里
     int idx;
 

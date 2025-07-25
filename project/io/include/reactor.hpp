@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <cerrno>
 #include <string>
-#include <unordered_map>
+// #include <unordered_map>
 #include <functional>
 #include <any>
 #include <memory>
@@ -58,7 +58,7 @@ private:
 
 public:
     friend class event;
-    std::unordered_map<int, event*> events;
+    //std::unordered_map<int, event*> events;
     epoll_event* epoll_events = nullptr;
 
     reactor();
@@ -71,8 +71,6 @@ public:
 
     int wait();
     void wake();
-    bool add_event(event* ev);
-    bool remove_event(event* ev);
     int get_epoll_fd() const;
 };
 

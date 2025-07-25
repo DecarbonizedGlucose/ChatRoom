@@ -102,7 +102,7 @@ reactor::~reactor() {
         delete[] epoll_events;
         epoll_events = nullptr;
     }
-    events.clear();
+    //events.clear();
 }
 
 int reactor::wait() {
@@ -124,29 +124,6 @@ void reactor::wake() {
         log_error("reactor::wake: Failed to wake reactor - {}", strerror(errno));
         throw std::runtime_error(std::string(__func__) + ": Failed to wake reactor - " + strerror(errno) + '\n');
     }
-}
-
-bool reactor::add_event(event* ev) {
-    if (ev == nullptr) {
-        throw std::invalid_argument(std::string(__func__) + ": Event is nullptr\n");
-    }
-    if (events.size() >= max_events) {
-        return false;
-    }
-    events[ev->get_sockfd()] = ev;
-    ev->bind_with(this);
-    return true;
-}
-
-bool reactor::remove_event(event* ev) {
-    if (ev == nullptr || !ev->is_binded()) {
-        throw std::invalid_argument(std::string(__func__) + ": Event is nullptr or not in reactor\n");
-    }
-    if (ev->in_epoll()) {
-        ev->remove_from_reactor();
-    }
-    events.erase(ev->get_sockfd());
-    return true;
 }
 
 int reactor::get_epoll_fd() const {

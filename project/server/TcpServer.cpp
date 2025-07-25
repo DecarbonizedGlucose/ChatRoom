@@ -2,6 +2,8 @@
 #include "../global/include/logging.hpp"
 #include "../../io/include/reactor.hpp"
 #include "include/redis.hpp"
+#include "../io/include/Socket.hpp"
+#include "include/dispatcher.hpp"
 
 namespace set_addr_s {
     Addr server_addr[3];
@@ -54,10 +56,7 @@ void TcpServer::init(thread_pool* pool, RedisController* re, Dispatcher* disp) {
         throw std::runtime_error("Failed to start listening on " + listen_conn->get_ip() + ":" + std::to_string(listen_conn->get_port()) + ": " + strerror(errno));
     }
     event* read_event = new event(listen_conn->get_fd(), EPOLLIN | EPOLLET);
-    if (!pr->add_event(read_event)) {
-        delete read_event;
-        throw std::runtime_error("Failed to add listening events to reactor: " + std::string(strerror(errno)));
-    }
+    read_event->bind_with(pr);
     read_event->add_to_reactor();
 }
 
@@ -140,17 +139,12 @@ void TcpServer::auto_accept() {
     // 其他的动态设定
     event* read_event = new event(new_sock->get_fd(), EPOLLIN | EPOLLET, conn);
     event* write_event = new event(new_sock->get_fd(), EPOLLOUT | EPOLLET, conn);
-    if (!pr->add_event(read_event) || !pr->add_event(write_event)) {
-        delete read_event;
-        delete write_event;
-        delete conn;
-        return;
-    }
+    read_event->bind_with(pr);
+    write_event->bind_with(pr);
     conn->read_event = read_event;
     conn->write_event = write_event;
     read_event->add_to_reactor();
     write_event->add_to_reactor();
-    //user_connections[conn->get_user_id()] = conn;
 }
 
 void TcpServer::heartbeat_monitor_loop(int interval_sec, int timeout_sec) {}

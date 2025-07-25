@@ -45,7 +45,7 @@ private:
         TcpServerConnection* conn,
         const std::string& email,
         const std::string& password);
-    void handle_sign_out();
+    void handle_sign_out(const std::string& user_ID);
     void handle_register(
         TcpServerConnection* conn,
         const std::string& email,

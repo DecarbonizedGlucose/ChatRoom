@@ -3,6 +3,7 @@
 #include "include/dispatcher.hpp"
 #include "../global/include/threadpool.hpp"
 #include "../global/include/logging.hpp"
+#include "include/connection_manager.hpp"
 
 TopServer::TopServer() {
     pool = new thread_pool(20, 30);

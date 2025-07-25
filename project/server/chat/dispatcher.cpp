@@ -1,6 +1,8 @@
 #include "../include/dispatcher.hpp"
+#include "../include/TcpServer.hpp"
 #include "handler.hpp"
 #include "../../global/include/logging.hpp"
+#include "../include/connection_manager.hpp"
 
 using RecvState = DataSocket::RecvState;
 
@@ -11,6 +13,7 @@ Dispatcher::Dispatcher(RedisController* re, MySQLController* my)
     file_handler = new FileHandler(this);
     sync_handler = new SyncHandler(this);
     offline_message_handler = new OfflineMessageHandler(this);
+    conn_manager = new ConnectionManager(this);
 }
 
 Dispatcher::~Dispatcher() {

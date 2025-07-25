@@ -1,4 +1,4 @@
-#include "../../include/CLI/output.hpp"
+#include "../include/output.hpp"
 #include <iostream>
 
 std::string style(const std::string& text, std::initializer_list<const char*> styles) {

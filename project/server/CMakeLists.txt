@@ -3,6 +3,7 @@ add_executable(server
     servermain.cpp
     TcpServer.cpp
     TopServer.cpp
+    TcpServerConnection.cpp
     chat/email.cpp
     connection_manager.cpp
     chat/dispatcher.cpp

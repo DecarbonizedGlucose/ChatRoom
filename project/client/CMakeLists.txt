@@ -7,9 +7,9 @@ add_executable(client
     clientmain.cpp
     TcpClient.cpp
     TopClient.cpp
-    interface/CLI/winloop.cpp
-    interface/CLI/output.cpp
-    chat/main/CommManager.cpp
+    interface/winloop.cpp
+    interface/output.cpp
+    chat/CommManager.cpp
 )
 
 target_link_libraries(client

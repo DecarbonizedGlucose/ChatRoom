@@ -10,6 +10,7 @@ class ChatMessage;
 #include "output.hpp"
 
 class CommManager;
+class thread_pool;
 
 // 页面状态枚举
 enum class UIPage {
@@ -25,7 +26,7 @@ enum class UIPage {
 
 class WinLoop {
 public:
-    WinLoop(CommManager* comm);
+    WinLoop(CommManager* comm, thread_pool* pool);
     ~WinLoop();
 
     void run();
@@ -39,6 +40,7 @@ private:
     void start_loop();
     void login_loop();
     void register_loop();
+    void main_init(); // 进入主界面前的初始化
     void main_loop();
     void message_loop();
     void contacts_loop();
@@ -55,6 +57,7 @@ private:
     bool running = false;
 
     CommManager* comm = nullptr; // 通信管理器
+    thread_pool* pool = nullptr; // 线程池
 };
 
 // 页面渲染

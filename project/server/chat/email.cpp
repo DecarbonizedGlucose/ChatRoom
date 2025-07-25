@@ -42,13 +42,17 @@ void QQMailSender::init(const std::string& qq_email, const std::string& authoriz
     curl_easy_setopt(curl_, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(curl_, CURLOPT_TIMEOUT, 30L);
     curl_easy_setopt(curl_, CURLOPT_LOGIN_OPTIONS, "AUTH=LOGIN");
-    curl_easy_setopt(curl_, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl_, CURLOPT_NOPROGRESS, 1L);  // 禁用进度输出
+    // curl_easy_setopt(curl_, CURLOPT_VERBOSE, 1L);  // 注释掉详细输出以避免控制台spam
 }
 
-void QQMailSender::set_content(const std::string& subject, 
+void QQMailSender::set_content(const std::string& subject,
                                const std::vector<std::string>& to,
                                const std::string& body) {
-    if (!curl_) throw std::runtime_error("CURL未初始化");
+    if (!curl_) {
+        log_error("CURL未初始化，无法设置邮件内容");
+        return;
+    }
 
     if (recipients_) {
         curl_slist_free_all(recipients_);
@@ -148,7 +152,7 @@ bool QQMailSender::is_valid_qq_email(const std::string& email) const {
 
 std::string QQMailSender::generate_message_id() const {
     std::stringstream ss;
-    ss << std::hex << std::setfill('0') 
+    ss << std::hex << std::setfill('0')
        << std::setw(8) << (std::time(nullptr) & 0xFFFFFFFF)
        << std::setw(8) << (rand() & 0xFFFFFFFF);
     return ss.str();
@@ -167,7 +171,7 @@ std::string QQMailSender::base64_encode_subject(const std::string& subject) {
 }
 
 std::string QQMailSender::base64_encode(const std::string& input) {
-    static const char* base64_chars = 
+    static const char* base64_chars =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     std::string result;
@@ -181,13 +185,13 @@ std::string QQMailSender::base64_encode(const std::string& input) {
         char_array_3[i++] = *(bytes_to_encode++);
         if (i == 3) {
             char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + 
+            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) +
                               ((char_array_3[1] & 0xf0) >> 4);
-            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + 
+            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) +
                               ((char_array_3[2] & 0xc0) >> 6);
             char_array_4[3] = char_array_3[2] & 0x3f;
 
-            for (i = 0; i < 4; i++) 
+            for (i = 0; i < 4; i++)
                 result += base64_chars[char_array_4[i]];
             i = 0;
         }
@@ -198,16 +202,16 @@ std::string QQMailSender::base64_encode(const std::string& input) {
             char_array_3[j] = '\0';
 
         char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + 
+        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) +
                           ((char_array_3[1] & 0xf0) >> 4);
-        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + 
+        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) +
                           ((char_array_3[2] & 0xc0) >> 6);
         char_array_4[3] = char_array_3[2] & 0x3f;
 
         for (j = 0; j < i + 1; j++)
             result += base64_chars[char_array_4[j]];
 
-        while (i++ < 3) 
+        while (i++ < 3)
             result += '=';
     }
 

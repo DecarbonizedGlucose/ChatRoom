@@ -1,12 +1,78 @@
 
 #include "datatypes.hpp"
 #include <iostream>
+#include <ctime>
 
+ChatMessage create_chat_message(
+    const std::string& sender,
+    const std::string& receiver,
+    const bool is_group_msg,
+    const std::string& text,
+    const bool pin,
+    const std::string& file_name,
+    const std::size_t file_size,
+    const std::string& file_hash
+) {
+    ChatMessage msg;
+    msg.set_sender(sender);
+    msg.set_receiver(receiver);
+    msg.set_is_group(is_group_msg);
+    msg.set_timestamp(std::time(nullptr));  // 设置当前时间戳
+    msg.set_text(text);
+    msg.set_pin(pin);
+    // 如果有文件附件，设置 FilePayload
+    if (pin && !file_name.empty()) {
+        FilePayload* payload = msg.mutable_payload();
+        payload->set_file_name(file_name);
+        payload->set_file_size(file_size);
+        payload->set_file_hash(file_hash);
+    }
+    return msg;
+}
+
+std::string get_message_string(const ChatMessage& msg) {
+    google::protobuf::Any any;
+    any.PackFrom(msg);
+    Envelope env;
+    env.mutable_payload()->CopyFrom(any);
+    std::string env_out;
+    env.SerializeToString(&env_out);
+    return env_out;
+}
+
+std::string create_message_string(
+    const std::string& sender,
+    const std::string& receiver,
+    const bool is_group_msg,
+    const std::string& text,
+    const bool pin,
+    const std::string& file_name,
+    const std::size_t file_size,
+    const std::string& file_hash
+) {
+    auto msg = create_chat_message(sender, receiver, is_group_msg, text,
+                                   pin, file_name, file_size, file_hash);
+    return get_message_string(msg);
+}
+
+ChatMessage get_chat_message(const std::string& proto_str) {
+    Envelope env;
+    if (!env.ParseFromString(proto_str)) {
+        throw std::runtime_error("Failed to parse Envelope from received data");
+    }
+    const google::protobuf::Any& any = env.payload();
+    ChatMessage msg;
+    if (!any.UnpackTo(&msg)) {
+        throw std::runtime_error("Failed to unpack Any to ChatMessage");
+    }
+    return msg;
+}
 
 CommandRequest create_command(
     Action action,
     const std::string& sender,
-    std::initializer_list<std::string> args) {
+    std::initializer_list<std::string> args
+) {
     CommandRequest cmd;
     cmd.set_action(static_cast<int>(action));
     cmd.set_sender(sender);
@@ -30,7 +96,8 @@ std::string get_command_string(const CommandRequest& cmd) {
 std::string create_command_string(
     Action action,
     const std::string& sender,
-    std::initializer_list<std::string> args) {
+    std::initializer_list<std::string> args
+) {
     auto cmd = create_command(action, sender, args);
     return get_command_string(cmd);
 }

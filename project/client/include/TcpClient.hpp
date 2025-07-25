@@ -5,7 +5,6 @@
 #include <string>
 #include <memory>
 #include <utility>
-#include <thread>
 
 namespace set_addr_c {
     using Addr = std::pair<std::string, uint16_t>;

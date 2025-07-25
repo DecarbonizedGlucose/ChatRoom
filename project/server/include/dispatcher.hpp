@@ -3,7 +3,6 @@
 #include <memory>
 #include <unordered_map>
 #include <functional>
-#include "TcpServer.hpp"
 #include "../../global/abstract/datatypes.hpp"
 #include "../include/redis.hpp"
 #include "../include/mysql.hpp"
@@ -15,13 +14,14 @@ class MessageHandler;
 class FileHandler;
 class SyncHandler;
 class OfflineMessageHandler;
+class ConnectionManager;
 
 class Dispatcher {
 public:
-    //using Task = std::function<void()>;
     TcpServer* server[3];
     RedisController* redis_con = nullptr;
     MySQLController* mysql_con = nullptr;
+    ConnectionManager* conn_manager = nullptr;
 
     Dispatcher(RedisController* re, MySQLController* my);
     ~Dispatcher();

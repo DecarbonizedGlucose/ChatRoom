@@ -8,7 +8,7 @@
  * 这期间还会有额外数据包的传输
 */
 
-// 由于发送时arg[]外已经有sender字段，以下arg中均不含自己的邮箱
+// 由于发送时arg[]外已经有sender字段，以下arg中均不含自己的邮箱/ID
 
 enum class Action {
     /*      账号系统      */
@@ -22,6 +22,8 @@ enum class Action {
     Authentication,               // 身份验证 --veri-code
     Refuse,                       // 拒绝
     Accept,                       // 接受
+
+// 以上sender存email(除了Sign_Out)，以下存user_ID
 
     /*      私信行为      */
     Add_Friend,                   // 添加好友 --email
@@ -43,5 +45,7 @@ enum class Action {
 
     /*      消息行为      */
     Download_File,                // 下载文件 --file-hash
-    
+
+    /*      连接管理      */
+    Remember_Connection,          // 记住连接
 };

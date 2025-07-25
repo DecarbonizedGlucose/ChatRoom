@@ -1,5 +1,4 @@
-#ifndef REDIS_HPP
-#define REDIS_HPP
+#pragma once
 
 #include <sw/redis++/redis++.h>
 #include <string>
@@ -45,7 +44,3 @@ public:
 private:
     Redis redis_conn; // 实际连接对象
 };
-
-
-
-#endif

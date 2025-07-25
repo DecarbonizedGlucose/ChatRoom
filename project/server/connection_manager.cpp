@@ -1,33 +1,29 @@
-#include "../include/connection_manager.hpp"
+#include "include/connection_manager.hpp"
+#include "include/dispatcher.hpp"
+#include <chrono>
 
-void CM::add_user(std::string user_ID, event* ev) {
-    user_events[std::move(user_ID)] = ev;
+void ConnectionManager::add_conn(TcpServerConnection* conn, int server_index) {
+    // 记录连接的时间戳
+    user_connections[conn->user_ID][server_index] = conn;
 }
 
-void CM::remove_user(const std::string& user_ID) {
-    auto it = user_events.find(user_ID);
-    if (it != user_events.end()) {
-        user_events.erase(it);
+void ConnectionManager::remove_user(std::string user_ID) {
+    auto it = user_connections.find(user_ID);
+    if (it == user_connections.end()) {
+        return; // 已经寄了
     }
-}
-
-void CM::remove_user(event* ev) {
-    for (auto it = user_events.begin(); it != user_events.end(); ++it) {
-        if (it->second == ev) {
-            user_events.erase(it);
-            return;
-        }
+    for (auto p : it->second) {
+        delete p;
     }
+    user_connections.erase(it);
+    // 还有Redis操作在另外的地方执行了
 }
 
-event* CM::get_user_event(const std::string& user_ID) const {
-    auto it = user_events.find(user_ID);
-    if (it != user_events.end()) {
-        return it->second;
+bool ConnectionManager::user_exists(std::string user_ID) {
+    bool exists = disp->redis_con->get_user_status(user_ID).first;
+    if (!exists) {
+        // 删掉用户连接
+        remove_user(user_ID);
     }
-    return nullptr;
-}
-
-bool CM::user_exists(const std::string& user_ID) const {
-    return user_events.find(user_ID) != user_events.end();
+    return exists;
 }

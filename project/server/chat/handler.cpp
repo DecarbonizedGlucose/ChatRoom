@@ -5,6 +5,7 @@
 #include "../include/dispatcher.hpp"
 #include "../../global/include/logging.hpp"
 #include "../../global/abstract/datatypes.hpp"
+#include "../include/connection_manager.hpp"
 #include <iostream>
 
 /* Handler base */
@@ -19,22 +20,7 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
     std::string receiver = message.receiver();
     bool is_group = message.is_group();
     auto recv_status = disp->redis_con->get_user_status(receiver);
-    if (!recv_status.first) {
-        // 用户不在线,需要上线后拉取
-        // 可能要搞个消息队列
-    } else {
-        auto it = disp->server[0]->user_connections.find(receiver);
-        if (it != disp->server[0]->user_connections.end()) {
-            auto send_conn = it->second;
-            send_conn->socket->set_write_buf(ostr);
-            send_conn->write_event->add_to_reactor();
-            // 这里没考虑群聊的情况 (for item in group)
-            // 需要改改
-        } else {
-            // 没找到连接,可能是用户离线了,或者是bug
-            // 需要处理离线消息
-        }
-    }
+
 }
 
 void MessageHandler::handle_send(TcpServerConnection* conn) {
@@ -58,6 +44,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Sign_Out: {
+            handle_sign_out(subj);
             break;
         }
         case Action::Register: {
@@ -149,7 +136,14 @@ void CommandHandler::handle_recv(
             handle_download_file();
             break;
         }
+        case Action::Remember_Connection: {
+            // 注册连接行为
+            conn->user_ID = subj; // 这里的subj是user_ID
+            int server_index = std::stoi(args[0]);
+            disp->conn_manager->add_conn(conn, server_index);
+        }
         default: {
+            log_error("Unknown action received: Action_ID={}", static_cast<int>(action));
             break;
         }
     }
@@ -190,7 +184,11 @@ void CommandHandler::handle_sign_in(
     }
 }
 
-void CommandHandler::handle_sign_out() {}
+void CommandHandler::handle_sign_out(const std::string& user_ID) {
+    disp->redis_con->set_user_status(user_ID, false);
+    disp->conn_manager->remove_user(user_ID);
+    disp->mysql_con->update_user_status(user_ID, false);
+}
 
 void CommandHandler::handle_register(
     TcpServerConnection* conn,

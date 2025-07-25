@@ -1,8 +1,10 @@
-#include "../../include/CLI/winloop.hpp"
-#include "../../include/CLI/output.hpp"
-#include "../../../global/include/logging.hpp"
-#include "../../include/chat/main/CommManager.hpp"
-#include "../../../global/include/action.hpp"
+#include "../include/winloop.hpp"
+#include "../include/output.hpp"
+#include "../../global/include/logging.hpp"
+#include "../include/CommManager.hpp"
+#include "../../global/abstract/datatypes.hpp"
+#include "../../global/include/threadpool.hpp"
+#include "../include/TcpClient.hpp"
 #include <iostream>
 
 std::string hash_password(const std::string& password) {
@@ -10,7 +12,8 @@ std::string hash_password(const std::string& password) {
     return std::to_string(std::hash<std::string>{}(password));
 }
 
-WinLoop::WinLoop(CommManager* comm) : current_page(UIPage::Start), comm(comm) {}
+WinLoop::WinLoop(CommManager* comm, thread_pool* pool)
+    : current_page(UIPage::Start), comm(comm), pool(pool) {}
 
 WinLoop::~WinLoop() {
 }
@@ -87,6 +90,8 @@ void WinLoop::login_loop() {
         CommandRequest resp = comm->handle_receive_command();
         if (resp.action() == static_cast<int>(Action::Accept)) {
             std::cout << "登录成功！" << std::endl;
+            // 向服务器发送身份信息
+            comm->user_ID = resp.args(0);
             switch_to(UIPage::Main);
             return;
         } else { // Refused
@@ -162,6 +167,7 @@ void WinLoop::register_loop() {
             comm->user_ID = username;
             comm->email = email;
             comm->password_hash = password_hash;
+            main_init();
             switch_to(UIPage::Start);
             return;
         } else {
@@ -171,6 +177,25 @@ void WinLoop::register_loop() {
             continue;
         }
     }
+}
+
+void WinLoop::main_init() {
+    std::cout << "正在初始化数据..." << std::endl;
+    // tcp连接认证
+    comm->handle_send_id();
+    // Message, Command循环读，Data适时读, 所有通道适时写
+    pool->submit([&]{
+        while (1) {
+            std::string proto = comm->read(0);
+            if (proto.empty()) {
+                log_error("Message client disconnected");
+                break;
+            }
+            auto msg = get_chat_message(proto);
+        }
+    });
+
+
 }
 
 void WinLoop::main_loop() {
@@ -205,13 +230,7 @@ void WinLoop::message_loop() {
 }
 
 void WinLoop::contacts_loop() {
-    sclear();
-    std::cout << "联系人功能尚未实现。" << std::endl;
-    std::cout << "按任意键返回主菜单..." << std::endl;
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    pause();
-    switch_to(UIPage::Main);
-    return;
+
 }
 
 void WinLoop::my_loop() {
@@ -256,7 +275,7 @@ void WinLoop::handle_main_input() {
         switch_to(UIPage::My);
     } else if (input == "0") {
         // 退出登录
-
+        comm->handle_send_command(Action::Sign_Out, comm->user_ID, {});
         std::cout << "正在退出登录..." << std::endl;
         switch_to(UIPage::Exit);
     } else {
