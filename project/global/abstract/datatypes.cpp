@@ -86,6 +86,20 @@ CommandRequest create_command(
     return cmd;
 }
 
+CommandRequest create_command(
+    Action action,
+    const std::string& sender,
+    const std::unordered_map<std::string, bool>& args
+) {
+    CommandRequest cmd;
+    cmd.set_action(static_cast<int>(action));
+    cmd.set_sender(sender);
+    for (const auto& arg : args) {
+        cmd.add_args(arg.first);
+    }
+    return cmd;
+}
+
 std::string get_command_string(const CommandRequest& cmd) {
     google::protobuf::Any any;
     any.PackFrom(cmd);
@@ -101,6 +115,15 @@ std::string create_command_string(
     Action action,
     const std::string& sender,
     std::initializer_list<std::string> args
+) {
+    auto cmd = create_command(action, sender, args);
+    return get_command_string(cmd);
+}
+
+std::string create_command_string(
+    Action action,
+    const std::string& sender,
+    const std::unordered_map<std::string, bool>& args
 ) {
     auto cmd = create_command(action, sender, args);
     return get_command_string(cmd);
@@ -149,6 +172,16 @@ std::string get_sync_string(const SyncItem& item) {
     std::string env_out;
     env.SerializeToString(&env_out);
     return env_out;
+}
+
+std::string create_sync_string(
+    SyncItem::SyncType type,
+    const std::string& target_id,
+    const std::string& content,
+    std::time_t timestamp
+) {
+    auto item = create_sync_item(type, target_id, content, timestamp);
+    return get_sync_string(item);
 }
 
 SyncItem get_sync_item(const std::string& proto_str) {

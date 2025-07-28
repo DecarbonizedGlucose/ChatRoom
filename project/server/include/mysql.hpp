@@ -42,6 +42,7 @@ public:
     bool check_user_pswd(const std::string& email, const std::string& password_hash);
     void update_user_last_active(const std::string& email);
     std::string get_user_id_from_email(const std::string& email);
+    std::string get_user_email_from_id(const std::string& user_ID);
     bool update_user_status(const std::string& user_ID, bool online);
 
 /* ---------- 好友 ---------- */
@@ -51,7 +52,6 @@ public:
     bool block_friend(const std::string& user_ID, const std::string& friend_ID);
     bool unblock_friend(const std::string& user_ID, const std::string& friend_ID);
     bool is_friend(const std::string& user_ID, const std::string& friend_ID);
-    bool search_user(const std::string& searched_ID);
 
     // 查询函数
     std::vector<std::string> get_friends_list(const std::string& user_ID);

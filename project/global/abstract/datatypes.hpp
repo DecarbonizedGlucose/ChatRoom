@@ -10,6 +10,7 @@
 #include "data.pb.h"
 #include "envelope.pb.h"
 #include "../include/action.hpp"
+#include <unordered_map>
 
 enum class DataType {
     None,
@@ -57,6 +58,12 @@ CommandRequest create_command(
     std::initializer_list<std::string> args
 );
 
+CommandRequest create_command(
+    Action action,
+    const std::string& sender,
+    const std::unordered_map<std::string, bool>& args
+);
+
 // trans CommandRequest to string
 std::string get_command_string(const CommandRequest& cmd);
 
@@ -65,6 +72,12 @@ std::string create_command_string(
     Action action,
     const std::string& sender,
     std::initializer_list<std::string> args
+);
+
+std::string create_command_string(
+    Action action,
+    const std::string& sender,
+    const std::unordered_map<std::string, bool>& args
 );
 
 // trans string to CommandRequest

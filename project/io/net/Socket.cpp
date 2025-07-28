@@ -108,13 +108,16 @@ ssize_t DataSocket::send_with_size() {
         return -1;
     }
     size_t size = write_buf.size();
+    if (size == 0) {
+        return 0; // No data to send
+    }
     ssize_t sent = ::write_size_to(fd, &size);
     // debug
     // std::cout << "Debug发送大小: " << std::dec << size << std::endl;
     // for (unsigned char c : write_buf) {
     //     std::cout << std::hex << (int)c << " ";
     // } std::cout << std::endl;
-    return send(size);
+    return size + send(size);
 }
 
 bool DataSocket::send_protocol(const std::string& proto) {
@@ -158,12 +161,15 @@ bool DataSocket::receive_protocol(std::string& proto) {
 
 DataSocket::RecvState DataSocket::receive_protocol_with_state(std::string& proto) {
     if (fd < 0) return RecvState::Error; // Invalid socket
+
     // 1. 事件内循环读到EAGAIN，拼接到packet_buf
     char tmp[4096];
+    bool has_new_data = false;
     while (true) {
         ssize_t n = ::read(fd, tmp, sizeof(tmp));
         if (n > 0) {
             packet_buf.append(tmp, n);
+            has_new_data = true;
         } else if (n == 0) {
             // 对端关闭
             return RecvState::Disconnected;
@@ -174,12 +180,19 @@ DataSocket::RecvState DataSocket::receive_protocol_with_state(std::string& proto
             return RecvState::Error;
         }
     }
+
     // 2. 拆包
-    if (packet_buf.size() < 4) return RecvState::Error; // 长度帧不够
+    if (packet_buf.size() < 4) {
+        // 如果没有读到新数据且缓冲区不足4字节，说明暂时没有完整包
+        return RecvState::NoMoreData;
+    }
     uint32_t net_len;
     memcpy(&net_len, packet_buf.data(), 4);
     size_t expected_size = ntohl(net_len);
-    if (packet_buf.size() < 4 + expected_size) return RecvState::NoMoreData; // 包体不够
+    if (packet_buf.size() < 4 + expected_size) {
+        // 包体不够，需要等待更多数据
+        return RecvState::NoMoreData;
+    }
     proto = packet_buf.substr(4, expected_size);
     packet_buf.erase(0, 4 + expected_size);
     // debug
@@ -213,7 +226,7 @@ bool AcceptedSocket::disconnect() {
     }
     fd = -1;
     connected = false;
-    log_info("AcceptedSocket disconnected");
+    log_info("AcceptedSocket disconnected (fd:{})", fd);
     return true;
 }
 
@@ -263,7 +276,7 @@ bool CSocket::disconnect() {
     }
     fd = -1;
     connected = false;
-    log_info("CSocket disconnected from {}:{}", ip, port);
+    log_info("CSocket (fd:{}) disconnected from {}:{}", fd, ip, port);
     return true;
 }
 

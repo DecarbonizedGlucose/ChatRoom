@@ -43,7 +43,7 @@ public:
 private:
     void handle_sign_in(
         TcpServerConnection* conn,
-        const std::string& email,
+        const std::string& subj,
         const std::string& password);
     void handle_sign_out(const std::string& user_ID);
     void handle_register(
@@ -65,7 +65,7 @@ private:
     void handle_refuse();
     void handle_add_friend();
     void handle_remove_friend();
-    void handle_search_person();
+    void handle_search_person(TcpServerConnection* conn, const std::string& searched_ID);
     void handle_create_group();
     void handle_join_group();
     void handle_leave_group();
@@ -75,9 +75,14 @@ private:
     void handle_search_group();
     void handle_add_admin();
     void handle_remove_admin();
-    void handle_get_relation_net(const std::string& user_ID);
+    void handle_post_relation_net(const std::string& user_ID);
     void handle_update_relation_net(const std::string& user_ID);
     void handle_download_file();
+    void handle_remember_connection(
+        TcpServerConnection* conn,
+        const std::string& user_ID,
+        int server_index);
+    void handle_online_init(const std::string& user_ID);
 };
 
 /* -------------- Data -------------- */
@@ -87,19 +92,19 @@ public:
     FileHandler(Dispatcher* dispatcher);
 
     void handle_recv(const FileChunk& file_chunk, const std::string& ostr);
-    void handle_send(const FileChunk& file_chunk, const std::string& ostr);
+    void handle_send(TcpServerConnection* conn);
 };
 
 class SyncHandler : public Handler {
 public:
     SyncHandler(Dispatcher* dispatcher);
 
-    void handle_send(const SyncItem& sync_item, const std::string& ostr);
+    void handle_send(TcpServerConnection* conn);
 };
 
 class OfflineMessageHandler : public Handler {
 public:
     OfflineMessageHandler(Dispatcher* dispatcher);
 
-    void handle_recv(const OfflineMessages& offline_messages, const std::string& ostr);
+    void handle_send(TcpServerConnection* conn);
 };

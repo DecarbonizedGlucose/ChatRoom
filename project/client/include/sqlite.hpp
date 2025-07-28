@@ -19,9 +19,6 @@ private:
     std::mutex db_mutex;                   // 数据库操作互斥锁，确保线程安全
     std::string db_path;                   // 数据库文件路径
 
-    // 初始化数据库表结构
-    bool init_tables();
-
     /* ---------- 通用辅助模板方法 ---------- */
     // 这些模板方法用于简化重复的数据库操作代码
 
@@ -166,6 +163,13 @@ public:
      * @note 用于用户注销登录时清理本地数据
      */
     bool clear_user_info();
+
+    /**
+     * @brief 清除所有用户相关数据
+     * @return 清除是否成功
+     * @note 用于用户注销登录时完全清理所有本地数据，包括好友、群组等
+     */
+    bool clear_all_user_data();
 
 /* ---------- 好友系统 ---------- */
 

@@ -6,7 +6,7 @@
 #include "include/connection_manager.hpp"
 
 TopServer::TopServer() {
-    pool = new thread_pool(20, 30);
+    pool = new thread_pool(20);
     redis = new RedisController();
     mysql = new MySQLController(
         "127.0.0.1",

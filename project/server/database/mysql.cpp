@@ -153,6 +153,15 @@ std::string MySQLController::get_user_id_from_email(const std::string& email) {
     return "";
 }
 
+std::string MySQLController::get_user_email_from_id(const std::string& user_ID) {
+    std::string sql = "SELECT user_email FROM users WHERE user_id = '" + user_ID + "';";
+    auto rows = query(sql);
+    if (!rows.empty() && rows[0].size() > 0) {
+        return rows[0][0];
+    }
+    return "";
+}
+
 bool MySQLController::update_user_status(const std::string& user_ID, bool online) {
     std::string status = online ? "active" : "offline";
     std::string sql = "UPDATE users SET status = '" + status + "' WHERE user_id = '" + user_ID + "';";
@@ -188,15 +197,6 @@ bool MySQLController::unblock_friend(const std::string& user_ID, const std::stri
 bool MySQLController::is_friend(const std::string& user_ID, const std::string& friend_ID) {
     std::string sql = "SELECT COUNT(*) FROM friends WHERE user_id = '"
         + user_ID + "' AND friend_id = '" + friend_ID + "';";
-    auto rows = query(sql);
-    if (!rows.empty() && rows[0].size() > 0) {
-        return std::stoi(rows[0][0]) > 0;
-    }
-    return false;
-}
-
-bool MySQLController::search_user(const std::string& searched_ID) {
-    std::string sql = "SELECT COUNT(*) FROM users WHERE user_id = '" + searched_ID + "';";
     auto rows = query(sql);
     if (!rows.empty() && rows[0].size() > 0) {
         return std::stoi(rows[0][0]) > 0;

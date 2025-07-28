@@ -57,6 +57,7 @@ void TcpServer::init(thread_pool* pool, RedisController* re, Dispatcher* disp) {
     }
     event* read_event = new event(listen_conn->get_fd(), EPOLLIN | EPOLLET);
     read_event->bind_with(pr);
+    pr->add_revent(read_event, listen_conn->get_fd());
     read_event->add_to_reactor();
 }
 
@@ -69,7 +70,7 @@ void TcpServer::start() {
             if (errno == EINTR) {
                 continue; // 被打断
             }
-            std::cerr << "Epoll wait failed: " << strerror(errno) << '\n';
+            log_error(std::string("Epoll wait failed: ") + strerror(errno));
             running = false;
             break; // Exit on error
         } else if (num_ready == 0) {
@@ -79,14 +80,11 @@ void TcpServer::start() {
         // 轮询
         for (int i = 0; i < num_ready; ++i) {
             auto ev = pr->epoll_events[i];
-            event* event_ptr = static_cast<event*>(ev.data.ptr);
-            if (event_ptr == nullptr) {
-                // 自唤醒
-                log_info("Epoll wakes self");
-                break;
-            }
+            int fd = ev.data.fd;
+            event* read_event = pr->fd_event_obj[fd].first;
+            event* write_event = pr->fd_event_obj[fd].second;
             // 先拉出来listen_conn的事件
-            if (event_ptr->get_sockfd() == listen_conn->get_fd()) {
+            if (fd == listen_conn->get_fd()) {
                 this->pool->submit([this]() {
                     this->auto_accept();
                 });
@@ -95,21 +93,22 @@ void TcpServer::start() {
             // 区分读写，分发事件
             if (ev.events & EPOLLIN) {
                 // 读事件
-                log_info("Reactor read event at fd {}", event_ptr->get_sockfd());
-                event_ptr->remove_from_reactor();
-                log_debug("Read event removed from reactor (fd:{})", event_ptr->get_sockfd());
-                pool->submit([event_ptr]() {
-                    event_ptr->conn->dispatcher \
-                    ->dispatch_recv(event_ptr->conn);
+                log_info("Reactor read event at fd {}", fd);
+                read_event->remove_from_reactor();
+                log_debug("Read event removed from reactor (fd:{})", fd);
+                pool->submit([read_event]() {
+                    read_event->conn->dispatcher \
+                    ->dispatch_recv(read_event->conn);
                 });
             }
-            else {
+            if (ev.events & EPOLLOUT) {
                 // 写事件
-                log_info("Reactor write event at fd {}", event_ptr->get_sockfd());
-                event_ptr->remove_from_reactor();
-                pool->submit([event_ptr]() {
-                    event_ptr->conn->dispatcher \
-                    ->dispatch_send(event_ptr->conn);
+                log_info("Reactor write event at fd {}", fd);
+                write_event->remove_from_reactor();
+                log_debug("Write event removed from reactor (fd:{})", fd);
+                pool->submit([write_event]() {
+                    write_event->conn->dispatcher \
+                    ->dispatch_send(write_event->conn);
                 });
             }
         }
@@ -119,7 +118,6 @@ void TcpServer::start() {
 
 void TcpServer::stop() {
     running = false;
-    pr->wake();
     log_info("Tcp server {} stopped", idx);
 }
 
@@ -143,6 +141,8 @@ void TcpServer::auto_accept() {
     write_event->bind_with(pr);
     conn->read_event = read_event;
     conn->write_event = write_event;
+    pr->add_revent(read_event, new_sock->get_fd());
+    pr->add_wevent(write_event, new_sock->get_fd());
     read_event->add_to_reactor();
     write_event->add_to_reactor();
 }

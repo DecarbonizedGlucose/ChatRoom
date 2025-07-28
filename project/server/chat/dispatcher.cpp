@@ -32,20 +32,23 @@ void Dispatcher::add_server(TcpServer* server, int idx) {
 }
 
 void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
+    log_debug("dispatch_recv called for connection fd: {}", conn->socket->get_fd());
     std::string proto_str;
     // 读
     while (1) {
         RecvState state = conn->socket->receive_protocol_with_state(proto_str);
         if (state == RecvState::NoMoreData) {
+            log_debug("No more data available for fd: {}", conn->socket->get_fd());
             break;
         } else if (state == RecvState::Disconnected) {
+            log_info("Connection fd {} disconnected", conn->socket->get_fd());
             conn->socket->disconnect();
             return; // 连接断开
         } else if (state == RecvState::Error) {
             log_error("Error receiving data from connection (fd: {})", conn->socket->get_fd());
             return; // 处理错误
         }
-        log_debug("Received data from connection");
+        log_debug("Received data from connection (fd:{})", conn->socket->get_fd());
         //std::cout << "Received data: " << std::hex << proto_str << std::endl;
         // 转写
         Envelope env;
@@ -75,8 +78,23 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
             continue;
         }
     }
-    conn->read_event->add_to_reactor();
-    log_debug("Read event added to reactor (fd:{})", conn->read_event->get_sockfd());
+    log_debug("Attempting to re-add read event for fd: {}", conn->socket->get_fd());
+
+    // 添加安全检查
+    if (!conn->read_event) {
+        log_error("CRITICAL: conn->read_event is null for fd: {}", conn->socket->get_fd());
+        return;
+    }
+
+    log_debug("read_event is valid, calling add_to_reactor()");
+    try {
+        conn->read_event->add_to_reactor();
+        log_debug("Read event added/modified in reactor (fd:{})", conn->read_event->get_sockfd());
+    } catch (const std::exception& e) {
+        log_error("Exception in add_to_reactor() for fd {}: {}", conn->socket->get_fd(), e.what());
+    } catch (...) {
+        log_error("Unknown exception in add_to_reactor() for fd {}", conn->socket->get_fd());
+    }
 }
 
 void Dispatcher::dispatch_send(TcpServerConnection* conn) {
@@ -103,5 +121,23 @@ void Dispatcher::dispatch_send(TcpServerConnection* conn) {
             std::cerr << "Unknown data type for sending\n";
             return;
         }
+    }
+
+    // 统一处理：发送完成后，重新添加读事件以继续接收数据
+    log_debug("dispatch_send: Attempting to re-add read event for fd: {}", conn->socket->get_fd());
+
+    if (!conn->read_event) {
+        log_error("dispatch_send: CRITICAL: conn->read_event is null for fd: {}", conn->socket->get_fd());
+        return;
+    }
+
+    log_debug("dispatch_send: read_event is valid, calling add_to_reactor()");
+    try {
+        conn->read_event->add_to_reactor();
+        log_debug("dispatch_send: Read event re-added/modified in reactor (fd:{})", conn->read_event->get_sockfd());
+    } catch (const std::exception& e) {
+        log_error("dispatch_send: Exception in add_to_reactor() for fd {}: {}", conn->socket->get_fd(), e.what());
+    } catch (...) {
+        log_error("dispatch_send: Unknown exception in add_to_reactor() for fd {}", conn->socket->get_fd());
     }
 }

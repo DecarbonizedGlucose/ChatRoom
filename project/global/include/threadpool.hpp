@@ -47,11 +47,12 @@ public:
     std::mutex m_Mutex;
     std::condition_variable m_Condition;
     int pool_core_size;
-    int pool_max_size;
+    //int pool_max_size;
     int pool_status = 0; // 0: working, 1: shutdown, 2: stop, 3: tidying, 4: terminated
     bool is_shutting_down = false;
 
-    thread_pool(int core_size = 4, int max_size = 8) : pool_core_size(core_size), pool_max_size(max_size) {}
+    thread_pool(int core_size = 4/*, int max_size = 8*/ )
+        : pool_core_size(core_size) {}
 
     thread_pool(const thread_pool&) = delete;
     thread_pool& operator=(const thread_pool&) = delete;

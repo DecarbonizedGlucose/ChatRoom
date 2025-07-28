@@ -60,8 +60,8 @@ bool SQLiteController::connect() {
         // 启用外键约束
         db->exec("PRAGMA foreign_keys = ON;");
 
-        // 初始化表结构
-        return init_tables();
+        // 初始化由编译脚本处理
+        return true;
     } catch (const std::exception& e) {
         log_error("Failed to open SQLite database: {}", e.what());
         db.reset();
@@ -79,59 +79,6 @@ void SQLiteController::disconnect() {
 
 bool SQLiteController::is_connected() const {
     return db != nullptr;
-}
-
-bool SQLiteController::init_tables() {
-    const std::string create_tables_sql = R"(
-        CREATE TABLE IF NOT EXISTS users (
-            user_id VARCHAR(30) PRIMARY KEY NOT NULL,
-            user_email VARCHAR(255) NOT NULL UNIQUE,
-            password_hash CHAR(60) NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS friends (
-            user_id TEXT NOT NULL,
-            friend_id TEXT NOT NULL,
-            is_blocked BOOLEAN DEFAULT FALSE,
-            PRIMARY KEY(user_id, friend_id),
-            FOREIGN KEY(user_id) REFERENCES users(user_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS chat_groups (
-            group_id VARCHAR(30) PRIMARY KEY NOT NULL,
-            group_name VARCHAR(255) NOT NULL,
-            owner_id VARCHAR(30) NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS group_members (
-            group_id VARCHAR(30) NOT NULL,
-            user_id VARCHAR(30) NOT NULL,
-            is_admin BOOLEAN DEFAULT FALSE,
-            PRIMARY KEY(group_id, user_id),
-            FOREIGN KEY(group_id) REFERENCES chat_groups(group_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            message_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sender_id VARCHAR(30) NOT NULL,
-            receiver_id VARCHAR(30) NOT NULL,
-            is_group BOOLEAN NOT NULL,
-            timestamp INTEGER NOT NULL,
-            text TEXT,
-            pin BOOLEAN DEFAULT FALSE,
-            file_name VARCHAR(255),
-            file_size INTEGER,
-            file_hash VARCHAR(128),
-            synced BOOLEAN DEFAULT TRUE
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_messages_receiver_time ON chat_messages(receiver_id, is_group, timestamp);
-        CREATE INDEX IF NOT EXISTS idx_messages_sender_time ON chat_messages(sender_id, timestamp);
-        CREATE INDEX IF NOT EXISTS idx_friends_user ON friends(user_id);
-        CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
-    )";
-
-    return execute(create_tables_sql);
 }
 
 bool SQLiteController::execute(const std::string& query) {
@@ -302,6 +249,18 @@ bool SQLiteController::get_stored_user_info(std::string& user_ID, std::string& e
 
 bool SQLiteController::clear_user_info() {
     return execute("DELETE FROM users");
+}
+
+bool SQLiteController::clear_all_user_data() {
+    // 清理所有用户相关数据（登出时使用）
+    bool success = true;
+    success &= this->execute("DELETE FROM users");
+    success &= this->execute("DELETE FROM friends");
+    success &= this->execute("DELETE FROM group_members");
+    success &= this->execute("DELETE FROM chat_groups");
+    // 可选：是否清理聊天记录
+    // success &= this->execute("DELETE FROM chat_messages");
+    return success;
 }
 
 /* ---------- 好友 ---------- */

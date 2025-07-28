@@ -22,6 +22,9 @@ enum class UIPage {
     Main,
     Message,
     Contacts,
+    Add_Person,
+    Join_Group,
+    My_Lists,
     My,
     Exit
 };
@@ -41,6 +44,7 @@ private:
     // 处理用户输入(仅选择)
     void handle_start_input();
     void handle_main_input();
+    void handle_contacts_input();
     // 各个页面
     void start_loop();
     void login_loop();
@@ -49,6 +53,9 @@ private:
     void main_loop();
     void message_loop();
     void contacts_loop();
+    void add_person_loop();
+    void join_group_loop();
+    void my_lists_loop();
     void my_loop();
     // 无界面功能
     void log_out();
@@ -71,3 +78,5 @@ void draw_start(std::mutex& mtx);
 void draw_login(std::mutex& mtx, int idx);
 void draw_register(std::mutex& mtx, int idx);
 void draw_main(std::mutex& mtx, const std::string& user_ID);
+void draw_contacts(std::mutex& mtx);
+void draw_my(std::mutex& mtx, CommManager* comm);

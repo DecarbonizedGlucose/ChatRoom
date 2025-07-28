@@ -5,11 +5,60 @@
 #include "../../global/abstract/datatypes.hpp"
 #include "../../global/include/threadpool.hpp"
 #include "../include/TcpClient.hpp"
+#include "../include/sqlite.hpp"
 #include <iostream>
+#include <regex>
 
-std::string hash_password(const std::string& password) {
-    // 这里可以使用更安全的哈希函数
-    return std::to_string(std::hash<std::string>{}(password));
+namespace {
+    // 密码合规性
+    bool is_password_valid(const std::string& password) {
+        // 8-16位，至少包含一个大写字母、小写字母、数字和特殊字符，且不能包含空格，在ascii 127范围内
+        if (password.length() < 8 || password.length() > 16) {
+            return false;
+        }
+        bool has_upper = false;
+        bool has_lower = false;
+        bool has_digit = false;
+        bool has_special = false;
+        for (char c : password) {
+            if (c < 0 || c > 127) {
+                return false;
+            }
+            if (std::isupper(c)) has_upper = true;
+            if (std::islower(c)) has_lower = true;
+            if (std::isdigit(c)) has_digit = true;
+            if (std::ispunct(c)) has_special = true;
+            if (std::isspace(c)) return false;
+        }
+        return has_upper && has_lower && has_digit && has_special;
+    }
+
+    // 用户名合规性
+    bool is_username_valid(const std::string& user_ID) {
+        // 只能包含字母、数字和下划线，长度在5-20位之间
+        if (user_ID.length() < 5 || user_ID.length() > 20) {
+            return false;
+        }
+        for (char c : user_ID) {
+            if (!std::isalnum(c) && c != '_') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // 密码求哈希
+    std::string hash_password(const std::string& password) {
+        // 这里可以使用更安全的哈希函数
+        return std::to_string(std::hash<std::string>{}(password));
+    }
+
+    // 邮箱合规性
+    bool is_email_valid(const std::string& email) {
+        const std::regex pattern(R"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})");
+        return std::regex_match(email, pattern);
+    }
+
 }
 
 WinLoop::WinLoop(CommManager* comm, thread_pool* pool)
@@ -19,7 +68,76 @@ WinLoop::~WinLoop() {
 }
 
 void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
-
+    Action action = static_cast<Action>(cmd.action());
+    // std::string sender = cmd.sender(); // 这不用户自己吗
+    auto args = cmd.args();
+    switch (action) {
+        case Action::Notify: { // 包罗各种通知
+            comm->handle_save_notify(args[0]);
+            break;
+        }
+        case Action::Notify_Exist: {
+            // 通知某个东西存在
+            comm->handle_show_notify_exist(args[0]);
+            break;
+        }
+        case Action::Notify_Not_Exist: {
+            // 通知某个东西不存在
+            comm->handle_show_notify_not_exist(args[0]);
+            break;
+        }
+        case Action::Friend_Online: {
+            // 好友上线通知
+            comm->cache.friend_list[args[0]].online = true;
+            break;
+        }
+        case Action::Friend_Offline: {
+            // 好友下线通知
+            comm->cache.friend_list[args[0]].online = false;
+            break;
+        }
+        case Action::Add_Friend: {
+            // 好友申请
+            break;
+        }
+        case Action::Remove_Friend: {
+            // 被删除通知
+            break;
+        }
+        case Action::Create_Group: {
+            // 有人创建了群，并把用户拉进去的通知
+            break;
+        }
+        case Action::Join_Group: {
+            // 如果用户是管理员，有人申请加群的申请
+            // 不管是不是管理员，用这个通知拉取最新的关系网
+            break;
+        }
+        case Action::Leave_Group: {
+            break;
+        }
+        case Action::Disband_Group: {
+            // 群被解散的通知
+            break;
+        }
+        case Action::Invite_To_Group: {
+            break;
+        }
+        case Action::Remove_From_Group: {
+            // 被移除出群的通知
+            break;
+        }
+        case Action::Add_Admin: {
+            break;
+        }
+        case Action::Remove_Admin: {
+            break;
+        }
+        default: {
+            log_error("Unknown action in command: {}", static_cast<int>(action));
+            return;
+        }
+    }
 }
 
 void WinLoop::run() {
@@ -44,6 +162,15 @@ void WinLoop::run() {
             case UIPage::Contacts:
                 contacts_loop();
                 break;
+            case UIPage::Add_Person:
+                add_person_loop();
+                break;
+            case UIPage::Join_Group:
+                join_group_loop();
+                break;
+            case UIPage::My_Lists:
+                my_lists_loop();
+                break;
             case UIPage::My:
                 my_loop();
                 break;
@@ -63,39 +190,46 @@ void WinLoop::stop() {
 /* ---------- 页面处理 ---------- */
 
 void WinLoop::start_loop() {
-    while (1) {
-        sclear();
-        draw_start(output_mutex);
-        handle_start_input();
-    }
+    sclear();
+    draw_start(output_mutex);
+    handle_start_input();
 }
 
-void WinLoop::login_loop() {
+void WinLoop::login_loop() { // 改进用email/ID均可登录，并返回另一个
     while (1) {
         sclear();
         draw_login(output_mutex, 1);
-        std::string email, password;
-        std::getline(std::cin, email);
-        if (email.empty()) { // 返回
+        std::string user, password;
+        std::getline(std::cin, user);
+        if (user.empty()) { // 返回
             switch_to(UIPage::Start);
             return;
         }
         draw_login(output_mutex, 2);
-        std::getline(std::cin, password);
-        if (email.empty() || password.empty()) {
-            std::cout << "Email or password cannot be empty." << std::endl;
-            pause();
-            continue;
+        while (1) {
+            std::getline(std::cin, password);
+            if (user.empty() || password.empty()) {
+                std::cout << "不能输入空字符串" << std::endl;
+                print_input_sign();
+                continue;
+            }
+            break;
         }
         auto password_hash = hash_password(password);
         // 传给服务器
-        comm->handle_send_command(Action::Sign_In, email, {password_hash}, false);
+        comm->handle_send_command(Action::Sign_In, user, {password_hash}, false);
         // 读取服务器响应
         CommandRequest resp = comm->handle_receive_command(false);
         if (resp.action() == static_cast<int>(Action::Accept)) {
             std::cout << "登录成功！" << std::endl;
-            comm->email = email;
-            // 向服务器发送身份信息
+            if (is_email_valid(user)) {
+                comm->cache.user_email = user;
+                comm->cache.user_ID = resp.args(0);
+            } else {
+                comm->cache.user_ID = user;
+                comm->cache.user_email = resp.args(0);
+            }
+            comm->cache.user_password_hash = password_hash;
             main_init();
             switch_to(UIPage::Main);
             return;
@@ -112,10 +246,18 @@ void WinLoop::register_loop() {
         sclear();
         std::string email, veri_code, username, password;
         draw_register(output_mutex, 1);
-        std::getline(std::cin, email);
-        if (email.empty()) { // 返回
-            switch_to(UIPage::Start);
-            return;
+        while (1) {
+            std::getline(std::cin, email);
+            if (email.empty()) { // 返回
+                switch_to(UIPage::Start);
+                return;
+            }
+            if (!is_email_valid(email)) {
+                std::cout << "邮箱格式不合法，请重新输入：" << std::endl;
+                print_input_sign();
+                continue;
+            }
+            break;
         }
         // 发送验证码请求
         comm->handle_send_command(Action::Get_Veri_Code, email, {}, false);
@@ -130,11 +272,14 @@ void WinLoop::register_loop() {
             continue;
         }
         draw_register(output_mutex, 2);
-        std::getline(std::cin, veri_code);
-        if (veri_code.empty()) {
-            std::cout << "验证码不能为空。" << std::endl;
-            pause();
-            continue;
+        while (1) {
+            std::getline(std::cin, veri_code);
+            if (veri_code.empty() || veri_code.length() != 6) { // 假设验证码是6位
+                std::cout << "验证码未完整。" << std::endl;
+                print_input_sign();
+                continue;
+            }
+            break;
         }
         // 发送验证码
         comm->handle_send_command(Action::Authentication, email, {veri_code}, false);
@@ -146,18 +291,34 @@ void WinLoop::register_loop() {
             continue;
         }
         draw_register(output_mutex, 3);
-        std::getline(std::cin, username);
-        if (username.empty()) {
-            std::cout << "用户名不能为空。" << std::endl;
-            pause();
-            continue;
+        while (1) {
+            std::getline(std::cin, username);
+            if (!is_username_valid(username)) {
+                std::cout << "请重新输入用户名：" << std::endl;
+                print_input_sign();
+                continue;
+            }
+            // 检验用户名唯一性
+            std::cout << "正在检查用户名唯一性..." << std::endl;
+            comm->handle_send_command(Action::Search_Person, username, {}, false);
+            CommandRequest search_resp = comm->handle_receive_command(false);
+            if (search_resp.action() == static_cast<int>(Action::Notify_Exist)) {
+                std::cout << "用户名已存在，请重新输入：" << std::endl;
+                print_input_sign();
+                continue;
+            }
+            std::cout << "恭喜，用户名可用！" << std::endl;
+            break;
         }
         draw_register(output_mutex, 4);
-        std::getline(std::cin, password);
-        if (password.empty()) { // 后面有空把这优化一下
-            std::cout << "密码不能为空。" << std::endl;
-            pause();
-            continue;
+        while (1) {
+            std::getline(std::cin, password);
+            if (!is_password_valid(password)) {
+                std::cout << "密码不合法。" << std::endl;
+                print_input_sign();
+                continue;
+            }
+            break;
         }
         std::string password_hash = hash_password(password);
         // 发送注册请求
@@ -182,13 +343,20 @@ void WinLoop::register_loop() {
 
 void WinLoop::main_init() {
     std::cout << "正在初始化数据..." << std::endl;
+    std::cout << "用户ID : " << comm->cache.user_ID << std::endl;
+    std::cout << "用户邮箱 : " << comm->cache.user_email << std::endl;
     // 用户email和ID写入SQLite
-    // ...
-    // tcp连接认证
+    comm->sqlite_con->store_user_info(comm->cache.user_ID, comm->cache.user_email, comm->cache.user_password_hash);
+    // tcp连接认证, server端：handle_remember_connection
     comm->handle_send_id();
-    // 拉取聊天记录
-    // ...
+    // 发送初始化请求
+    comm->handle_send_command(Action::Online_Init, comm->cache.user_ID, {}, false);
     // 拉取关系网
+    std::cout << "正在拉取关系网..." << std::endl;
+    comm->handle_get_relation_net();
+    // 拉取聊天记录
+    comm->handle_get_chat_history();
+    // 拉取通知和好友请求/群聊邀请/加群申请等
     // ...
     // Message, Command循环读，Data适时读, 所有通道适时写
     pool->submit([&]{
@@ -196,7 +364,7 @@ void WinLoop::main_init() {
         while (this->running) {
             auto msg = comm->handle_receive_message();
             pool->submit([this, msg](){
-                comm->handle_manage_message(msg);
+                comm->handle_manage_message(msg); // 直接调用处理
             });
         }
     });
@@ -205,32 +373,18 @@ void WinLoop::main_init() {
         while (this->running) {
             auto cmd = comm->handle_receive_command();
             pool->submit([this, cmd](){
-                comm->handle_manage_command(cmd);
+                dispatch_cmd(cmd); // 分发给不同的处理函数
             });
         }
     });
     std::cout << "数据初始化完成。" << std::endl;
+    pause();
 }
 
 void WinLoop::main_loop() {
-    while (1) {
-        sclear();
-        draw_main(output_mutex, comm->user_ID);
-        std::string input;
-        std::getline(std::cin, input);
-        if (input == "1") {
-            switch_to(UIPage::Message);
-        } else if (input == "2") {
-            switch_to(UIPage::Contacts);
-        } else if (input == "3") {
-            switch_to(UIPage::My);
-        } else if (input == "0") {
-            switch_to(UIPage::Exit);
-            return;
-        } else {
-            log_error("Invalid input: {}", input);
-        }
-    }
+    sclear();
+    draw_main(output_mutex, comm->cache.user_ID);
+    handle_main_input();
 }
 
 void WinLoop::message_loop() {
@@ -244,21 +398,59 @@ void WinLoop::message_loop() {
 }
 
 void WinLoop::contacts_loop() {
+    sclear();
+    draw_contacts(output_mutex);
+    handle_contacts_input();
+}
 
+void WinLoop::add_person_loop() {
+    while (1) {
+        sclear();
+        std::cout << "请输入要添加的好友的user_ID";
+        print_input_sign();
+        std::string user_ID;
+        std::getline(std::cin, user_ID);
+        if (user_ID.empty()) { // 返回
+            std::cout << "输入为空，返回联系人菜单。" << std::endl;
+            pause();
+            switch_to(UIPage::Contacts);
+            return;
+        }
+        // 发送添加好友请求
+        comm->handle_send_command(Action::Add_Friend, comm->cache.user_ID, {user_ID});
+        std::cout << "正在发送添加好友请求..." << std::endl;
+        // 读取服务器响应
+        // handler自动处理
+
+    }
+}
+
+void WinLoop::join_group_loop() {}
+
+void WinLoop::my_lists_loop() {
+    // 暂时仅展示列表
+    sclear();
+    comm->print_friends();
+    std::cout << std::endl << "======================"
+              << std::endl << std::endl;
+    comm->print_groups();
+    pause();
+    switch_to(UIPage::Main);
 }
 
 void WinLoop::my_loop() {
     sclear();
-    std::cout << "关于功能尚未实现。" << std::endl;
-    std::cout << "按任意键返回主菜单..." << std::endl;
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cout << "用户ID : " << comm->cache.user_ID << std::endl;
+    std::cout << "邮箱 : " << comm->cache.user_email << std::endl << std::endl << std::endl;
+    std::cout << "=====================" << std::endl;
+    std::cout << "开源软件仓库 : https://github.com/DecarbonizedGlucose/ChatRoom.git" << std::endl;
     pause();
     switch_to(UIPage::Main);
     return;
 }
 
 void WinLoop::log_out() {
-    comm->handle_send_command(Action::Sign_Out, comm->email, {});
+    comm->handle_send_command(Action::Sign_Out, comm->cache.user_email, {});
 }
 
 /* ---------- 菜单选择 ---------- */
@@ -289,9 +481,26 @@ void WinLoop::handle_main_input() {
         switch_to(UIPage::My);
     } else if (input == "0") {
         // 退出登录
-        comm->handle_send_command(Action::Sign_Out, comm->user_ID, {});
+        comm->handle_send_command(Action::Sign_Out, comm->cache.user_ID, {});
         std::cout << "正在退出登录..." << std::endl;
         switch_to(UIPage::Exit);
+    } else {
+        std::cout << "无效的输入，请重新选择。" << std::endl;
+        pause();
+    }
+}
+
+void WinLoop::handle_contacts_input() {
+    std::string input;
+    std::getline(std::cin, input);
+    if (input == "1") {
+        switch_to(UIPage::Add_Person);
+    } else if (input == "2") {
+        switch_to(UIPage::Join_Group);
+    } else if (input == "3") {
+        switch_to(UIPage::My_Lists);
+    } else if (input == "0") {
+        switch_to(UIPage::Main);
     } else {
         std::cout << "无效的输入，请重新选择。" << std::endl;
         pause();
@@ -329,9 +538,9 @@ void draw_login(std::mutex& mtx, int idx) {
     switch (idx) {
         case 1: {
             std::cout << "         -$- 登    录 -$-" << std::endl;
-            std::cout << "请输入邮箱和密码。" << std::endl;
+            std::cout << "请输入邮箱/用户名和密码。" << std::endl;
             std::cout << "（直接回车返回）" << std::endl;
-            std::cout << "邮箱";
+            std::cout << "邮箱/用户名";
             print_input_sign();
             break;
         }
@@ -361,11 +570,14 @@ void draw_register(std::mutex& mtx, int idx) {
             break;
         }
         case 3: {
+            std::cout << "用户名只能包含字母、数字和下划线，长度在5-20位之间";
             std::cout << "用户名";
             print_input_sign();
             break;
         }
         case 4: {
+            std::cout << "密码长度8-16位，至少包含一个大写字母、小写字母、\n";
+            std::cout << "数字和特殊字符，且不能包含空格，在ascii 127范围内" << std::endl;
             std::cout << "密码";
             print_input_sign();
             break;
@@ -380,5 +592,15 @@ void draw_main(std::mutex& mtx, const std::string& user_ID) {
     std::cout << selnum(2) + " 联系人" << std::endl;
     std::cout << selnum(3) + " 我的" << std::endl;
     std::cout << selnum(0) + " 退出登录 && 退出程序" << std::endl;
+    print_input_sign();
+}
+
+void draw_contacts(std::mutex& mtx) {
+    std::lock_guard<std::mutex> lock(mtx);
+    std::cout << "-$- 联系人列表 -$-" << std::endl;
+    std::cout << selnum(1) + " 添加好友" << std::endl;
+    std::cout << selnum(2) + " 加入群聊" << std::endl;
+    std::cout << selnum(3) + " 查看我的列表" << std::endl;
+    std::cout << selnum(0) + " 返回主菜单" << std::endl;
     print_input_sign();
 }

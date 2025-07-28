@@ -8,8 +8,34 @@
 #include "../include/connection_manager.hpp"
 #include <nlohmann/json.hpp>
 #include <iostream>
+#include <regex>
 
 using json = nlohmann::json;
+
+namespace {
+    void try_send(TcpServerConnection* conn,
+        const std::string& proto,
+        DataType type = DataType::None
+    ) {
+        // 首先设置要发送的数据
+        conn->socket->set_write_buf(proto);
+        conn->set_send_type(type);
+
+        // 先尝试立即发送数据
+        ssize_t sent = conn->socket->send_with_size();
+        if (sent == 0) {
+            // 可能是缓冲区空或者socket不可写，注册写事件等待
+            log_debug("Socket not ready for writing or no data, registering write event for fd: {}", conn->socket->get_fd());
+            conn->write_event->add_to_reactor();
+        } else if (sent > 0) {
+            // 数据发送成功
+            log_debug("Data sent immediately to fd: {} (sent {} bytes)", conn->socket->get_fd(), sent);
+        } else {
+            // 发送出错 (sent < 0)
+            log_error("Failed to send (fd:{}): {}", conn->socket->get_fd(), strerror(errno));
+        }
+    }
+}
 
 /* Handler base */
 Handler::Handler(Dispatcher* dispatcher) : disp(dispatcher) {}
@@ -91,7 +117,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Search_Person: {
-            handle_search_person();
+            handle_search_person(conn, args[0]);
             break;
         }
         case Action::Create_Group: {
@@ -131,7 +157,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Get_Relation_Net: {
-            handle_get_relation_net(subj);
+            handle_post_relation_net(subj);
             break;
         }
         case Action::Download_File: {
@@ -143,6 +169,14 @@ void CommandHandler::handle_recv(
             conn->user_ID = subj; // 这里的subj是user_ID
             int server_index = std::stoi(args[0]);
             disp->conn_manager->add_conn(conn, server_index);
+        }
+        case Action::Update_Relation_Net: {
+            handle_update_relation_net(subj);
+            break;
+        }
+        case Action::Online_Init: {
+            handle_online_init(subj);
+            break;
         }
         default: {
             log_error("Unknown action received: Action_ID={}", static_cast<int>(action));
@@ -158,29 +192,38 @@ void CommandHandler::handle_send(TcpServerConnection* conn) {
 
 void CommandHandler::handle_sign_in(
     TcpServerConnection* conn,
-    const std::string& email,
+    const std::string& subj,
     const std::string& password_hash) {
     log_debug("handle_sign_in called");
-    bool res = disp->mysql_con->check_user_pswd(email, password_hash);
+    // 判断subj是邮箱还是用户名
+    const std::regex pattern(R"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})");
+    bool is_email = std::regex_match(subj, pattern);
+    std::string ret;
+    bool res;
+    if (is_email) {
+        res = disp->mysql_con->check_user_pswd(subj, password_hash);
+        ret = disp->mysql_con->get_user_id_from_email(subj); // user_ID
+    } else {
+        ret = disp->mysql_con->get_user_email_from_id(subj); // email
+        res = disp->mysql_con->check_user_pswd(ret, password_hash);
+    }
+    auto user_ID = is_email ? ret : subj; // user_ID
+    auto user_email = is_email ? subj : ret; // email
     if (res) {
         // 登录成功
-        // 通知客户端
-        CommandRequest cmd;
         auto env_out = create_command_string(
-            Action::Accept, email, {});
+            Action::Accept, "", {ret});
         conn->socket->set_write_buf(env_out);
         conn->write_event->add_to_reactor();
         // 更新mysql的last_active
-        disp->mysql_con->update_user_last_active(email);
+        disp->mysql_con->update_user_last_active(is_email?ret:subj);
         // 更新redis的在线状态
-        std::string user_ID = disp->mysql_con->get_user_id_from_email(email);
-        // 一般不会获取失败，除非客户端寄了
-        disp->redis_con->set_user_status(user_ID, "active");
+        disp->redis_con->set_user_status(is_email?ret:subj, "active");
     } else {
         // 登录失败
-        std::string err_msg = "用户名或密码错误";
+        std::string err_msg = "用户名/邮箱与密码不匹配";
         auto env_out = create_command_string(
-            Action::Refuse, email, {err_msg});
+            Action::Refuse, "", {err_msg});
         conn->socket->set_write_buf(env_out);
         conn->write_event->add_to_reactor();
     }
@@ -316,7 +359,23 @@ void CommandHandler::handle_add_friend() {}
 
 void CommandHandler::handle_remove_friend() {}
 
-void CommandHandler::handle_search_person() {}
+void CommandHandler::handle_search_person(
+    TcpServerConnection* conn, const std::string& searched_ID) {
+    log_debug("handle_search_person called for user");
+    bool user_exists = disp->mysql_con->do_user_id_exist(searched_ID);
+    std::string env_str;
+    if (user_exists) {
+        env_str = create_command_string(
+            Action::Notify_Exist, conn->user_ID, {searched_ID});
+        log_debug("User {} exists, sending Notify_Exist", searched_ID);
+    } else {
+        env_str = create_command_string(
+            Action::Notify_Not_Exist, conn->user_ID, {searched_ID});
+        log_debug("User {} does not exist, sending Notify_Not_Exist", searched_ID);
+    }
+    conn->socket->set_write_buf(env_str);
+    conn->write_event->add_to_reactor();
+}
 
 void CommandHandler::handle_create_group() {}
 
@@ -336,8 +395,8 @@ void CommandHandler::handle_add_admin() {}
 
 void CommandHandler::handle_remove_admin() {}
 
-void CommandHandler::handle_get_relation_net(const std::string& user_ID) {
-    log_debug("handle_get_relation_net called for user: {}", user_ID);
+void CommandHandler::handle_post_relation_net(const std::string& user_ID) {
+    log_debug("handle_post_relation_net called for user: {}", user_ID);
     // 构建完整关系网数据的JSON
     json relation_data;
     // 获取好友列表（包含屏蔽状态）
@@ -379,10 +438,7 @@ void CommandHandler::handle_get_relation_net(const std::string& user_ID) {
     );
     auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
     if (data_conn) {
-        data_conn->socket->set_write_buf(sync_str);
-        data_conn->write_event->add_to_reactor();
-        data_conn->set_send_type(DataType::SyncItem);
-        log_info("Full relation network sent to user: {}", user_ID);
+        try_send(data_conn, sync_str, DataType::SyncItem);
     } else {
         log_error("Data connection not found for user: {}", user_ID);
     }
@@ -393,6 +449,24 @@ void CommandHandler::handle_update_relation_net(const std::string& user_ID) {}
 
 void CommandHandler::handle_download_file() {}
 
+void CommandHandler::handle_remember_connection(
+    TcpServerConnection* conn, const std::string& user_ID, int server_index) {
+    log_debug("handle_remember_connection {} called for user: {}", server_index, user_ID);
+    // 将连接添加到连接管理器
+    // 每次登录，这个会调用三次
+    conn->user_ID = user_ID; // 更新连接的user_ID
+    disp->conn_manager->add_conn(conn, server_index);
+    log_info("Remembered {}'s conn[{}] fd: {}", user_ID, server_index, conn->socket->get_fd());
+}
+
+void CommandHandler::handle_online_init(const std::string& user_ID) {
+    log_debug("handle_online_init called for user: {}", user_ID);
+    // 发送最新关系网
+    handle_post_relation_net(user_ID);
+    // 发送用户聊天记录
+    // ...
+}
+
 /* ---------- FileHandler ---------- */
 
 FileHandler::FileHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
@@ -401,22 +475,25 @@ void FileHandler::handle_recv(const FileChunk& file_chunk, const std::string& os
     // 处理文件分片
 }
 
-void FileHandler::handle_send(const FileChunk& file_chunk, const std::string& ostr) {
-    // 处理文件分片发送
+void FileHandler::handle_send(TcpServerConnection* conn) {
+    conn->socket->send_with_size();
+    log_debug("FileHandler::handle_send called");
 }
 
 /* ---------- SyncHandler ---------- */
 
 SyncHandler::SyncHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
-void SyncHandler::handle_send(const SyncItem& sync_item, const std::string& ostr) {
-    // 处理同步数据
+void SyncHandler::handle_send(TcpServerConnection* conn) {
+    conn->socket->send_with_size();
+    log_debug("SyncHandler::handle_send called");
 }
 
 /* ---------- OfflineMessageHandler ---------- */
 
 OfflineMessageHandler::OfflineMessageHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
-void OfflineMessageHandler::handle_recv(const OfflineMessages& offline_messages, const std::string& ostr) {
-    // 处理离线消息
+void OfflineMessageHandler::handle_send(TcpServerConnection* conn) {
+    conn->socket->send_with_size();
+    log_debug("OfflineMessageHandler::handle_send called");
 }
