@@ -22,6 +22,8 @@ enum class UIPage {
     Main,
     Message,
     Contacts,
+    Show_Notices,
+    Manage_Requests,
     Add_Person,
     Join_Group,
     My_Lists,
@@ -53,6 +55,8 @@ private:
     void main_loop();
     void message_loop();
     void contacts_loop();
+    void notice_loop();
+    void request_loop();
     void add_person_loop();
     void join_group_loop();
     void my_lists_loop();
@@ -78,5 +82,5 @@ void draw_start(std::mutex& mtx);
 void draw_login(std::mutex& mtx, int idx);
 void draw_register(std::mutex& mtx, int idx);
 void draw_main(std::mutex& mtx, const std::string& user_ID);
-void draw_contacts(std::mutex& mtx);
+void draw_contacts(std::mutex& mtx, CommManager* comm);
 void draw_my(std::mutex& mtx, CommManager* comm);

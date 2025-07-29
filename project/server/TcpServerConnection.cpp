@@ -23,5 +23,4 @@ TcpServerConnection::~TcpServerConnection() {
     if (socket) {
         delete socket;
     }
-    // 这里不需要删除dispatcher，因为它是由Dispatcher管理的
 }

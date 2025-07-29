@@ -139,7 +139,6 @@ CommandRequest get_command_request(const std::string& proto_str) {
     if (!any.UnpackTo(&cmd)) {
         throw std::runtime_error("Failed to unpack Any to CommandRequest");
     }
-    //std::cout << "解包测试类型[" << any.type_url() << "]" << std::endl; // 调试输出
     return cmd;
 }
 
@@ -149,13 +148,11 @@ CommandRequest get_command_request(const std::string& proto_str) {
 
 SyncItem create_sync_item(
     SyncItem::SyncType type,
-    const std::string& target_id,
     const std::string& content,
     std::time_t timestamp
 ) {
     SyncItem item;
     item.set_type(type);
-    item.set_target_id(target_id);
     item.set_content(content);
     if (timestamp == 0) {
         timestamp = std::time(nullptr); // 如果没有提供时间戳，使用当前时间
@@ -176,11 +173,10 @@ std::string get_sync_string(const SyncItem& item) {
 
 std::string create_sync_string(
     SyncItem::SyncType type,
-    const std::string& target_id,
     const std::string& content,
     std::time_t timestamp
 ) {
-    auto item = create_sync_item(type, target_id, content, timestamp);
+    auto item = create_sync_item(type, content, timestamp);
     return get_sync_string(item);
 }
 

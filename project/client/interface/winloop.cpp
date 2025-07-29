@@ -8,6 +8,8 @@
 #include "../include/sqlite.hpp"
 #include <iostream>
 #include <regex>
+#include <chrono>
+#include "../../global/include/time_utils.hpp"
 
 namespace {
     // 密码合规性
@@ -69,68 +71,100 @@ WinLoop::~WinLoop() {
 
 void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
     Action action = static_cast<Action>(cmd.action());
-    // std::string sender = cmd.sender(); // 这不用户自己吗
+    std::string sender = cmd.sender();
     auto args = cmd.args();
     switch (action) {
         case Action::Notify: { // 包罗各种通知
-            comm->handle_save_notify(args[0]);
+            comm->cache.notices.push(cmd);
             break;
         }
         case Action::Notify_Exist: {
             // 通知某个东西存在
-            comm->handle_show_notify_exist(args[0]);
+            comm->cache.real_time_notices.push(cmd);
             break;
         }
         case Action::Notify_Not_Exist: {
             // 通知某个东西不存在
-            comm->handle_show_notify_not_exist(args[0]);
+            comm->cache.real_time_notices.push(cmd);
             break;
         }
         case Action::Friend_Online: {
-            // 好友上线通知
+            // 好友上线
             comm->cache.friend_list[args[0]].online = true;
             break;
         }
         case Action::Friend_Offline: {
-            // 好友下线通知
+            // 好友下线
             comm->cache.friend_list[args[0]].online = false;
             break;
         }
-        case Action::Add_Friend: {
-            // 好友申请
+        case Action::Accept_FReq: {
+            auto friend_ID = cmd.sender();
+            comm->cache.notices.push(cmd);
+            if (comm->cache.friend_list.find(friend_ID) != comm->cache.friend_list.end()) {
+                // 说明是上线前同意的，已经拉取过来
+                break;
+            }
+            comm->handle_add_friend(friend_ID);
+        }
+        case Action::Refuse_FReq: {
+            comm->cache.notices.push(cmd);
+        }
+        case Action::Add_Friend_Req: {
+            comm->cache.requests.push(cmd);
             break;
         }
         case Action::Remove_Friend: {
-            // 被删除通知
+            comm->cache.notices.push(cmd);
+            comm->handle_remove_friend(sender);
             break;
         }
-        case Action::Create_Group: {
-            // 有人创建了群，并把用户拉进去的通知
-            break;
-        }
-        case Action::Join_Group: {
+        case Action::Join_Group_Req: {
             // 如果用户是管理员，有人申请加群的申请
-            // 不管是不是管理员，用这个通知拉取最新的关系网
+            comm->cache.requests.push(cmd);
             break;
         }
-        case Action::Leave_Group: {
+        case Action::Accept_GReq: {
+            // 加入群组的请求
+            comm->cache.notices.push(cmd);
+            // 这里面要拉取群成员名单
+            comm->handle_join_group(comm->cache.user_ID, cmd.args(1));
+            break;
+        }
+        case Action::Refuse_GReq: {
+            // 拒绝加入群组的请求
+            comm->cache.notices.push(cmd);
+            break;
+        }
+        case Action::Leave_Group: { // 自己跑了
             break;
         }
         case Action::Disband_Group: {
-            // 群被解散的通知
+            comm->cache.notices.push(cmd);
+            // 还要有磁盘IO
             break;
         }
-        case Action::Invite_To_Group: {
+        case Action::Invite_To_Group_Req: {
+            // 邀请加入群组的请求
+            // 同意后自动发送入群申请
+            comm->cache.requests.push(cmd);
             break;
         }
-        case Action::Remove_From_Group: {
-            // 被移除出群的通知
+        case Action::Remove_From_Group: { // 被踢
+            // 管理员会受到通知
+            comm->cache.notices.push(cmd);
+            // 还要有磁盘IO
             break;
         }
         case Action::Add_Admin: {
+            comm->cache.notices.push(cmd);
+            // 还有磁盘IO
             break;
         }
         case Action::Remove_Admin: {
+            // 管理员会收到通知，被移除的管理员也会
+            comm->cache.notices.push(cmd);
+            // 还要有磁盘IO
             break;
         }
         default: {
@@ -162,6 +196,12 @@ void WinLoop::run() {
             case UIPage::Contacts:
                 contacts_loop();
                 break;
+            case UIPage::Show_Notices:
+                notice_loop();
+                break;
+            case UIPage::Manage_Requests:
+                request_loop();
+                break;
             case UIPage::Add_Person:
                 add_person_loop();
                 break;
@@ -175,6 +215,7 @@ void WinLoop::run() {
                 my_loop();
                 break;
             case UIPage::Exit:
+                comm->handle_send_command(Action::Sign_Out, comm->cache.user_ID, {}, false);
                 running = false;
                 break;
             default:
@@ -220,7 +261,7 @@ void WinLoop::login_loop() { // 改进用email/ID均可登录，并返回另一�
         comm->handle_send_command(Action::Sign_In, user, {password_hash}, false);
         // 读取服务器响应
         CommandRequest resp = comm->handle_receive_command(false);
-        if (resp.action() == static_cast<int>(Action::Accept)) {
+        if (resp.action() == static_cast<int>(Action::Accept_Login)) {
             std::cout << "登录成功！" << std::endl;
             if (is_email_valid(user)) {
                 comm->cache.user_email = user;
@@ -266,7 +307,7 @@ void WinLoop::register_loop() {
         CommandRequest resp = comm->handle_receive_command(false);
         log_info("Received veri code response");
         int action_ = resp.action();
-        if (action_ != static_cast<int>(Action::Accept)) {
+        if (action_ != static_cast<int>(Action::Accept_Post_Code)) {
             std::cout << resp.args(0) << std::endl;
             pause();
             continue;
@@ -285,7 +326,7 @@ void WinLoop::register_loop() {
         comm->handle_send_command(Action::Authentication, email, {veri_code}, false);
         // 读取服务器响应
         CommandRequest auth_resp = comm->handle_receive_command(false);
-        if (auth_resp.action() != static_cast<int>(Action::Accept)) {
+        if (auth_resp.action() != static_cast<int>(Action::Success_Auth)) {
             std::cout << "身份验证失败：" << auth_resp.args(0) << std::endl;
             pause();
             continue;
@@ -327,7 +368,7 @@ void WinLoop::register_loop() {
         // 读取服务器响应
         CommandRequest reg_resp = comm->handle_receive_command(false);
         log_info("Received registration response");
-        if (reg_resp.action() == static_cast<int>(Action::Accept)) {
+        if (reg_resp.action() == static_cast<int>(Action::Accept_Regi)) {
             log_info("Successfully registered");
             std::cout << "注册成功！" << std::endl;
             switch_to(UIPage::Start);
@@ -354,7 +395,11 @@ void WinLoop::main_init() {
     // 拉取关系网
     std::cout << "正在拉取关系网..." << std::endl;
     comm->handle_get_relation_net();
+    // 获取好友在线状态
+    std::cout << "正在获取好友在线状态..." << std::endl;
+    comm->handle_get_friend_status();
     // 拉取聊天记录
+    std::cout << "正在拉取聊天记录..." << std::endl;
     comm->handle_get_chat_history();
     // 拉取通知和好友请求/群聊邀请/加群申请等
     // ...
@@ -399,8 +444,151 @@ void WinLoop::message_loop() {
 
 void WinLoop::contacts_loop() {
     sclear();
-    draw_contacts(output_mutex);
+    draw_contacts(output_mutex, comm);
     handle_contacts_input();
+}
+
+void WinLoop::notice_loop() {
+    sclear();
+    if (comm->cache.notices.empty()) {
+        std::cout << "没有新的通知。" << std::endl;
+        pause();
+        switch_to(UIPage::Contacts);
+        return;
+    }
+    std::cout << "-$- 通知列表 -$-" << std::endl;
+    std::cout << "共有" << comm->cache.notices.size() << "条通知。" << std::endl;
+    while (!comm->cache.notices.empty()) {
+        CommandRequest cmd;
+        comm->cache.notices.pop(cmd);
+        Action action = static_cast<Action>(cmd.action());
+        auto time = cmd.args(0);
+        std::cout << "[" << time << "] ";
+        switch (action) {
+            case Action::Notify: {
+                std::cout << cmd.args(1) << std::endl;
+                break;
+            }
+            case Action::Accept_FReq: {
+                std::cout << cmd.sender() << "接受了你的好友请求。" << std::endl;
+                break;
+            }
+            case Action::Refuse_FReq: {
+                std::cout << cmd.sender() << "拒绝了你的好友请求。" << std::endl;
+                break;
+            }
+            case Action::Accept_GReq: {
+                std::cout << cmd.sender() << "已同意你加入群聊。" << std::endl;
+                break;
+            }
+            case Action::Refuse_GReq: {
+                std::cout << cmd.sender() << "拒绝让你加入群聊。" << std::endl;
+                break;
+            }
+            case ::Action::Add_Friend: {
+                std::cout << cmd.sender() << "已经是你的好友。" << std::endl;
+                break;
+            }
+            case Action::Remove_Friend: {
+                std::cout << cmd.sender() << "把你删掉了。" << std::endl;
+                break;
+            }
+            case Action::Create_Group: {
+                std::cout << cmd.sender() << "创建了群聊：" << cmd.args(1);
+                std::cout << "，并把你拉进了群聊。" << std::endl;
+                break;
+            }
+            case Action::Disband_Group: {
+                std::cout << cmd.sender() << "解散了群聊：" << cmd.args(1) << std::endl;
+                break;
+            }
+            case Action::Add_Admin: {
+                std::cout << cmd.sender() << "把";
+                if (cmd.args(2) == comm->cache.user_ID) {
+                    std::cout << "你";
+                } else {
+                    std::cout << cmd.args(2);
+                }
+                std::cout << "设为群聊管理员。" << std::endl;
+                break;
+            }
+            case Action::Remove_Admin: {
+                std::cout << cmd.sender() << "把";
+                if (cmd.args(2) == comm->cache.user_ID) {
+                    std::cout << "你";
+                } else {
+                    std::cout << cmd.args(2);
+                }
+                std::cout << "从群聊管理员中移除。" << std::endl;
+                break;
+            }
+        }
+    }
+}
+
+void WinLoop::request_loop() {
+    sclear();
+    if (comm->cache.requests.empty()) {
+        std::cout << "没有新的请求。" << std::endl;
+        pause();
+        switch_to(UIPage::Contacts);
+        return;
+    }
+    std::cout << "共有" << comm->cache.requests.size() << "条请求。" << std::endl;
+    pause();
+    int count = 1;
+    std::string confirm;
+    auto query = [&](){
+        std::cout << "是否同意？(y/n): ";
+        print_input_sign();
+        std::getline(std::cin, confirm);
+        return confirm == "y" || confirm == "Y";
+    };
+    while (!comm->cache.requests.empty()) {
+        sclear();
+        CommandRequest cmd;
+        comm->cache.requests.pop(cmd);
+        Action action = static_cast<Action>(cmd.action());
+        std::cout << count++ << ". [" << cmd.args(0) << "] ";
+        switch (action) {
+            case Action::Add_Friend_Req: {
+                std::cout << cmd.sender() << "请求添加你为好友。" << std::endl;
+                if (query()) {
+                    comm->handle_send_command(Action::Accept_FReq, comm->cache.user_ID, {cmd.sender()}, false);
+                    std::cout << "已同意好友请求。" << std::endl;
+                } else {
+                    comm->handle_send_command(Action::Refuse_FReq, comm->cache.user_ID, {cmd.sender()}, false);
+                    std::cout << "已拒绝好友请求。" << std::endl;
+                }
+                break;
+            }
+            case Action::Accept_GReq: {
+                std::cout << cmd.sender() << "请求加入群聊: ";
+                std::cout << cmd.args(1) << std::endl;
+                if (query()) {
+                    comm->handle_send_command(Action::Accept_GReq, comm->cache.user_ID, {cmd.args(1), cmd.sender()}, false);
+                    std::cout << "已同意加入群聊请求。" << std::endl;
+                }
+                else {
+                    comm->handle_send_command(Action::Refuse_GReq, comm->cache.user_ID, {cmd.args(1), cmd.sender()}, false);
+                    std::cout << "已拒绝加入群聊请求。" << std::endl;
+                }
+                break;
+            }
+            case Action::Invite_To_Group_Req: {
+                std::cout << cmd.sender() << "邀请你加入群聊: ";
+                std::cout << cmd.args(1) << std::endl;
+                if (query()) {
+                    comm->handle_send_command(Action::Join_Group_Req, comm->cache.user_ID, {cmd.args(1)}, false);
+                    std::cout << "已发送加入群聊请求。" << std::endl;
+                } else {
+                    std::cout << "已拒绝群聊邀请。" << std::endl;
+                }
+                break;
+            }
+        }
+        pause();
+    }
 }
 
 void WinLoop::add_person_loop() {
@@ -416,16 +604,99 @@ void WinLoop::add_person_loop() {
             switch_to(UIPage::Contacts);
             return;
         }
-        // 发送添加好友请求
-        comm->handle_send_command(Action::Add_Friend, comm->cache.user_ID, {user_ID});
-        std::cout << "正在发送添加好友请求..." << std::endl;
-        // 读取服务器响应
-        // handler自动处理
-
+        // 清空实时通知队列，确保没有旧的通知干扰
+        comm->cache.real_time_notices.clear();
+        // 发送搜索用户请求
+        comm->handle_send_command(Action::Search_Person, comm->cache.user_ID, {user_ID}, false);
+        std::cout << "正在搜索账户..." << std::endl;
+        // 等待服务器响应（最多等待5秒）
+        CommandRequest response;
+        bool received = comm->cache.real_time_notices.wait_for_and_pop(
+            response, std::chrono::seconds(5)
+        );
+        if (!received) {
+            std::cout << "搜索超时，请检查网络连接后重试。" << std::endl;
+            pause();
+            continue;
+        }
+        // 处理响应
+        Action action = static_cast<Action>(response.action());
+        if (action == Action::Notify_Exist) {
+            std::cout << "找到用户: " << user_ID << std::endl;
+            std::cout << "是否发送好友请求？(y/n): ";
+            std::string confirm;
+            std::getline(std::cin, confirm);
+            if (confirm == "y" || confirm == "Y") {
+                // 发送添加好友请求
+                comm->handle_send_command(Action::Add_Friend,
+                    comm->cache.user_ID,
+                    {TimeUtils::current_time_string(), user_ID}, false);
+                std::cout << "好友请求已发送！" << std::endl;
+            } else {
+                std::cout << "已取消发送好友请求。" << std::endl;
+            }
+        } else if (action == Action::Notify_Not_Exist) {
+            std::cout << "用户 " << user_ID << " 不存在，请检查用户ID是否正确。" << std::endl;
+        } else {
+            std::cout << "收到意外的响应，请重试。" << std::endl;
+        }
+        pause();
     }
 }
 
-void WinLoop::join_group_loop() {}
+void WinLoop::join_group_loop() {
+    while (1) {
+        sclear();
+        std::cout << "请输入要加入的群组ID";
+        print_input_sign();
+        std::string group_ID;
+        std::getline(std::cin, group_ID);
+        if (group_ID.empty()) { // 返回
+            std::cout << "输入为空，返回联系人菜单。" << std::endl;
+            pause();
+            switch_to(UIPage::Contacts);
+            return;
+        }
+        // 清空实时通知队列，确保没有旧的通知干扰
+        comm->cache.real_time_notices.clear();
+        // 发送搜索群组请求
+        comm->handle_send_command(Action::Search_Group, comm->cache.user_ID, {group_ID}, false);
+        std::cout << "正在搜索群组..." << std::endl;
+        // 等待服务器响应（最多等待5秒）
+        CommandRequest response;
+        bool received = comm->cache.real_time_notices.wait_for_and_pop(
+            response, std::chrono::seconds(5)
+        );
+        if (!received) {
+            std::cout << "搜索超时，请检查网络连接后重试。" << std::endl;
+            pause();
+            continue;
+        }
+        // 处理响应
+        Action action = static_cast<Action>(response.action());
+        if (action == Action::Notify_Exist) {
+            std::cout << "找到群组: " << response.args(0) << std::endl; // group name
+            std::cout << "是否加入群组？(y/n): ";
+            std::string confirm;
+            std::getline(std::cin, confirm);
+            if (confirm == "y" || confirm == "Y") {
+                // 发送加入群组请求
+                comm->handle_send_command(Action::Join_Group,
+                    comm->cache.user_ID,
+                    { TimeUtils::current_time_string(),
+                    group_ID}, false);
+                std::cout << "已发送加入群组请求！" << std::endl;
+            } else {
+                std::cout << "已取消加入群组请求。" << std::endl;
+            }
+        } else if (action == Action::Notify_Not_Exist) {
+            std::cout << "群组 " << group_ID << " 不存在，请检查群组ID是否正确。" << std::endl;
+        } else {
+            std::cout << "收到意外的响应，请重试。" << std::endl;
+        }
+        pause();
+    }
+}
 
 void WinLoop::my_lists_loop() {
     // 暂时仅展示列表
@@ -434,6 +705,7 @@ void WinLoop::my_lists_loop() {
     std::cout << std::endl << "======================"
               << std::endl << std::endl;
     comm->print_groups();
+    std::cout << std::endl;
     pause();
     switch_to(UIPage::Main);
 }
@@ -494,10 +766,14 @@ void WinLoop::handle_contacts_input() {
     std::string input;
     std::getline(std::cin, input);
     if (input == "1") {
-        switch_to(UIPage::Add_Person);
+        switch_to(UIPage::Show_Notices);
     } else if (input == "2") {
+        switch_to(UIPage::Manage_Requests);
+    }else if (input == "3") {
+        switch_to(UIPage::Add_Person);
+    } else if (input == "4") {
         switch_to(UIPage::Join_Group);
-    } else if (input == "3") {
+    } else if (input == "5") {
         switch_to(UIPage::My_Lists);
     } else if (input == "0") {
         switch_to(UIPage::Main);
@@ -595,12 +871,14 @@ void draw_main(std::mutex& mtx, const std::string& user_ID) {
     print_input_sign();
 }
 
-void draw_contacts(std::mutex& mtx) {
+void draw_contacts(std::mutex& mtx, CommManager* comm) {
     std::lock_guard<std::mutex> lock(mtx);
     std::cout << "-$- 联系人列表 -$-" << std::endl;
-    std::cout << selnum(1) + " 添加好友" << std::endl;
-    std::cout << selnum(2) + " 加入群聊" << std::endl;
-    std::cout << selnum(3) + " 查看我的列表" << std::endl;
+    std::cout << selnum(1) + " 查看通知(" << comm->cache.notices.size() << ")" << std::endl;
+    std::cout << selnum(2) + " 管理请求(" << comm->cache.requests.size() << ")" << std::endl;
+    std::cout << selnum(3) + " 添加好友" << std::endl;
+    std::cout << selnum(4) + " 加入群聊" << std::endl;
+    std::cout << selnum(5) + " 查看我的列表" << std::endl;
     std::cout << selnum(0) + " 返回主菜单" << std::endl;
     print_input_sign();
 }

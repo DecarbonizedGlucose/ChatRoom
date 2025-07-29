@@ -230,6 +230,12 @@ bool AcceptedSocket::disconnect() {
     return true;
 }
 
+AcceptedSocket::~AcceptedSocket() {
+    if (fd > 0) {
+        disconnect();
+    }
+}
+
 bool AcceptedSocket::is_connected() const {
     return connected;
 }
@@ -256,6 +262,12 @@ bool CSocket::connect() {
     connected = true;
     log_info("CSocket connected to {}:{}", ip, port);
     return true;
+}
+
+CSocket::~ConnectSocket() {
+    if (fd > 0) {
+        disconnect();
+    }
 }
 
 bool CSocket::is_connected() const {

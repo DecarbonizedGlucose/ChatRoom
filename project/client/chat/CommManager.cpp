@@ -126,21 +126,21 @@ void CommManager::handle_send_command(Action action, const std::string& sender,
     log_debug("Command sent");
 }
 
-void CommManager::handle_save_notify(const std::string& description) {
-    cache.notices.push(description);
-}
+// void CommManager::handle_save_notify(const CommandRequest& cmd) {
+//     //cache.notices.push(description);
+// }
 
-void CommManager::handle_show_notify_exist(const std::string& user_ID) {
-    std::cout << "用户" << user_ID << "存在" << std::endl;
-}
+// void CommManager::handle_show_notify_exist(const CommandRequest& cmd) {
+//     //cache.notices.push("已找到用户: " + user_ID);
+// }
 
-void CommManager::handle_show_notify_not_exist(const std::string& user_ID) {
-    std::cout << "用户" << user_ID << "不存在" << std::endl;
-}
+// void CommManager::handle_show_notify_not_exist(const CommandRequest& cmd) {
+//     //cache.notices.push("用户" + user_ID + " 不存在");
+// }
 
-void CommManager::handle_save_request(const std::string& description) {
-    cache.requests.push(description);
-}
+// void CommManager::handle_save_request(const CommandRequest& cmd) {
+//     //cache.requests.push(description);
+// }
 
 // file chunk
 
@@ -232,6 +232,54 @@ void CommManager::handle_get_relation_net() {
 
 void CommManager::handle_get_chat_history() {}
 
+void CommManager::handle_add_friend(const std::string& friend_ID) {
+    // 检查是否已经是好友
+    if (cache.friend_list.find(friend_ID) != cache.friend_list.end()) {
+        log_info("Friend {} already exists", friend_ID);
+        return;
+    }
+    // 添加到缓存
+    cache.friend_list[friend_ID] = {false, true}; // 默认未屏蔽，在线
+    // 存储到SQLite
+    sqlite_con->cache_friend(cache.user_ID, friend_ID);
+    log_info("Added friend: {}", friend_ID);
+}
+
+void CommManager::handle_remove_friend(const std::string& friend_ID) {
+    // 从缓存中删除好友
+    cache.friend_list.erase(friend_ID);
+    // 从数据库中删除好友记录
+    sqlite_con->remove_friend_cache(cache.user_ID, friend_ID);
+    log_info("Removed friend: {}", friend_ID);
+}
+
+void CommManager::handle_get_friend_status() {
+    std::string env_str = this->read(2);
+    auto sync = get_sync_item(env_str);
+    if (sync.type() != SyncItem::ALL_FRIEND_STATUS) {
+        log_error("Unexpected sync type: {}", static_cast<int>(sync.type()));
+        return;
+    }
+    std::string content = sync.content();
+    json j = json::parse(content);
+    for (auto& item : j) {
+        // JSON数组中每个元素是 [friend_id, online_status]
+        if (item.is_array() && item.size() == 2) {
+            std::string friend_id = item[0];
+            bool online_status = item[1];
+            // 更新好友在线状态
+            if (cache.friend_list.find(friend_id) != cache.friend_list.end()) {
+                cache.friend_list[friend_id].online = online_status;
+                log_debug("Updated friend {} online status: {}", friend_id, online_status);
+            } else {
+                log_error("Received status for unknown friend: {}", friend_id);
+            }
+        } else {
+            log_error("Invalid friend status format in JSON array");
+        }
+    }
+    log_info("Updated online status for {} friends", j.size());
+}
 /* ---------- Print ---------- */
 
 void CommManager::print_friends() {
@@ -266,6 +314,6 @@ void CommManager::print_groups() {
         std::cout << std::left << std::setw(max_length)
                   << info.group_name << '('
                   << info.member_count << ')'
-                  << ' | ' << id << std::endl;
+                  << " | " << id << std::endl;
     }
 }

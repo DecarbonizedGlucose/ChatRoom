@@ -42,7 +42,14 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
             break;
         } else if (state == RecvState::Disconnected) {
             log_info("Connection fd {} disconnected", conn->socket->get_fd());
-            conn->socket->disconnect();
+            if (conn->user_ID.empty()) {
+                delete conn;
+                conn = nullptr;
+            }
+            else {
+                // 执行死刑
+                command_handler->handle_sign_out(conn->user_ID);
+            }
             return; // 连接断开
         } else if (state == RecvState::Error) {
             log_error("Error receiving data from connection (fd: {})", conn->socket->get_fd());

@@ -89,6 +89,7 @@ private:
 public:
     AcceptedSocket() = delete;
     explicit AcceptedSocket(int fd, bool nonblock = false);
+    ~AcceptedSocket();
 
     bool disconnect();
     bool is_connected() const;
@@ -104,6 +105,7 @@ public:
     ConnectSocket() = delete;
     ConnectSocket(const std::string& ip, uint16_t port, bool nonblock = false)
         : DataSocket(socket(AF_INET, SOCK_STREAM, 0), nonblock), ip(ip), port(port) {}
+    ~ConnectSocket();
 
     bool connect();
     bool disconnect();

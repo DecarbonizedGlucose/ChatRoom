@@ -4,6 +4,7 @@
 #include "../../global/include/safe_queue.hpp"
 #include <nlohmann/json.hpp>
 #include <unordered_map>
+#include "../../global/abstract/datatypes.hpp"
 using json = nlohmann::json;
 
 class TopClient;
@@ -34,10 +35,11 @@ public:
     std::unordered_map<std::string, GroupInfo> group_list;
 
     // 通知队列
-    safe_queue<std::string> notices;
+    safe_queue<CommandRequest> notices;
+    safe_queue<CommandRequest> real_time_notices; // 实时通知
 
     // 请求队列
-    safe_queue<std::string> requests;
+    safe_queue<CommandRequest> requests;
 };
 
 class CommManager {
@@ -74,16 +76,22 @@ public:
     CommandRequest handle_receive_command(bool nb = true);
     void handle_send_command(Action action, const std::string& sender, std::initializer_list<std::string> args, bool nb = true);
 
-    void handle_save_notify(const std::string& description);
-    void handle_show_notify_exist(const std::string& user_ID);
-    void handle_show_notify_not_exist(const std::string& user_ID);
-    void handle_save_request(const std::string& description);
+    // void handle_save_notify(const CommandRequest& cmd);
+    // void handle_show_notify_exist(const CommandRequest& cmd);
+    // void handle_show_notify_not_exist(const CommandRequest& cmd);
+    // void handle_save_request(const CommandRequest& cmd);
 
     // others
-    // 不发请求，主动拉取，不知道发来什么
-    void handle_get_relation_net();
+    void handle_get_relation_net(); // 不发请求，主动拉取，不知道发来什么
     void handle_send_id();
     void handle_get_chat_history();
+    void handle_add_friend(const std::string& friend_ID);
+    void handle_remove_friend(const std::string& friend_ID);
+    void handle_get_friend_status();
+    void handle_join_group(
+        const std::string& user_ID,
+        const std::string& group_ID
+    );
 /* ---------- Print ---------- */
     void print_friends();
     void print_groups();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <nlohmann/json.hpp>
 
 class Dispatcher;
 class TcpServer;
@@ -11,6 +12,8 @@ class FileChunk;
 class SyncItem;
 class OfflineMessages;
 enum class Action;
+
+using json = nlohmann::json;
 
 class Handler {
 public:
@@ -33,6 +36,7 @@ public:
 class CommandHandler : public Handler {
 public:
     CommandHandler(Dispatcher* dispatcher);
+    friend class Dispatcher;
 
     void handle_recv(
         TcpServerConnection* conn,
@@ -61,8 +65,10 @@ private:
         TcpServerConnection* conn,
         const std::string& email,
         const std::string& veri_code);
-    void handle_accept();
-    void handle_refuse();
+    void handle_accept_friend_request();
+    void handle_refuse_friend_request();
+    void handle_accept_group_request();
+    void handle_refuse_group_request();
     void handle_add_friend();
     void handle_remove_friend();
     void handle_search_person(TcpServerConnection* conn, const std::string& searched_ID);
@@ -75,7 +81,6 @@ private:
     void handle_search_group();
     void handle_add_admin();
     void handle_remove_admin();
-    void handle_post_relation_net(const std::string& user_ID);
     void handle_update_relation_net(const std::string& user_ID);
     void handle_download_file();
     void handle_remember_connection(
@@ -83,6 +88,13 @@ private:
         const std::string& user_ID,
         int server_index);
     void handle_online_init(const std::string& user_ID);
+
+    // 非直接指令驱动的业务逻辑
+    void handle_post_relation_net(const std::string& user_ID, json* relation_data);
+    void handle_post_friends_status(const std::string& user_ID, const json& friends);
+    void handle_post_offline_messages(const std::string& user_ID, const json& relation_data);
+    void handle_post_unordered_noti_and_req(const std::string& user_ID, const json& relation_data);
+    void handle_notify_friends_online(const std::string& user_ID, const json& friends);
 };
 
 /* -------------- Data -------------- */

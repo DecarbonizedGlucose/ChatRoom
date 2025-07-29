@@ -22,8 +22,18 @@ enum class Action {
     Authentication,        // 身份验证 --veri-code
 
     /*      服务器通知      */
-    Refuse,                // 拒绝
-    Accept,                // 接受
+    Refuse_Regi,           // 拒绝注册 --description
+    Accept_Regi,           // 接受注册
+    Refuse_Login,          // 拒绝登录 --description
+    Accept_Login,          // 接受登录
+    Refuse_FReq,           // 拒绝好友请求 --user_ID
+    Accept_FReq,           // 接受好友请求 --user_ID
+    Refuse_GReq,           // 拒绝群组请求 --group_ID --user_ID
+    Accept_GReq,           // 接受群组请求 --group_ID --user_ID
+    Refuse_Post_Code,      // 拒绝获取验证码 --description
+    Accept_Post_Code,      // 接受获取验证码
+    Success_Auth,          // 成功验证
+    Failed_Auth,           // 验证失败 --description
     Notify,                // 通知 --description
     Notify_Exist,          // 通知已存在 --user_ID
     Notify_Not_Exist,      // 通知不存在 --user_ID
@@ -32,21 +42,23 @@ enum class Action {
 
     /*      私信行为      */
     Add_Friend,            // 添加好友 --user_ID
+    Add_Friend_Req,        // 添加好友请求 --time --user_ID
     Remove_Friend,         // 删除好友 --user_ID
     Search_Person,         // 搜索用户 --user_ID
 
     /*      群聊管理      */
-    Create_Group,          // 创建群组 --name
-    Join_Group,            // 加入群组 --group_ID --time
-    Leave_Group,           // 退出群组 --group_ID --time
-    Disband_Group,         // 解散群组 --group_ID --time
-    Invite_To_Group,       // 邀请加入群组 --user_ID --group_ID --time
-    Remove_From_Group,     // 从群组中移除 --user_ID --group_ID --time
-    Search_Group,          // 搜索群组* --group_ID --time
-    Add_Admin,             // 添加管理员 --user_ID --group_ID --time
-    Remove_Admin,          // 移除管理员 --user_ID --group_ID --time
+    Create_Group,          // 创建群组 --time --name
+    Join_Group,            // 加入群组 --time --group_ID
+    Join_Group_Req,        // 加入群组请求 --time --group_ID
+    Leave_Group,           // 退出群组 --time --group_ID
+    Disband_Group,         // 解散群组 --time --group_ID
+    Invite_To_Group_Req,   // 邀请加入群组 --time --group_ID --user_ID
+    Remove_From_Group,     // 从群组中移除 --time --group_ID --user_ID
+    Search_Group,          // 搜索群组* --time --group_ID
+    Add_Admin,             // 添加管理员 --time --group_ID --user_ID
+    Remove_Admin,          // 移除管理员 --time --group_ID --user_ID
 
-    Get_Relation_Net,      // 获取关系网
+    // Get_Relation_Net,      // 获取关系网
     Update_Relation_Net,   // 更新关系网 这个似乎轮不到客户端发送
 
     /*      消息行为      */
