@@ -4,6 +4,9 @@
 #include <stdexcept>
 #include <sstream>
 #include <cstdlib>
+#include <thread>
+#include <chrono>
+#include <sqlite3.h>
 
 namespace {
     /**
@@ -59,6 +62,13 @@ bool SQLiteController::connect() {
 
         // 启用外键约束
         db->exec("PRAGMA foreign_keys = ON;");
+
+        // 优化SQLite配置以减少锁竞争
+        db->exec("PRAGMA journal_mode = WAL;");        // 使用WAL模式减少锁竞争
+        db->exec("PRAGMA synchronous = NORMAL;");      // 平衡性能和安全性
+        db->exec("PRAGMA cache_size = 10000;");        // 增加缓存大小
+        db->exec("PRAGMA temp_store = MEMORY;");       // 临时表存储在内存中
+        db->exec("PRAGMA busy_timeout = 5000;");       // 设置忙等超时为5秒
 
         // 初始化由编译脚本处理
         return true;
@@ -139,15 +149,34 @@ bool SQLiteController::execute_stmt(const std::string& sql, const std::string& o
         log_error("Database not connected");
         return false;
     }
-    try {
-        SQLite::Statement stmt(*db, sql);
-        bind_params(stmt, 1, std::forward<Args>(args)...);
-        stmt.exec();
-        return true;
-    } catch (const std::exception& e) {
-        log_error("{} failed: {}", operation, e.what());
-        return false;
+
+    // 重试机制处理数据库锁定
+    const int max_retries = 3;
+    for (int retry = 0; retry < max_retries; ++retry) {
+        try {
+            SQLite::Statement stmt(*db, sql);
+            bind_params(stmt, 1, std::forward<Args>(args)...);
+            stmt.exec();
+            return true;
+        } catch (const SQLite::Exception& e) {
+            // 检查是否是锁定错误
+            if (e.getErrorCode() == SQLITE_BUSY || e.getErrorCode() == SQLITE_LOCKED) {
+                log_info("{} failed due to database lock (attempt {}/{}): {}",
+                        operation, retry + 1, max_retries, e.what());
+                if (retry < max_retries - 1) {
+                    // 等待一段时间后重试
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100 * (retry + 1)));
+                    continue;
+                }
+            }
+            log_error("{} failed: {}", operation, e.what());
+            return false;
+        } catch (const std::exception& e) {
+            log_error("{} failed: {}", operation, e.what());
+            return false;
+        }
     }
+    return false;
 }
 
 template<typename T>

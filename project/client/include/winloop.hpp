@@ -21,6 +21,7 @@ enum class UIPage {
     Register,
     Main,
     Message,
+    Chat,
     Contacts,
     Show_Notices,
     Manage_Requests,
@@ -34,7 +35,7 @@ enum class UIPage {
 class WinLoop {
 public:
     WinLoop(CommManager* comm, thread_pool* pool);
-    ~WinLoop();
+    ~WinLoop(); // 需要实现以正确释放unique_ptr
 
     void run();
     void stop();
@@ -61,6 +62,15 @@ private:
     void join_group_loop();
     void my_lists_loop();
     void my_loop();
+    void chat_loop();      // 具体聊天页面
+    void chat_loop_traditional();   // 传统聊天模式
+
+    // 聊天相关辅助方法
+    void display_conversation_list();
+    void display_chat_messages(const std::string& conversation_id);
+    void handle_chat_input(const std::string& conversation_id);
+    std::string format_message(const ChatMessage& msg);
+
     // 无界面功能
     void log_out();
     // 页面跳转
@@ -83,4 +93,3 @@ void draw_login(std::mutex& mtx, int idx);
 void draw_register(std::mutex& mtx, int idx);
 void draw_main(std::mutex& mtx, const std::string& user_ID);
 void draw_contacts(std::mutex& mtx, CommManager* comm);
-void draw_my(std::mutex& mtx, CommManager* comm);

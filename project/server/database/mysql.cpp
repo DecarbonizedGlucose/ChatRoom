@@ -204,6 +204,16 @@ bool MySQLController::is_friend(const std::string& user_ID, const std::string& f
     return false;
 }
 
+bool MySQLController::is_blocked_by_friend(const std::string& user_ID, const std::string& friend_ID) {
+    std::string sql = "SELECT is_blocked FROM friends WHERE user_id = '"
+        + user_ID + "' AND friend_id = '" + friend_ID + "';";
+    auto rows = query(sql);
+    if (!rows.empty() && rows[0].size() > 0) {
+        return (rows[0][0] == "1" || rows[0][0] == "TRUE");
+    }
+    return false;
+}
+
 std::vector<std::string> MySQLController::get_friends_list(const std::string& user_ID) {
     std::vector<std::string> friends;
     std::string sql = "SELECT friend_id FROM friends WHERE user_id = '" + user_ID + "' AND is_blocked = FALSE;";

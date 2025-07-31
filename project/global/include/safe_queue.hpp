@@ -74,4 +74,16 @@ public:
             m_Queue.pop();
         }
     }
+
+    // 获取所有元素的副本，不移除原元素
+    std::vector<T> copy_all() {
+        std::unique_lock<std::mutex> lock(m_Mutex);
+        std::vector<T> result;
+        std::queue<T> temp_queue = m_Queue;  // 复制队列
+        while (!temp_queue.empty()) {
+            result.push_back(temp_queue.front());
+            temp_queue.pop();
+        }
+        return result;
+    }
 };

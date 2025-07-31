@@ -21,9 +21,6 @@ ssize_t read_size_from(int fd, size_t* datasize) {
         if (n == 0) return 0;
         total += static_cast<size_t>(n);
     }
-    printf("raw size bytes: ");
-    for (int i = 0; i < 4; ++i) printf("%02x ", ((unsigned char*)ptr)[i]);
-    printf("\n");
     *datasize = static_cast<size_t>(ntohl(net_len));
     return static_cast<ssize_t>(total);
 }

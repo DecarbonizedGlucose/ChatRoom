@@ -1,8 +1,5 @@
 # 可执行文件：client
 
-find_package(Curses REQUIRED)
-include_directories(${CURSES_INCLUDE_DIR})
-
 add_executable(client
     clientmain.cpp
     TcpClient.cpp
@@ -23,7 +20,6 @@ target_link_libraries(client
     nlohmann_json::nlohmann_json
     ${CURL_LIBRARIES}
     spdlog::spdlog_header_only
-    #${CURSES_LIBRARIES}
     absl_base
     absl_strings
     absl_throw_delegate

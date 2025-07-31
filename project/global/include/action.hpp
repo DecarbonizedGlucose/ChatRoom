@@ -19,13 +19,13 @@ enum class Action {
     Find_Password,         // 找回密码* --veri_code
     Change_Password,       // 修改密码 --old-password --new-password
     Change_Username,       // 修改用户名
-    Authentication,        // 身份验证 --veri-code
+    Authentication,        // 身份验证 --veri_code
 
     /*      服务器通知      */
     Refuse_Regi,           // 拒绝注册 --description
     Accept_Regi,           // 接受注册
     Refuse_Login,          // 拒绝登录 --description
-    Accept_Login,          // 接受登录
+    Accept_Login,          // 接受登录 --user_ID/email
     Refuse_FReq,           // 拒绝好友请求 --user_ID
     Accept_FReq,           // 接受好友请求 --user_ID
     Refuse_GReq,           // 拒绝群组请求 --group_ID --user_ID
@@ -35,10 +35,11 @@ enum class Action {
     Success_Auth,          // 成功验证
     Failed_Auth,           // 验证失败 --description
     Notify,                // 通知 --description
-    Notify_Exist,          // 通知已存在 --user_ID
-    Notify_Not_Exist,      // 通知不存在 --user_ID
+    Notify_Exist,          // 通知已存在 --user_ID/group_ID
+    Notify_Not_Exist,      // 通知不存在 --user_ID/group_ID
     Friend_Online,         // 好友上线 --user_ID
     Friend_Offline,        // 好友下线 --user_ID
+    Warn,                  // 警告 --description(非好友/非群成员发消息)
 
     /*      私信行为      */
     Add_Friend,            // 添加好友 --user_ID
@@ -65,6 +66,7 @@ enum class Action {
     Download_File,         // 下载文件 --file_ID
 
     /*      连接管理      */
-    Remember_Connection,   // 记住连接
+    Remember_Connection,   // 记住连接 --idx
     Online_Init,           // 在线初始化
+    HEARTBEAT,             // 心跳检测
 };

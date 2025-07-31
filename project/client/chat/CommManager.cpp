@@ -5,7 +5,9 @@
 #include "../../global/abstract/datatypes.hpp"
 #include "../../global/include/logging.hpp"
 #include "../include/sqlite.hpp"
-#include "../../global/include/safe_queue.hpp"
+#include <ctime>
+#include <fstream>
+#include <algorithm>
 
 CommManager::CommManager(TopClient* client)
     : top_client(client) {
@@ -103,7 +105,36 @@ void CommManager::handle_send_message(const std::string& sender, const std::stri
 
 void CommManager::handle_manage_message(const ChatMessage& msg) {
     // 存到本地 (SQLite)
-    // 根据打开的聊天窗口，决定是否需要显示
+    sqlite_con->cache_chat_message(
+        msg.sender(), msg.receiver(), msg.is_group(),
+        msg.timestamp(), msg.text(), msg.pin(),
+        msg.payload().file_name(),
+        msg.payload().file_size(),
+        msg.payload().file_hash()
+    );
+    cache.messages.push(msg);
+
+    // 确定会话ID（群聊用receiver，私聊用sender）
+    std::string conversation_id = msg.is_group() ? msg.receiver() : msg.sender();
+
+    auto& conv = cache.conversations[conversation_id];
+    if (msg.timestamp() > conv.last_time) {
+        conv.last_time = msg.timestamp();
+        conv.id = conversation_id;
+        conv.name = msg.is_group() ? cache.group_list[msg.receiver()].group_name : msg.sender();
+        if (msg.is_group()) {
+            conv.last_message = msg.sender() + ": ";
+        }
+        if (msg.text().empty() && !msg.payload().file_name().empty()) {
+            conv.last_message += "[文件] " + msg.payload().file_name();
+        }
+        else {
+            conv.last_message += msg.text();
+        }
+
+        // 更新会话排序
+        cache.update_conversation_order(conversation_id);
+    }
 }
 
 // command
@@ -126,22 +157,6 @@ void CommManager::handle_send_command(Action action, const std::string& sender,
     log_debug("Command sent");
 }
 
-// void CommManager::handle_save_notify(const CommandRequest& cmd) {
-//     //cache.notices.push(description);
-// }
-
-// void CommManager::handle_show_notify_exist(const CommandRequest& cmd) {
-//     //cache.notices.push("已找到用户: " + user_ID);
-// }
-
-// void CommManager::handle_show_notify_not_exist(const CommandRequest& cmd) {
-//     //cache.notices.push("用户" + user_ID + " 不存在");
-// }
-
-// void CommManager::handle_save_request(const CommandRequest& cmd) {
-//     //cache.requests.push(description);
-// }
-
 // file chunk
 
 // sync item
@@ -160,11 +175,21 @@ void CommManager::handle_send_id() {
 }
 
 void CommManager::store_relation_network_data(const json& relation_data) {
+    log_debug("Received relation network data: {}", relation_data.dump(2));
+
     // 解析好友数据
     if (relation_data.contains("friends") && relation_data["friends"].is_array()) {
         for (const auto& friend_info : relation_data["friends"]) {
             std::string friend_id = friend_info["id"];
             bool is_blocked = friend_info["blocked"];
+
+            log_debug("Processing friend: {} (blocked: {})", friend_id, is_blocked);
+
+            // 检查是否是自己，如果是则跳过
+            if (friend_id == cache.user_ID) {
+                log_error("Server sent user's own ID {} in friends list - skipping", friend_id);
+                continue;
+            }
 
             // 缓存好友信息到本地数据库
             sqlite_con->cache_friend(cache.user_ID, friend_id, is_blocked);
@@ -233,6 +258,12 @@ void CommManager::handle_get_relation_net() {
 void CommManager::handle_get_chat_history() {}
 
 void CommManager::handle_add_friend(const std::string& friend_ID) {
+    // 检查是否试图添加自己为好友
+    if (friend_ID == cache.user_ID) {
+        log_info("Cannot add self {} as friend", friend_ID);
+        return;
+    }
+
     // 检查是否已经是好友
     if (cache.friend_list.find(friend_ID) != cache.friend_list.end()) {
         log_info("Friend {} already exists", friend_ID);
@@ -240,9 +271,15 @@ void CommManager::handle_add_friend(const std::string& friend_ID) {
     }
     // 添加到缓存
     cache.friend_list[friend_ID] = {false, true}; // 默认未屏蔽，在线
-    // 存储到SQLite
-    sqlite_con->cache_friend(cache.user_ID, friend_ID);
-    log_info("Added friend: {}", friend_ID);
+
+    // 直接存储到SQLite（SQLiteController内部有mutex保护）
+    if (sqlite_con->cache_friend(cache.user_ID, friend_ID)) {
+        log_info("Added friend to database: {}", friend_ID);
+    } else {
+        log_error("Failed to add friend to database: {}", friend_ID);
+    }
+
+    log_info("Added friend to cache: {}", friend_ID);
 }
 
 void CommManager::handle_remove_friend(const std::string& friend_ID) {
@@ -280,20 +317,38 @@ void CommManager::handle_get_friend_status() {
     }
     log_info("Updated online status for {} friends", j.size());
 }
+
+void CommManager::handle_join_group(const std::string& user_ID, const std::string& group_ID) {
+
+}
+
+void CommManager::handle_reply_heartbeat() {
+    log_debug("Received heartbeat from server, sending response");
+    // 立即回复心跳
+    handle_send_command(Action::HEARTBEAT, cache.user_ID, {});
+}
+
 /* ---------- Print ---------- */
 
 void CommManager::print_friends() {
+    log_debug("Current user_ID: {}", cache.user_ID);
+    log_debug("Friend list contains {} entries:", cache.friend_list.size());
+    for (const auto& [id, info] : cache.friend_list) {
+        log_debug("  - Friend ID: {} (blocked: {}, online: {})", id, info.blocked, info.online);
+    }
+
     int max_length = 0;
     for (const auto& [id, info] : cache.friend_list) {
         max_length = std::max(max_length, static_cast<int>(id.size()));
     }
+    max_length = std::max(max_length, 9);
     std::cout << "好友列表(" << cache.friend_list.size()
               << "): " << std::endl;
     std::cout << std::left << std::setw(max_length) << "Friend ID"
-              << " | Status" << std::endl;
+              << " | Blocked?" << " | Status" << std::endl;
     for (const auto& [id, info] : cache.friend_list) {
         std::cout << std::left << std::setw(max_length) << id
-                  << " | " << (info.blocked ? "Blocked" : "Active")
+                  << " | " << (info.blocked ? "Yes     " : "No      ")
                   << " | " << (info.online ? "Online" : "Offline") << std::endl;
     }
 }
@@ -306,6 +361,7 @@ void CommManager::print_groups() {
             (info.member_count == 0 ? 1
                 : (int)log10(abs(info.member_count)) + 1));
     }
+    max_length = std::max(max_length, 20);
     std::cout << "群组列表(" << cache.group_list.size()
               << "): " << std::endl;
     std::cout << std::left << std::setw(max_length) << "Group Name (Members)"
@@ -316,4 +372,208 @@ void CommManager::print_groups() {
                   << info.member_count << ')'
                   << " | " << id << std::endl;
     }
+}
+
+/* ---------- 会话管理 ---------- */
+
+void CommManager::update_conversation_list() {
+    // 根据好友列表更新会话
+    for (const auto& [friend_id, friend_info] : cache.friend_list) {
+        if (cache.conversations.find(friend_id) == cache.conversations.end()) {
+            // 创建新会话
+            ContactCache::ConversationInfo conv_info;
+            conv_info.id = friend_id;
+            conv_info.name = friend_id; // 可以后续从用户信息中获取昵称
+            conv_info.is_group = false;
+            conv_info.last_time = 0;
+            conv_info.unread_count = 0;
+
+            cache.conversations[friend_id] = conv_info;
+
+            // 新会话添加到排序列表末尾（没有消息的会话排在后面）
+            cache.sorted_conversation_list.push_back(friend_id);
+        }
+    }
+
+    // 根据群组列表更新会话
+    for (const auto& [group_id, group_info] : cache.group_list) {
+        if (cache.conversations.find(group_id) == cache.conversations.end()) {
+            // 创建新会话
+            ContactCache::ConversationInfo conv_info;
+            conv_info.id = group_id;
+            conv_info.name = group_info.group_name;
+            conv_info.is_group = true;
+            conv_info.last_time = 0;
+            conv_info.unread_count = 0;
+
+            cache.conversations[group_id] = conv_info;
+
+            // 新会话添加到排序列表末尾（没有消息的会话排在后面）
+            cache.sorted_conversation_list.push_back(group_id);
+        }
+    }
+}
+
+void CommManager::load_conversation_history(const std::string& conversation_id) {
+    // 从SQLite加载聊天历史
+    // 这里可以调用sqlite_con的相关方法
+}
+
+void CommManager::send_text_message(const std::string& receiver_id, bool is_group, const std::string& text) {
+    // 发送文本消息
+    handle_send_message(
+        cache.user_ID,          // sender
+        receiver_id,            // receiver
+        is_group,               // is_group_msg
+        text,                   // text
+        false,                  // pin (not a file)
+        "",                     // file_name
+        0,                      // file_size
+        "",                     // file_hash
+        true                    // nb (non-blocking)
+    );
+
+    log_info("Sent text message to {}: {}", receiver_id, text);
+
+    // 更新会话信息
+    if (cache.conversations.find(receiver_id) != cache.conversations.end()) {
+        cache.conversations[receiver_id].last_message = text;
+        cache.conversations[receiver_id].last_time = std::time(nullptr);
+        // 更新会话排序
+        cache.update_conversation_order(receiver_id);
+    }
+}
+
+void CommManager::send_file_message(const std::string& receiver_id, bool is_group, const std::string& file_path) {
+    // TODO: 实现文件读取和哈希计算
+    std::ifstream file(file_path, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        log_error("Failed to open file: {}", file_path);
+        return;
+    }
+
+    std::size_t file_size = file.tellg();
+    file.close();
+
+    // 获取文件名
+    std::string file_name = file_path.substr(file_path.find_last_of("/\\") + 1);
+
+    // TODO: 计算文件哈希
+    std::string file_hash = "hash_placeholder";
+
+    // 发送文件消息
+    handle_send_message(
+        cache.user_ID,          // sender
+        receiver_id,            // receiver
+        is_group,               // is_group_msg
+        "",                     // text (empty for file)
+        true,                   // pin (file message)
+        file_name,              // file_name
+        file_size,              // file_size
+        file_hash,              // file_hash
+        true                    // nb (non-blocking)
+    );
+
+    log_info("Sent file message to {}: {}", receiver_id, file_name);
+
+    // 更新会话信息
+    if (cache.conversations.find(receiver_id) != cache.conversations.end()) {
+        cache.conversations[receiver_id].last_message = "[文件] " + file_name;
+        cache.conversations[receiver_id].last_time = std::time(nullptr);
+        // 更新会话排序
+        cache.update_conversation_order(receiver_id);
+    }
+}
+
+std::vector<ChatMessage> CommManager::get_conversation_messages(const std::string& conversation_id, int limit) {
+    std::vector<ChatMessage> messages;
+
+    // 从SQLite获取聊天记录
+    if (!cache.conversations[conversation_id].is_group) {
+        // 私聊消息
+        auto chat_history = sqlite_con->get_private_chat_history(cache.user_ID, conversation_id, limit);
+
+        for (const auto& row : chat_history) {
+            if (row.size() >= 10) {  // 数据库表有10个字段
+                ChatMessage msg;
+                msg.set_sender(row[1]);          // sender_id
+                msg.set_receiver(row[2]);        // receiver_id
+                msg.set_is_group(row[3] == "1"); // is_group
+                msg.set_timestamp(std::stoll(row[4])); // timestamp
+                msg.set_text(row[5]);            // text
+                msg.set_pin(row[6] == "1");      // pin
+                if (msg.pin()) {
+                    // 设置文件信息
+                    auto* file_payload = msg.mutable_payload();
+                    file_payload->set_file_name(row[7]);      // file_name
+                    file_payload->set_file_size(std::stoll(row[8])); // file_size
+                    file_payload->set_file_hash(row[9]);      // file_hash
+                }
+                messages.push_back(msg);
+            }
+        }
+    } else {
+        // 群聊消息
+        auto chat_history = sqlite_con->get_group_chat_history(conversation_id, limit);
+
+        for (const auto& row : chat_history) {
+            if (row.size() >= 10) {  // 数据库表有10个字段
+                ChatMessage msg;
+                msg.set_sender(row[1]);          // sender_id
+                msg.set_receiver(row[2]);        // receiver_id
+                msg.set_is_group(row[3] == "1"); // is_group
+                msg.set_timestamp(std::stoll(row[4])); // timestamp
+                msg.set_text(row[5]);            // text
+                msg.set_pin(row[6] == "1");      // pin
+                if (msg.pin()) {
+                    // 设置文件信息
+                    auto* file_payload = msg.mutable_payload();
+                    file_payload->set_file_name(row[7]);      // file_name
+                    file_payload->set_file_size(std::stoll(row[8])); // file_size
+                    file_payload->set_file_hash(row[9]);      // file_hash
+                }
+                messages.push_back(msg);
+            }
+        }
+    }
+
+    return messages;
+}
+
+/* ---------- ContactCache 实现 ---------- */
+
+void ContactCache::update_conversation_order(const std::string& conversation_id) {
+    // 简单直接：从列表中移除该会话（如果存在）
+    auto it = std::find(sorted_conversation_list.begin(), sorted_conversation_list.end(), conversation_id);
+    if (it != sorted_conversation_list.end()) {
+        sorted_conversation_list.erase(it);
+    }
+
+    // 将该会话添加到列表开头（最新的在前面）
+    sorted_conversation_list.insert(sorted_conversation_list.begin(), conversation_id);
+}
+
+auto ContactCache::get_sorted_conversations()
+    -> std::vector<std::pair<std::string, ContactCache::ConversationInfo*>> {
+    std::vector<std::pair<std::string, ConversationInfo*>> result;
+
+    // 方案1: 使用排序列表作为主要排序依据
+    // 先添加排序列表中的有效会话
+    for (const auto& conv_id : sorted_conversation_list) {
+        auto it = conversations.find(conv_id);
+        if (it != conversations.end()) {
+            result.push_back({conv_id, &it->second});
+        }
+    }
+
+    // 添加不在排序列表中的新会话（一般不应该发生，但作为安全机制）
+    for (auto& [id, info] : conversations) {
+        if (std::find(sorted_conversation_list.begin(), sorted_conversation_list.end(), id) == sorted_conversation_list.end()) {
+            result.push_back({id, &info});
+            // 同时更新排序列表
+            sorted_conversation_list.push_back(id);
+        }
+    }
+
+    return result;
 }

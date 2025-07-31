@@ -16,16 +16,16 @@ namespace TimeUtils {
 inline std::string timestamp_to_string(std::time_t timestamp) {
     std::tm* tm_info = std::localtime(&timestamp);
     std::ostringstream oss;
-    oss << "[" << std::put_time(tm_info, "%Y-%m-%d %H:%M:%S") << "]";
+    oss << std::put_time(tm_info, "%Y-%m-%d %H:%M:%S");
     return oss.str();
 }
 
 /**
  * 将时间戳转换为 [YYYY-MM-DD HH:MM:SS] 格式的字符串
- * @param timestamp Unix时间戳（毫秒）
+ * @param timestamp_ms Unix时间戳（毫秒）
  * @return 格式化后的时间字符串
  */
-inline std::string timestamp_to_string(int64_t timestamp_ms) {
+inline std::string timestamp_ms_to_string(int64_t timestamp_ms) {
     std::time_t timestamp = timestamp_ms / 1000;
     return timestamp_to_string(timestamp);
 }

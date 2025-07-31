@@ -52,6 +52,7 @@ public:
     bool block_friend(const std::string& user_ID, const std::string& friend_ID);
     bool unblock_friend(const std::string& user_ID, const std::string& friend_ID);
     bool is_friend(const std::string& user_ID, const std::string& friend_ID);
+    bool is_blocked_by_friend(const std::string& user_ID, const std::string& friend_ID);
 
     // 查询函数
     std::vector<std::string> get_friends_list(const std::string& user_ID);

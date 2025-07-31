@@ -65,6 +65,8 @@ public:
 
     void get_read_buf(std::string& buf);
     void set_write_buf(const std::string& buf);
+    size_t get_read_buf_size() const;
+    size_t get_write_buf_size() const;
 
     ssize_t receive(size_t size = -1);
     ssize_t send(size_t size = -1);

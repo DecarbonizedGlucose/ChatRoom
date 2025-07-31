@@ -95,7 +95,7 @@ void TcpServer::start() {
                 // 读事件
                 log_info("Reactor read event at fd {}", fd);
                 read_event->remove_from_reactor();
-                log_debug("Read event removed from reactor (fd:{})", fd);
+                //log_debug("Read event removed from reactor (fd:{})", fd);
                 pool->submit([read_event]() {
                     read_event->conn->dispatcher \
                     ->dispatch_recv(read_event->conn);
@@ -105,7 +105,7 @@ void TcpServer::start() {
                 // 写事件
                 log_info("Reactor write event at fd {}", fd);
                 write_event->remove_from_reactor();
-                log_debug("Write event removed from reactor (fd:{})", fd);
+                //log_debug("Write event removed from reactor (fd:{})", fd);
                 pool->submit([write_event]() {
                     write_event->conn->dispatcher \
                     ->dispatch_send(write_event->conn);
@@ -113,7 +113,7 @@ void TcpServer::start() {
             }
         }
     }
-    log_debug("Tcp server {} main loop exited", idx);
+    //log_debug("Tcp server {} main loop exited", idx);
 }
 
 void TcpServer::stop() {

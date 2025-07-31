@@ -40,6 +40,31 @@ public:
 
     // 请求队列
     safe_queue<CommandRequest> requests;
+
+    // 会话管理
+    struct ConversationInfo {
+        std::string id;              // 会话ID（用户ID或群组ID）
+        std::string name;            // 显示名称
+        bool is_group = false;       // 是否为群聊
+        std::string last_message;    // 最后一条消息
+        std::time_t last_time = 0;   // 最后消息时间
+        int unread_count = 0;        // 未读消息数
+    };
+    std::unordered_map<std::string, ConversationInfo> conversations;
+    std::string current_conversation_id; // 当前打开的会话ID
+
+    // 消息队列（用于实时接收）
+    safe_queue<ChatMessage> messages;
+
+    // 会话排序管理（实时更新的消息列表顺序）
+    // 原理：当有新消息时，将对应会话移到列表开头，实现类似QQ/微信的效果
+    std::vector<std::string> sorted_conversation_list;
+
+    // 更新会话排序（有新消息时调用，自动将会话置顶）
+    void update_conversation_order(const std::string& conversation_id);
+
+    // 获取排序后的会话列表（UI显示用）
+    std::vector<std::pair<std::string, ConversationInfo*>> get_sorted_conversations();
 };
 
 class CommManager {
@@ -76,11 +101,6 @@ public:
     CommandRequest handle_receive_command(bool nb = true);
     void handle_send_command(Action action, const std::string& sender, std::initializer_list<std::string> args, bool nb = true);
 
-    // void handle_save_notify(const CommandRequest& cmd);
-    // void handle_show_notify_exist(const CommandRequest& cmd);
-    // void handle_show_notify_not_exist(const CommandRequest& cmd);
-    // void handle_save_request(const CommandRequest& cmd);
-
     // others
     void handle_get_relation_net(); // 不发请求，主动拉取，不知道发来什么
     void handle_send_id();
@@ -92,6 +112,26 @@ public:
         const std::string& user_ID,
         const std::string& group_ID
     );
+    void handle_reply_heartbeat();
+
+    // 会话管理
+    void update_conversation_list();
+    void load_conversation_history(const std::string& conversation_id);
+    void send_text_message(
+        const std::string& receiver_id,
+        bool is_group,
+        const std::string& text);
+    void send_file_message(
+        const std::string& receiver_id,
+        bool is_group,
+        const std::string& file_path);
+    void send_text_with_file(
+        const std::string& receiver_id,
+        bool is_group,
+        const std::string& text,
+        const std::string& file_path);
+    std::vector<ChatMessage> get_conversation_messages(const std::string& conversation_id, int limit = 50);
+
 /* ---------- Print ---------- */
     void print_friends();
     void print_groups();

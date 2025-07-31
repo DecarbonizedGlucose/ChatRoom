@@ -2,6 +2,7 @@
 
 #include <string>
 #include <nlohmann/json.hpp>
+#include "../../global/abstract/datatypes.hpp"
 
 class Dispatcher;
 class TcpServer;
@@ -11,9 +12,15 @@ class CommandRequest;
 class FileChunk;
 class SyncItem;
 class OfflineMessages;
-enum class Action;
+class ConnectionManager;
 
 using json = nlohmann::json;
+
+void try_send(ConnectionManager* conn_manager,
+    TcpServerConnection* conn,
+    const std::string& proto,
+    DataType type = DataType::None
+);
 
 class Handler {
 public:
@@ -65,20 +72,39 @@ private:
         TcpServerConnection* conn,
         const std::string& email,
         const std::string& veri_code);
-    void handle_accept_friend_request();
-    void handle_refuse_friend_request();
-    void handle_accept_group_request();
-    void handle_refuse_group_request();
-    void handle_add_friend();
+    void handle_accept_friend_request(
+        const std::string& sender,
+        const std::string& ori_user_ID,
+        const std::string& ostr);
+    void handle_refuse_friend_request(
+        const std::string& sender,
+        const std::string& ori_user_ID,
+        const std::string& ostr);
+    void handle_accept_group_request(
+        const std::string& ori_user_ID,
+        const std::string& ostr);
+    void handle_refuse_group_request(
+        const std::string& ori_user_ID,
+        const std::string& ostr);
+    void handle_add_friend_req(
+        const std::string& friend_ID,
+        const std::string& ostr);
     void handle_remove_friend();
-    void handle_search_person(TcpServerConnection* conn, const std::string& searched_ID);
-    void handle_create_group();
-    void handle_join_group();
+    void handle_search_person(
+        TcpServerConnection* conn,
+        const std::string& searched_ID);
+    void handle_create_group(
+        const std::string& user_ID,
+        const std::string& time,
+        const std::string& group_name);
+    void handle_join_group_req();
     void handle_leave_group();
     void handle_disband_group();
-    void handle_invite_to_group();
+    void handle_invite_to_group_req();
     void handle_remove_from_group();
-    void handle_search_group();
+    void handle_search_group(
+        TcpServerConnection* conn,
+        const std::string& group_ID);
     void handle_add_admin();
     void handle_remove_admin();
     void handle_update_relation_net(const std::string& user_ID);
@@ -90,11 +116,18 @@ private:
     void handle_online_init(const std::string& user_ID);
 
     // 非直接指令驱动的业务逻辑
-    void handle_post_relation_net(const std::string& user_ID, json* relation_data);
+    void handle_post_relation_net(const std::string& user_ID, const json& relation_data);
     void handle_post_friends_status(const std::string& user_ID, const json& friends);
     void handle_post_offline_messages(const std::string& user_ID, const json& relation_data);
     void handle_post_unordered_noti_and_req(const std::string& user_ID, const json& relation_data);
     void handle_notify_friends_online(const std::string& user_ID, const json& friends);
+
+    // 封装起来的函数
+    void get_friends(const std::string& user_ID, json& friends);
+    void get_groups(const std::string& user_ID, json& groups);
+    void get_relation_net(const std::string& user_ID, json& relation_net);
+    void get_blocked_info(const std::string& user_ID, const json& friends, json& blocked_info);
+
 };
 
 /* -------------- Data -------------- */

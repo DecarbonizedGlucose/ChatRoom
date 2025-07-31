@@ -4,33 +4,33 @@
 #include "../include/TcpServer.hpp"
 #include "../include/dispatcher.hpp"
 #include "../../global/include/logging.hpp"
-#include "../../global/abstract/datatypes.hpp"
 #include "../include/connection_manager.hpp"
 #include <iostream>
 #include <regex>
 
-namespace {
-    void try_send(TcpServerConnection* conn,
-        const std::string& proto,
-        DataType type = DataType::None
-    ) {
-        // 首先设置要发送的数据
-        conn->socket->set_write_buf(proto);
-        conn->set_send_type(type);
+void try_send(ConnectionManager* conn_manager,
+    TcpServerConnection* conn,
+    const std::string& proto,
+    DataType type
+) {
+    // 首先设置要发送的数据
+    conn->socket->set_write_buf(proto);
+    conn->set_send_type(type);
 
-        // 先尝试立即发送数据
-        ssize_t sent = conn->socket->send_with_size();
-        if (sent == 0) {
-            // 可能是缓冲区空或者socket不可写，注册写事件等待
-            log_debug("Socket not ready for writing or no data, registering write event for fd: {}", conn->socket->get_fd());
-            conn->write_event->add_to_reactor();
-        } else if (sent > 0) {
-            // 数据发送成功
-            log_debug("Data sent immediately to fd: {} (sent {} bytes)", conn->socket->get_fd(), sent);
-        } else {
-            // 发送出错 (sent < 0)
-            log_error("Failed to send (fd:{}): {}", conn->socket->get_fd(), strerror(errno));
-        }
+    // 先尝试立即发送数据
+    ssize_t sent = conn->socket->send_with_size();
+    if (sent == 0) {
+        // 可能是缓冲区空或者socket不可写，注册写事件等待
+        //log_debug("Socket not ready for writing or no data, registering write event for fd: {}", conn->socket->get_fd());
+        conn->write_event->add_to_reactor();
+    } else if (sent > 0) {
+        // 数据发送成功
+        if (!conn->user_ID.empty())
+            conn_manager->update_user_activity(conn->user_ID);
+        log_debug("###Sent immediately to fd={}, bytes={}, user_ID={}", conn->socket->get_fd(), sent, conn->user_ID);
+    } else {
+        // 发送出错 (sent < 0)
+        log_error("Failed to send (fd:{}): {}", conn->socket->get_fd(), strerror(errno));
     }
 }
 
@@ -45,8 +45,67 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
     std::string sender = message.sender();
     std::string receiver = message.receiver();
     bool is_group = message.is_group();
-    auto recv_status = disp->redis_con->get_user_status(receiver);
 
+    if (!is_group) {
+        // 判断是不是他好友
+        if (disp->redis_con->is_friend(sender, receiver)) {
+            // 判断有没有被对方屏蔽
+            if (!disp->redis_con->is_blocked_by_friend(sender, receiver)) {
+                // 判断是否在线
+                if (disp->redis_con->get_user_status(receiver).first) {
+                    auto conn = disp->conn_manager->get_connection(receiver);
+                    if (conn) {
+                        // 在线，直接发送
+                        try_send(disp->conn_manager, conn, ostr);
+                        return;
+                    }
+                }
+                // 不在线, 存起来
+                // ...
+            } else {
+                // 被屏蔽了
+                log_info("User {} blocked message from {}", receiver, sender);
+            }
+        } else {
+            // 不是好友
+            auto conn = disp->conn_manager->get_connection(sender, 1);
+            auto env_str = create_command_string(
+                Action::Warn,
+                "ChatRoom Team",
+                { "You are not friends with " + receiver + ", message not sent." }
+            );
+            try_send(disp->conn_manager, conn, env_str, DataType::Command);
+        }
+    } else { // 群组消息
+        // 判断他在不在群里
+        if (disp->redis_con->is_group_member(receiver, sender)) {
+            // 在群里，对所有人发送
+            auto members = disp->redis_con->
+                get_group_members(receiver);
+            for (const auto& member_id : members) {
+                if (member_id == sender) continue; // 不发给自己
+                auto conn = disp->conn_manager->get_connection(member_id);
+                if (conn) {
+                    try_send(disp->conn_manager, conn, ostr);
+                } else {
+                    // 离线，存起来
+                    // 因为是群消息，存1份就可以
+                    // 谁上线谁拉取
+                    // ...
+                }
+            }
+        }
+        else {
+            // 不在群里
+            auto conn = disp->conn_manager->get_connection(sender, 1);
+            auto env_str = create_command_string(
+                Action::Warn,
+                "ChatRoom Team",
+                { "You are not a member of group " + receiver + ", message not sent." }
+            );
+            try_send(disp->conn_manager, conn, env_str, DataType::Command);
+        }
+    }
 }
 
 void MessageHandler::handle_send(TcpServerConnection* conn) {
@@ -64,6 +123,13 @@ void CommandHandler::handle_recv(
     Action action = (Action)command.action();
     std::string subj = command.sender();
     auto args = command.args();
+
+    if (action == Action::HEARTBEAT) {
+        // 专门的心跳包
+        log_debug("Heartbeat received from user: {}", subj);
+        return;
+    }
+
     switch (action) {
         case Action::Sign_In: {
             handle_sign_in(conn, subj, args[0]);
@@ -98,23 +164,28 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Accept_FReq: {
-            handle_accept_friend_request();
+            handle_accept_friend_request(
+                subj, args[1], ostr);
             break;
         }
         case Action::Refuse_FReq: {
-            handle_refuse_friend_request();
+            handle_refuse_friend_request(
+                subj, args[1], ostr);
             break;
         }
         case Action::Refuse_GReq: {
-            handle_refuse_group_request();
+            handle_refuse_group_request(
+                args[1], ostr);
             break;
         }
         case Action::Accept_GReq: {
-            handle_accept_group_request();
+            handle_accept_group_request(
+                args[1], ostr);
             break;
         }
         case Action::Add_Friend_Req: {
-            handle_add_friend();
+            handle_add_friend_req(
+                args[1], ostr);
             break;
         }
         case Action::Remove_Friend: {
@@ -126,11 +197,12 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Create_Group: {
-            handle_create_group();
+            handle_create_group(
+                subj, args[0], args[1]);
             break;
         }
         case Action::Join_Group_Req: {
-            handle_join_group();
+            handle_join_group_req();
             break;
         }
         case Action::Leave_Group: {
@@ -142,7 +214,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Invite_To_Group_Req: {
-            handle_invite_to_group();
+            handle_invite_to_group_req();
             break;
         }
         case Action::Remove_From_Group: {
@@ -150,7 +222,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Search_Group: {
-            handle_search_group();
+            handle_search_group(conn, args[0]);
             break;
         }
         case Action::Add_Admin: {
@@ -187,8 +259,9 @@ void CommandHandler::handle_recv(
 }
 
 void CommandHandler::handle_send(TcpServerConnection* conn) {
+    auto sent = conn->socket->send_with_size();
     conn->socket->send_with_size();
-    log_debug("CommandHandler::handle_send called");
+    log_debug("###CommandHandler::handle_send called, sent to fd={}, size={}, user_ID={}", conn->socket->get_fd(), sent, conn->user_ID);
 }
 
 void CommandHandler::handle_sign_in(
@@ -214,26 +287,45 @@ void CommandHandler::handle_sign_in(
         // 登录成功
         auto env_out = create_command_string(
             Action::Accept_Login, "", {ret});
-        conn->socket->set_write_buf(env_out);
-        conn->write_event->add_to_reactor();
-        // 更新redis的在线状态
-        disp->redis_con->set_user_status(is_email?ret:subj, "active");
+            conn->user_ID = user_ID; // 设置连接的user_ID
+        try_send(disp->conn_manager, conn, env_out);
     } else {
         // 登录失败
         std::string err_msg = "用户名/邮箱与密码不匹配";
         auto env_out = create_command_string(
             Action::Refuse_Login, "", {err_msg});
-        conn->socket->set_write_buf(env_out);
-        conn->write_event->add_to_reactor();
+        try_send(disp->conn_manager, conn, env_out);
+        return;
+    }
+    // 通知所有在线好友
+    auto friends = disp->mysql_con->get_friends_list(user_ID);
+    for (const auto& friend_ID : friends) {
+        if (!disp->redis_con->get_user_status(friend_ID).first)
+            continue; // 不在线
+        auto env_out = create_command_string(
+            Action::Friend_Online, "", {user_ID});
+        auto friend_conn = disp->conn_manager->get_connection(friend_ID, 1);
+        if (friend_conn) { // 好友在线
+            try_send(disp->conn_manager, friend_conn, env_out);
+        }
     }
 }
 
 void CommandHandler::handle_sign_out(const std::string& user_ID) {
     log_debug("handle_sign_out called for user_ID: {}", user_ID);
-    disp->redis_con->set_user_status(user_ID, false);
     disp->conn_manager->remove_user(user_ID);
-    disp->mysql_con->update_user_status(user_ID, false); // 我觉得这个没啥用
-    disp->mysql_con->update_user_last_active(user_ID);
+    // 通知所有在线好友
+    auto friends = disp->mysql_con->get_friends_list(user_ID);
+    for (const auto& friend_ID : friends) {
+        if (!disp->redis_con->get_user_status(friend_ID).first)
+            continue; // 不在线
+        auto env_out = create_command_string(
+            Action::Friend_Offline, "", {user_ID});
+        auto friend_conn = disp->conn_manager->get_connection(friend_ID, 1);
+        if (friend_conn) { // 好友在线
+            try_send(disp->conn_manager, friend_conn, env_out);
+        }
+    }
 }
 
 void CommandHandler::handle_register(
@@ -247,14 +339,10 @@ void CommandHandler::handle_register(
     if (!user_ID_exists) {
         if (disp->mysql_con->insert_user(user_ID, email, user_password)) {
             // 注册成功
-            // 通知他注册成功了
-            // ...
             CommandRequest cmd;
             auto env_out = create_command_string(
-                Action::Accept_Regi, email, {"注册成功"});
-            // 注册事件
-            conn->socket->set_write_buf(env_out);
-            conn->write_event->add_to_reactor();
+                Action::Accept_Regi, "", {});
+            try_send(disp->conn_manager, conn, env_out);
             return;
         }
         err_msg = "注册失败，请稍后再试";
@@ -262,10 +350,8 @@ void CommandHandler::handle_register(
     // 通知他不能注册(Refuse)
     if (err_msg.empty()) err_msg = "用户名已存在";
     std::string env_out = create_command_string(
-        Action::Refuse_Regi, email, {err_msg});
-    // 注册事件
-    conn->socket->set_write_buf(env_out);
-    conn->write_event->add_to_reactor();
+        Action::Refuse_Regi, "", {err_msg});
+    try_send(disp->conn_manager, conn, env_out);
 }
 
 void CommandHandler::handle_send_veri_code(
@@ -274,9 +360,8 @@ void CommandHandler::handle_send_veri_code(
     bool email_exists = disp->mysql_con->do_email_exist(subj);
     if (email_exists) {
         auto env_out = create_command_string(
-            Action::Refuse_Post_Code, subj, {"邮箱已存在"});
-        conn->socket->set_write_buf(env_out);
-        conn->write_event->add_to_reactor();
+            Action::Refuse_Post_Code, "", {"邮箱已存在"});
+        try_send(disp->conn_manager, conn, env_out);
         return;
     }
     const std::string qq_email = "decglu@qq.com";
@@ -286,11 +371,13 @@ void CommandHandler::handle_send_veri_code(
         QQMailSender sender;
         sender.init(qq_email, auth_code);
         sender.set_content(
+            "[C++聊天室项目测试]"
             "聊天室账户验证",
             {subj},
             "尊敬的用户：\n\n"
             "感谢您使用聊天室(チャットルーム)服务！\n"
             "您的验证码是：" + veri_code + "\n\n"
+            "如非本人操作，请忽略本邮件。\n"
             "请勿将此验证码分享给他人。\n"
             "此验证码5分钟后失效。\n\n"
             "感谢您的支持！\n"
@@ -303,17 +390,15 @@ void CommandHandler::handle_send_veri_code(
             log_info("验证码已存入Redis");
             // 发送成功，通知客户端
             auto env_out = create_command_string(
-                Action::Accept_Post_Code, subj, {});
-            conn->socket->set_write_buf(env_out);
-            conn->write_event->add_to_reactor();
+                Action::Accept_Post_Code, "", {});
+            try_send(disp->conn_manager, conn, env_out);
             return;
         } else {
             log_error("!!! 邮件发送失败: " + sender.get_error() + " !!!");
         }
         auto env_out = create_command_string(
-            Action::Refuse_Post_Code, subj, {"暂时无法使用验证服务"});
-        conn->socket->set_write_buf(env_out);
-        conn->write_event->add_to_reactor();
+            Action::Refuse_Post_Code, "", {"暂时无法使用验证服务"});
+        try_send(disp->conn_manager, conn, env_out);
     } catch (const std::exception& e) {
         std::cerr << "初始化错误: " << e.what() << std::endl;
         return;
@@ -337,34 +422,90 @@ void CommandHandler::handle_authentication(
         // 撤下验证码
         disp->redis_con->del_veri_code(email);
         auto env_out = create_command_string(
-            Action::Success_Auth, email, {"身份验证成功"});
-        conn->socket->set_write_buf(env_out);
-        conn->write_event->add_to_reactor();
+            Action::Success_Auth, "", {});
+        try_send(disp->conn_manager, conn, env_out);
     } else {
         auto env_out = create_command_string(
-            Action::Failed_Auth, email, {"验证码错误"});
-        conn->socket->set_write_buf(env_out);
-        conn->write_event->add_to_reactor();
+            Action::Failed_Auth, "", {"验证码错误"});
+        try_send(disp->conn_manager, conn, env_out);
     }
 }
 
-void CommandHandler::handle_refuse_friend_request() {
+void CommandHandler::handle_refuse_friend_request(
+        const std::string& sender,
+        const std::string& ori_user_ID,
+        const std::string& ostr) {
     log_debug("handle_refuse_friend_request called");
+    auto user_online = disp->redis_con->get_user_status(ori_user_ID);
+    if (user_online.first) {
+        auto data_conn = disp->conn_manager->get_connection(ori_user_ID, 1);
+        if (data_conn) {
+            try_send(
+                disp->conn_manager,
+                data_conn,
+                ostr
+            );
+            log_debug("Refuse friend request sent to online user: {}", ori_user_ID);
+        }
+    }
+    // 不在线，存到mysql
 }
 
-void CommandHandler::handle_accept_friend_request() {
+void CommandHandler::handle_accept_friend_request(
+        const std::string& sender,
+        const std::string& ori_user_ID,
+        const std::string& ostr) {
     log_debug("handle_accept_friend_request called");
+    auto user_online = disp->redis_con->get_user_status(ori_user_ID);
+    if (user_online.first) {
+        auto data_conn = disp->conn_manager->get_connection(ori_user_ID, 1);
+        if (data_conn) {
+            try_send(
+                disp->conn_manager,
+                data_conn,
+                ostr
+            );
+            log_debug("Accept friend request sent to online user: {}", ori_user_ID);
+        }
+    }
+    // 不在线，存到mysql
+    // 服务器mysql更新
+    // 双向好友关系
+    disp->mysql_con->add_friend(ori_user_ID, sender);
+    disp->mysql_con->add_friend(sender, ori_user_ID);
 }
 
-void CommandHandler::handle_refuse_friend_request() {
-    log_debug("handle_refuse_friend_request called");
+void CommandHandler::handle_refuse_group_request(
+        const std::string& ori_user_ID,
+        const std::string& ostr) {
+    log_debug("handle_refuse_group_request called");
 }
 
-void CommandHandler::handle_accept_friend_request() {
-    log_debug("handle_accept_friend_request called");
+void CommandHandler::handle_accept_group_request(
+        const std::string& ori_user_ID,
+        const std::string& ostr) {
+    log_debug("handle_accept_group_request called");
 }
 
-void CommandHandler::handle_add_friend() {}
+void CommandHandler::handle_add_friend_req(
+    const std::string& friend_ID,
+    const std::string& ostr) {
+    log_debug("handle_add_friend_req called");
+    auto user_online = disp->redis_con->get_user_status(friend_ID);
+    if (user_online.first) {
+        auto data_conn = disp->conn_manager->get_connection(friend_ID, 1);
+        if (data_conn) {
+            try_send(
+                disp->conn_manager,
+                data_conn,
+                ostr
+            );
+            //log_debug("Friend request sent to online user: {}", friend_ID);
+        }
+    }
+    // 不在线，存到mysql
+    // cao, 这里怎么还没写
+}
 
 void CommandHandler::handle_remove_friend() {}
 
@@ -382,75 +523,61 @@ void CommandHandler::handle_search_person(
             Action::Notify_Not_Exist, conn->user_ID, {searched_ID});
         log_debug("User {} does not exist, sending Notify_Not_Exist", searched_ID);
     }
-    conn->socket->set_write_buf(env_str);
-    conn->write_event->add_to_reactor();
+    try_send(disp->conn_manager, conn, env_str);
 }
 
-void CommandHandler::handle_create_group() {}
+void CommandHandler::handle_create_group(
+    const std::string& group_name,
+    const std::string& user_ID,
+    const std::string& time) {
+    log_debug("handle_create_group called");
+}
 
-void CommandHandler::handle_join_group() {}
+void CommandHandler::handle_join_group_req() {}
 
 void CommandHandler::handle_leave_group() {}
 
 void CommandHandler::handle_disband_group() {}
 
-void CommandHandler::handle_invite_to_group() {}
+void CommandHandler::handle_invite_to_group_req() {}
 
 void CommandHandler::handle_remove_from_group() {}
 
-void CommandHandler::handle_search_group() {}
+void CommandHandler::handle_search_group(
+    TcpServerConnection* conn, const std::string& group_ID) {
+    log_debug("handle_search_group called for group: {}", group_ID);
+    bool group_exists = disp->mysql_con->search_group(group_ID);
+    std::string env_str;
+    if (group_exists) {
+        env_str = create_command_string(
+            Action::Notify_Exist, conn->user_ID, {group_ID});
+        log_debug("Group {} exists, sending Notify_Exist", group_ID);
+    } else {
+        env_str = create_command_string(
+            Action::Notify_Not_Exist, conn->user_ID, {group_ID});
+        log_debug("Group {} does not exist, sending Notify_Not_Exist", group_ID);
+    }
+    try_send(disp->conn_manager, conn, env_str);
+}
 
 void CommandHandler::handle_add_admin() {}
 
 void CommandHandler::handle_remove_admin() {}
 
-void CommandHandler::handle_post_relation_net(const std::string& user_ID, json* relation_data) {
+void CommandHandler::handle_post_relation_net(const std::string& user_ID, const json& relation_data) {
     log_debug("handle_post_relation_net called for user: {}", user_ID);
-    // 构建完整关系网数据的JSON
-    //json relation_data;
-    // 获取好友列表（包含屏蔽状态）
-    auto friends_with_status = disp->mysql_con->get_friends_with_block_status(user_ID);
-    json friends_array = json::array();
-    for (const auto& [friend_id, is_blocked] : friends_with_status) {
-        json friend_info;
-        friend_info["id"] = friend_id;
-        friend_info["blocked"] = is_blocked;
-        friends_array.push_back(friend_info);
-    }
-    (*relation_data)["friends"] = friends_array;
-    // 获取群组列表
-    auto group_list = disp->mysql_con->get_user_groups(user_ID);
-    json groups_array = json::array();
-    for (const auto& group_id : group_list) {
-        json group_info;
-        group_info["id"] = group_id;
-        group_info["name"] = disp->mysql_con->get_group_name(group_id);
-        group_info["owner"] = disp->mysql_con->get_group_owner(group_id);
-        // 获取群成员（包含管理员状态）
-        auto members_with_admin = disp->mysql_con->get_group_members_with_admin_status(group_id);
-        json members_array = json::array();
-        for (const auto& [member_id, is_admin] : members_with_admin) {
-            json member_info;
-            member_info["id"] = member_id;
-            member_info["is_admin"] = is_admin;
-            members_array.push_back(member_info);
-        }
-        group_info["members"] = members_array;
-        groups_array.push_back(group_info);
-    }
-    (*relation_data)["groups"] = groups_array;
     // 创建SyncItem进行全量关系网同步
     auto sync_str = create_sync_string(
         SyncItem::RELATION_NET_FULL,
-        relation_data->dump()
+        relation_data.dump()
     );
     auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
     if (data_conn) {
-        try_send(data_conn, sync_str, DataType::SyncItem);
+        try_send(disp->conn_manager, data_conn, sync_str, DataType::SyncItem);
     } else {
         log_error("Data connection not found for user: {}", user_ID);
     }
-    log_debug("Full relation network data prepared for user: {}", user_ID);
+    //log_debug("Full relation network data prepared for user: {}", user_ID);
 }
 
 void CommandHandler::handle_update_relation_net(const std::string& user_ID) {}
@@ -470,8 +597,12 @@ void CommandHandler::handle_remember_connection(
 void CommandHandler::handle_online_init(const std::string& user_ID) {
     log_debug("handle_online_init called for user: {}", user_ID);
     json relation_data; // 用于存储关系网数据
+    json blocked_info;
+    get_relation_net(user_ID, relation_data);
+    get_blocked_info(user_ID, relation_data["friends"], blocked_info);
+    disp->redis_con->load_user_relations(user_ID, relation_data, blocked_info);
     // 发送最新关系网
-    handle_post_relation_net(user_ID, &relation_data);
+    handle_post_relation_net(user_ID, relation_data);
     // 发送所有在线好友的状态
     handle_post_friends_status(user_ID, relation_data["friends"]);
     // 发送用户离线消息（消息记录）
@@ -496,11 +627,17 @@ void CommandHandler::handle_post_friends_status(
         SyncItem::ALL_FRIEND_STATUS,
         friend_list.dump()
     );
-    try_send(
-        disp->conn_manager->get_connection(user_ID, 2),
-        sync_str,
-        DataType::SyncItem
-    );
+    auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
+    if (data_conn) {
+        try_send(
+            disp->conn_manager,
+            data_conn,
+            sync_str,
+            DataType::SyncItem
+        );
+    } else {
+        log_error("Data connection not found for user: {}", user_ID);
+    }
 }
 
 void CommandHandler::handle_post_offline_messages(
@@ -519,12 +656,74 @@ void CommandHandler::handle_notify_friends_online(
 
 }
 
+void CommandHandler::get_friends(const std::string& user_ID, json& friends) {
+    auto friends_with_status = disp->mysql_con->get_friends_with_block_status(user_ID);
+    friends = json::array();
+    for (const auto& [friend_id, is_blocked] : friends_with_status) {
+        json friend_info;
+        friend_info["id"] = friend_id;
+        friend_info["blocked"] = is_blocked;
+        friends.push_back(friend_info);
+    }
+}
+
+void CommandHandler::get_groups(const std::string& user_ID, json& groups) {
+    auto group_list = disp->mysql_con->get_user_groups(user_ID);
+    groups = json::array();
+    for (const auto& group_id : group_list) {
+        json group_info;
+        group_info["id"] = group_id;
+        group_info["name"] = disp->mysql_con->get_group_name(group_id);
+        group_info["owner"] = disp->mysql_con->get_group_owner(group_id);
+        // 获取群成员（包含管理员状态）
+        auto members_with_admin = disp->mysql_con->get_group_members_with_admin_status(group_id);
+        json members_array = json::array();
+        for (const auto& [member_id, is_admin] : members_with_admin) {
+            json member_info;
+            member_info["id"] = member_id;
+            member_info["is_admin"] = is_admin;
+            members_array.push_back(member_info);
+        }
+        group_info["members"] = members_array;
+        groups.push_back(group_info);
+    }
+}
+
+void CommandHandler::get_relation_net(const std::string& user_ID, json& relation_net) {
+    json friends, groups;
+    get_friends(user_ID, friends);
+    get_groups(user_ID, groups);
+    relation_net = json::object();
+    relation_net["friends"] = friends;
+    relation_net["groups"] = groups;
+}
+
+void CommandHandler::get_blocked_info(const std::string& user_ID, const json& friends, json& blocked_info) {
+    blocked_info = json::object();
+
+    // 遍历所有好友，查询当前用户是否被每个好友屏蔽
+    for (const auto& friend_info : friends) {
+        if (friend_info.contains("id")) {
+            std::string friend_id = friend_info["id"];
+
+            // 查询friend_id是否屏蔽了user_ID
+            // 这相当于查询friend_id的好友列表中user_ID的屏蔽状态
+            bool is_blocked_by_friend = disp->mysql_con->is_blocked_by_friend(user_ID, friend_id);
+
+            blocked_info[friend_id] = is_blocked_by_friend;
+
+            log_debug("User {} blocked by {}: {}", user_ID, friend_id, is_blocked_by_friend);
+        }
+    }
+
+    log_debug("Generated blocked_info for user {}: {}", user_ID, blocked_info.dump());
+}
+
 /* ---------- FileHandler ---------- */
 
 FileHandler::FileHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
 void FileHandler::handle_recv(const FileChunk& file_chunk, const std::string& ostr) {
-    // 处理文件分片
 }
 
 void FileHandler::handle_send(TcpServerConnection* conn) {

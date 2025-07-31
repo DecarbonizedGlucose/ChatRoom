@@ -85,22 +85,22 @@ void event::remove_from_reactor() {
 void event::add_event_to_fd() {
     // log_debug("add_event_to_fd called: fd={}, events={:#x} (signed: {})", fd, (uint32_t)events, events);
 
-    // 如果是写事件，检查 socket 状态
-    if (events & EPOLLOUT) {
-        // 检查 socket 是否有效
-        int error = 0;
-        socklen_t len = sizeof(error);
-        int result = getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len);
-        if (result == 0) {
-            if (error != 0) {
-                log_error("Socket fd={} has error: {}", fd, strerror(error));
-            } else {
-                log_debug("Write event: Socket fd={} status OK", fd);
-            }
-        } else {
-            log_error("Failed to get socket status for fd={}: {}", fd, strerror(errno));
-        }
-    }
+    // // 如果是写事件，检查 socket 状态
+    // if (events & EPOLLOUT) {
+    //     // 检查 socket 是否有效
+    //     int error = 0;
+    //     socklen_t len = sizeof(error);
+    //     int result = getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len);
+    //     if (result == 0) {
+    //         if (error != 0) {
+    //             log_error("Socket fd={} has error: {}", fd, strerror(error));
+    //         } else {
+    //             log_debug("Write event: Socket fd={} status OK", fd);
+    //         }
+    //     } else {
+    //         log_error("Failed to get socket status for fd={}: {}", fd, strerror(errno));
+    //     }
+    // }
 
     if (pr->fd_events_map.find(fd) != pr->fd_events_map.end()) {
         if (pr->fd_events_map[fd] & events) {
@@ -123,7 +123,7 @@ void event::add_event_to_fd() {
         ev.events = events;
         ev.data.fd = fd;
         uint32_t add_events = ev.events;  // 复制到临时变量
-        log_debug("ADD: fd={}, events={:#x}", fd, add_events);
+        //log_debug("ADD: fd={}, events={:#x}", fd, add_events);
         int result = epoll_ctl(pr->epoll_fd, EPOLL_CTL_ADD, fd, &ev);
         if (result < 0) {
             log_error("epoll_ctl ADD failed for fd={}: {}", fd, strerror(errno));

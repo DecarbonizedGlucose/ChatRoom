@@ -81,6 +81,14 @@ void DataSocket::set_write_buf(const std::string& buf) {
     write_buf.assign(buf.begin(), buf.end());
 }
 
+size_t DataSocket::get_read_buf_size() const {
+    return read_buf.size();
+}
+
+size_t DataSocket::get_write_buf_size() const {
+    return write_buf.size();
+}
+
 ssize_t DataSocket::receive(size_t size) {
     if (fd < 0) {
         return -1;
