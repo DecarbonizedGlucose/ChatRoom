@@ -48,7 +48,7 @@ public:
         return true;
     }
 
-    // 阻塞等待直到队列非空，然后取出一个元素
+    // 阻塞等待直到队列非空, 然后取出一个元素
     void wait_and_pop(T& value) {
         std::unique_lock<std::mutex> lock(m_Mutex);
         m_Condition.wait(lock, [this] { return !m_Queue.empty(); });
@@ -75,7 +75,7 @@ public:
         }
     }
 
-    // 获取所有元素的副本，不移除原元素
+    // 获取所有元素的副本, 不移除原元素
     std::vector<T> copy_all() {
         std::unique_lock<std::mutex> lock(m_Mutex);
         std::vector<T> result;

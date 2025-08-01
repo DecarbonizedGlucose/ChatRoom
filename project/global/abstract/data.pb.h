@@ -210,13 +210,10 @@ class FileChunk final :
 
   enum : int {
     kFileIdFieldNumber = 1,
-    kFilenameFieldNumber = 2,
-    kDataFieldNumber = 3,
-    kSenderIdFieldNumber = 7,
-    kReceiverIdFieldNumber = 8,
-    kChunkIndexFieldNumber = 4,
-    kTotalChunksFieldNumber = 5,
-    kIsLastChunkFieldNumber = 6,
+    kDataFieldNumber = 2,
+    kChunkIndexFieldNumber = 3,
+    kTotalChunksFieldNumber = 4,
+    kIsLastChunkFieldNumber = 5,
   };
   // string file_id = 1;
   void clear_file_id();
@@ -232,21 +229,7 @@ class FileChunk final :
   std::string* _internal_mutable_file_id();
   public:
 
-  // string filename = 2;
-  void clear_filename();
-  const std::string& filename() const;
-  template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_filename(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_filename();
-  PROTOBUF_NODISCARD std::string* release_filename();
-  void set_allocated_filename(std::string* filename);
-  private:
-  const std::string& _internal_filename() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_filename(const std::string& value);
-  std::string* _internal_mutable_filename();
-  public:
-
-  // bytes data = 3;
+  // bytes data = 2;
   void clear_data();
   const std::string& data() const;
   template <typename ArgT0 = const std::string&, typename... ArgT>
@@ -260,35 +243,7 @@ class FileChunk final :
   std::string* _internal_mutable_data();
   public:
 
-  // string sender_id = 7;
-  void clear_sender_id();
-  const std::string& sender_id() const;
-  template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_sender_id(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_sender_id();
-  PROTOBUF_NODISCARD std::string* release_sender_id();
-  void set_allocated_sender_id(std::string* sender_id);
-  private:
-  const std::string& _internal_sender_id() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_sender_id(const std::string& value);
-  std::string* _internal_mutable_sender_id();
-  public:
-
-  // string receiver_id = 8;
-  void clear_receiver_id();
-  const std::string& receiver_id() const;
-  template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_receiver_id(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_receiver_id();
-  PROTOBUF_NODISCARD std::string* release_receiver_id();
-  void set_allocated_receiver_id(std::string* receiver_id);
-  private:
-  const std::string& _internal_receiver_id() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_receiver_id(const std::string& value);
-  std::string* _internal_mutable_receiver_id();
-  public:
-
-  // uint32 chunk_index = 4;
+  // uint32 chunk_index = 3;
   void clear_chunk_index();
   uint32_t chunk_index() const;
   void set_chunk_index(uint32_t value);
@@ -297,7 +252,7 @@ class FileChunk final :
   void _internal_set_chunk_index(uint32_t value);
   public:
 
-  // uint32 total_chunks = 5;
+  // uint32 total_chunks = 4;
   void clear_total_chunks();
   uint32_t total_chunks() const;
   void set_total_chunks(uint32_t value);
@@ -306,7 +261,7 @@ class FileChunk final :
   void _internal_set_total_chunks(uint32_t value);
   public:
 
-  // bool is_last_chunk = 6;
+  // bool is_last_chunk = 5;
   void clear_is_last_chunk();
   bool is_last_chunk() const;
   void set_is_last_chunk(bool value);
@@ -324,10 +279,7 @@ class FileChunk final :
   typedef void DestructorSkippable_;
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr file_id_;
-    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr filename_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr data_;
-    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr sender_id_;
-    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr receiver_id_;
     uint32_t chunk_index_;
     uint32_t total_chunks_;
     bool is_last_chunk_;
@@ -759,57 +711,7 @@ inline void FileChunk::set_allocated_file_id(std::string* file_id) {
   // @@protoc_insertion_point(field_set_allocated:FileChunk.file_id)
 }
 
-// string filename = 2;
-inline void FileChunk::clear_filename() {
-  _impl_.filename_.ClearToEmpty();
-}
-inline const std::string& FileChunk::filename() const {
-  // @@protoc_insertion_point(field_get:FileChunk.filename)
-  return _internal_filename();
-}
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void FileChunk::set_filename(ArgT0&& arg0, ArgT... args) {
- 
- _impl_.filename_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:FileChunk.filename)
-}
-inline std::string* FileChunk::mutable_filename() {
-  std::string* _s = _internal_mutable_filename();
-  // @@protoc_insertion_point(field_mutable:FileChunk.filename)
-  return _s;
-}
-inline const std::string& FileChunk::_internal_filename() const {
-  return _impl_.filename_.Get();
-}
-inline void FileChunk::_internal_set_filename(const std::string& value) {
-  
-  _impl_.filename_.Set(value, GetArenaForAllocation());
-}
-inline std::string* FileChunk::_internal_mutable_filename() {
-  
-  return _impl_.filename_.Mutable(GetArenaForAllocation());
-}
-inline std::string* FileChunk::release_filename() {
-  // @@protoc_insertion_point(field_release:FileChunk.filename)
-  return _impl_.filename_.Release();
-}
-inline void FileChunk::set_allocated_filename(std::string* filename) {
-  if (filename != nullptr) {
-    
-  } else {
-    
-  }
-  _impl_.filename_.SetAllocated(filename, GetArenaForAllocation());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (_impl_.filename_.IsDefault()) {
-    _impl_.filename_.Set("", GetArenaForAllocation());
-  }
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:FileChunk.filename)
-}
-
-// bytes data = 3;
+// bytes data = 2;
 inline void FileChunk::clear_data() {
   _impl_.data_.ClearToEmpty();
 }
@@ -859,7 +761,7 @@ inline void FileChunk::set_allocated_data(std::string* data) {
   // @@protoc_insertion_point(field_set_allocated:FileChunk.data)
 }
 
-// uint32 chunk_index = 4;
+// uint32 chunk_index = 3;
 inline void FileChunk::clear_chunk_index() {
   _impl_.chunk_index_ = 0u;
 }
@@ -879,7 +781,7 @@ inline void FileChunk::set_chunk_index(uint32_t value) {
   // @@protoc_insertion_point(field_set:FileChunk.chunk_index)
 }
 
-// uint32 total_chunks = 5;
+// uint32 total_chunks = 4;
 inline void FileChunk::clear_total_chunks() {
   _impl_.total_chunks_ = 0u;
 }
@@ -899,7 +801,7 @@ inline void FileChunk::set_total_chunks(uint32_t value) {
   // @@protoc_insertion_point(field_set:FileChunk.total_chunks)
 }
 
-// bool is_last_chunk = 6;
+// bool is_last_chunk = 5;
 inline void FileChunk::clear_is_last_chunk() {
   _impl_.is_last_chunk_ = false;
 }
@@ -917,106 +819,6 @@ inline void FileChunk::_internal_set_is_last_chunk(bool value) {
 inline void FileChunk::set_is_last_chunk(bool value) {
   _internal_set_is_last_chunk(value);
   // @@protoc_insertion_point(field_set:FileChunk.is_last_chunk)
-}
-
-// string sender_id = 7;
-inline void FileChunk::clear_sender_id() {
-  _impl_.sender_id_.ClearToEmpty();
-}
-inline const std::string& FileChunk::sender_id() const {
-  // @@protoc_insertion_point(field_get:FileChunk.sender_id)
-  return _internal_sender_id();
-}
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void FileChunk::set_sender_id(ArgT0&& arg0, ArgT... args) {
- 
- _impl_.sender_id_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:FileChunk.sender_id)
-}
-inline std::string* FileChunk::mutable_sender_id() {
-  std::string* _s = _internal_mutable_sender_id();
-  // @@protoc_insertion_point(field_mutable:FileChunk.sender_id)
-  return _s;
-}
-inline const std::string& FileChunk::_internal_sender_id() const {
-  return _impl_.sender_id_.Get();
-}
-inline void FileChunk::_internal_set_sender_id(const std::string& value) {
-  
-  _impl_.sender_id_.Set(value, GetArenaForAllocation());
-}
-inline std::string* FileChunk::_internal_mutable_sender_id() {
-  
-  return _impl_.sender_id_.Mutable(GetArenaForAllocation());
-}
-inline std::string* FileChunk::release_sender_id() {
-  // @@protoc_insertion_point(field_release:FileChunk.sender_id)
-  return _impl_.sender_id_.Release();
-}
-inline void FileChunk::set_allocated_sender_id(std::string* sender_id) {
-  if (sender_id != nullptr) {
-    
-  } else {
-    
-  }
-  _impl_.sender_id_.SetAllocated(sender_id, GetArenaForAllocation());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (_impl_.sender_id_.IsDefault()) {
-    _impl_.sender_id_.Set("", GetArenaForAllocation());
-  }
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:FileChunk.sender_id)
-}
-
-// string receiver_id = 8;
-inline void FileChunk::clear_receiver_id() {
-  _impl_.receiver_id_.ClearToEmpty();
-}
-inline const std::string& FileChunk::receiver_id() const {
-  // @@protoc_insertion_point(field_get:FileChunk.receiver_id)
-  return _internal_receiver_id();
-}
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void FileChunk::set_receiver_id(ArgT0&& arg0, ArgT... args) {
- 
- _impl_.receiver_id_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:FileChunk.receiver_id)
-}
-inline std::string* FileChunk::mutable_receiver_id() {
-  std::string* _s = _internal_mutable_receiver_id();
-  // @@protoc_insertion_point(field_mutable:FileChunk.receiver_id)
-  return _s;
-}
-inline const std::string& FileChunk::_internal_receiver_id() const {
-  return _impl_.receiver_id_.Get();
-}
-inline void FileChunk::_internal_set_receiver_id(const std::string& value) {
-  
-  _impl_.receiver_id_.Set(value, GetArenaForAllocation());
-}
-inline std::string* FileChunk::_internal_mutable_receiver_id() {
-  
-  return _impl_.receiver_id_.Mutable(GetArenaForAllocation());
-}
-inline std::string* FileChunk::release_receiver_id() {
-  // @@protoc_insertion_point(field_release:FileChunk.receiver_id)
-  return _impl_.receiver_id_.Release();
-}
-inline void FileChunk::set_allocated_receiver_id(std::string* receiver_id) {
-  if (receiver_id != nullptr) {
-    
-  } else {
-    
-  }
-  _impl_.receiver_id_.SetAllocated(receiver_id, GetArenaForAllocation());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (_impl_.receiver_id_.IsDefault()) {
-    _impl_.receiver_id_.Set("", GetArenaForAllocation());
-  }
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:FileChunk.receiver_id)
 }
 
 // -------------------------------------------------------------------

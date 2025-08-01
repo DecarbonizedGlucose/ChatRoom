@@ -10,7 +10,7 @@ using json = nlohmann::json;
 用户在线状态：
 chat:user:<user_id>:status -> JSON字符串 {
     "online" : true/false,
-    "last_active" : <timestamp> // Unix时间戳，用于心跳检测
+    "last_active" : <timestamp> // Unix时间戳, 用于心跳检测
 }
 
 用户验证码（邮箱验证）：
@@ -68,7 +68,7 @@ public:
 
     // 加载用户关系数据到Redis缓存
     // relation_data: 来自get_relation_net的好友和群组数据（不使用其中的blocked字段）
-    // blocked_by_data: 专门的被屏蔽状态数据，存储到friends缓存中
+    // blocked_by_data: 专门的被屏蔽状态数据, 存储到friends缓存中
     bool load_user_relations(const std::string& user_ID, json& relation_data, const json& blocked_by_data = json{});
 
     // 从Redis缓存中卸载用户关系数据

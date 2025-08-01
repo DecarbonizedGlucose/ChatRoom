@@ -3,9 +3,7 @@ add_library(global STATIC
     abstract/command.pb.cc
     abstract/data.pb.cc
     abstract/envelope.pb.cc
-    abstract/file.pb.cc
     abstract/message.pb.cc
-    entity/message.cpp
     entity/file.cpp
     abstract/datatypes.cpp
 )

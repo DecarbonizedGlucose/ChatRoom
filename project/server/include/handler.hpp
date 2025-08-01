@@ -65,9 +65,6 @@ private:
     void handle_send_veri_code(
         TcpServerConnection* conn,
         std::string subj);
-    void handle_find_password();
-    void handle_change_password();
-    void handle_change_username();
     void handle_authentication(
         TcpServerConnection* conn,
         const std::string& email,
@@ -93,6 +90,12 @@ private:
     void handle_search_person(
         TcpServerConnection* conn,
         const std::string& searched_ID);
+    void handle_block_friend(
+        const std::string& user_ID,
+        const std::string& friend_ID);
+    void handle_unblock_friend(
+        const std::string& user_ID,
+        const std::string& friend_ID);
     void handle_create_group(
         const std::string& user_ID,
         const std::string& time,
@@ -107,8 +110,12 @@ private:
         const std::string& group_ID);
     void handle_add_admin();
     void handle_remove_admin();
-    void handle_update_relation_net(const std::string& user_ID);
-    void handle_download_file();
+    void handle_upload_file(
+        TcpServerConnection* conn,
+        const std::string& file_hash);
+    void handle_download_file(
+        const std::string& user_ID,
+        const std::string& file_ID);
     void handle_remember_connection(
         TcpServerConnection* conn,
         const std::string& user_ID,

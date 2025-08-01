@@ -3,15 +3,11 @@ syntax = "proto3";
 import "message.proto";
 
 message FileChunk {
-  string file_id = 1;             // 文件唯一标识（可使用UUID）
-  string filename = 2;            // 原始文件名
-  bytes data = 3;                 // 实际数据内容（建议 64KB 以下）
-
-  uint32 chunk_index = 4;         // 当前分片序号（从0开始）
-  uint32 total_chunks = 5;        // 总分片数量
-  bool is_last_chunk = 6;         // 可选标志
-  string sender_id = 7;
-  string receiver_id = 8;
+  string file_id = 1;             // 文件唯一标识（作为服务端的文件名）
+  bytes data = 2;                 // 实际数据内容（建议 64KB 以下）
+  uint32 chunk_index = 3;         // 当前分片序号（从0开始）
+  uint32 total_chunks = 4;        // 总分片数量
+  bool is_last_chunk = 5;         // 可选标志
 }
 
 message SyncItem {

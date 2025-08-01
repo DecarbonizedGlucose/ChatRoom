@@ -21,7 +21,7 @@ namespace {
 
         const char* home = std::getenv("HOME");
         if (!home) {
-            // 如果没有HOME环境变量，尝试使用用户主目录
+            // 如果没有HOME环境变量, 尝试使用用户主目录
             home = std::getenv("USERPROFILE"); // Windows
             if (!home) {
                 throw std::runtime_error("Cannot determine home directory");
@@ -35,7 +35,7 @@ namespace {
             // ~/something 格式
             return std::string(home) + path.substr(1);
         } else {
-            // ~username 格式，暂不支持，直接返回原路径
+            // ~username 格式, 暂不支持, 直接返回原路径
             return path;
         }
     }
@@ -396,6 +396,28 @@ std::string SQLiteController::get_cached_group_name(const std::string& group_ID)
     );
 }
 
+bool SQLiteController::is_group_member(const std::string& group_ID, const std::string& user_ID) {
+    return query_single<bool>(
+        "SELECT COUNT(*) > 0 FROM group_members WHERE group_id = ? AND user_id = ?",
+        "Check group membership",
+        false,
+        [](SQLite::Statement& stmt) { return stmt.getColumn(0).getInt() != 0; },
+        group_ID,
+        user_ID
+    );
+}
+
+bool SQLiteController::is_group_admin(const std::string& group_ID, const std::string& user_ID) {
+    return query_single<bool>(
+        "SELECT is_admin FROM group_members WHERE group_id = ? AND user_id = ?",
+        "Check group admin status",
+        false,
+        [](SQLite::Statement& stmt) { return stmt.getColumn(0).getInt() != 0; },
+        group_ID,
+        user_ID
+    );
+}
+
 /* ---------- 聊天记录缓存 ---------- */
 
 bool SQLiteController::cache_chat_message(
@@ -427,7 +449,7 @@ bool SQLiteController::cache_chat_message(
         stmt.bind(5, text_content);
         stmt.bind(6, pin ? 1 : 0);
 
-        // 绑定文件相关字段，如果没有文件则为NULL
+        // 绑定文件相关字段, 如果没有文件则为NULL
         if (pin && !file_name.empty()) {
             stmt.bind(7, file_name);
             stmt.bind(8, (int64_t)file_size);

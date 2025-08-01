@@ -50,7 +50,7 @@ void QQMailSender::set_content(const std::string& subject,
                                const std::vector<std::string>& to,
                                const std::string& body) {
     if (!curl_) {
-        log_error("CURL未初始化，无法设置邮件内容");
+        log_error("CURL未初始化, 无法设置邮件内容");
         return;
     }
 

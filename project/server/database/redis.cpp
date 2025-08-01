@@ -74,7 +74,7 @@ bool RedisController::load_user_relations(const std::string& user_ID, json& rela
             redis_conn.expire(friends_key, 24 * 3600); // 24小时过期
         }
 
-        // 缓存群组信息 - relation_data["groups"] 是数组格式，包含完整群组信息
+        // 缓存群组信息 - relation_data["groups"] 是数组格式, 包含完整群组信息
         if (relation_data.contains("groups") && relation_data["groups"].is_array()) {
             std::string groups_key = "chat:user:" + user_ID + ":groups";
             redis_conn.del(groups_key); // 清空现有数据
@@ -192,7 +192,7 @@ bool RedisController::is_blocked_by_friend(const std::string& user_ID, const std
         std::string key = "chat:user:" + user_ID + ":friends";
         auto result = redis_conn.hget(key, friend_ID);
         if (!result) {
-            return false; // 缓存中没有该好友信息，返回false
+            return false; // 缓存中没有该好友信息, 返回false
         }
         return *result == "1"; // "1"表示被屏蔽
     } catch (const std::exception& e) {
@@ -304,7 +304,7 @@ bool RedisController::cache_group_members(const std::string& group_ID, const std
             }
         }
 
-        // 群组信息持久化，不设置过期时间
+        // 群组信息持久化, 不设置过期时间
         log_debug("Cached {} members for group {}", members.size(), group_ID);
         return true;
     } catch (const std::exception& e) {
@@ -324,7 +324,7 @@ bool RedisController::cache_group_admins(const std::string& group_ID, const std:
             }
         }
 
-        // 群组信息持久化，不设置过期时间
+        // 群组信息持久化, 不设置过期时间
         log_debug("Cached {} admins for group {}", admins.size(), group_ID);
         return true;
     } catch (const std::exception& e) {
@@ -348,7 +348,7 @@ bool RedisController::cache_group_info(const std::string& group_ID, const json& 
             redis_conn.hset(key, "member_count", std::to_string(group_info["member_count"].get<int>()));
         }
 
-        // 群组信息持久化，不设置过期时间
+        // 群组信息持久化, 不设置过期时间
         log_debug("Cached info for group {}", group_ID);
         return true;
     } catch (const std::exception& e) {

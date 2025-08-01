@@ -1,91 +1,472 @@
 #include "../include/file.hpp"
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdexcept>
-#include <fstream>
-#include <sstream>
-#include <iomanip>
+#include "../include/logging.hpp"
 #include <openssl/sha.h>
+#include <openssl/evp.h>
+#include <iomanip>
+#include <sstream>
+#include <filesystem>
+#include <cmath>
 
-File::File(const std::string& local_path)
-    : local_path(local_path), file_size(0) {}
+// 全局文件传输管理器实例
+FileTransferManager g_file_manager;
 
-File::File(const std::string& file_name, const std::string& local_path)
-    : file_name(file_name), local_path(local_path), file_size(0) {}
+// ============ File 基类实现 ============
 
-FilePtr get_fileptr(const std::string& local_path) {
-    if (local_path.empty()) {
-        return nullptr;
+File::File(const std::string& name, const std::string& hash, size_t size)
+    : file_name(name), file_hash(hash), file_size(size) {}
+
+std::string File::calculate_hash(const std::string& file_path) {
+    std::ifstream file(file_path, std::ios::binary);
+    if (!file.is_open()) {
+        log_error("Failed to open file for hash calculation: {}", file_path);
+        return "";
     }
-    int fd = open(local_path.c_str(), O_RDONLY);
-    if (fd < 0) {
-        return nullptr;
+
+    EVP_MD_CTX* context = EVP_MD_CTX_new();
+    if (!context) {
+        log_error("Failed to create EVP context");
+        return "";
     }
-    struct stat file_stat;
-    off_t file_size = 0;
-    if (fstat(fd, &file_stat) == 0) {
-        file_size = file_stat.st_size;
-    } else {
-        close(fd);
-        return nullptr;
+
+    if (EVP_DigestInit_ex(context, EVP_sha256(), nullptr) != 1) {
+        log_error("Failed to initialize SHA256");
+        EVP_MD_CTX_free(context);
+        return "";
     }
-    close(fd);
-    FilePtr file_ptr = std::make_shared<File>(local_path);
-    file_ptr->fd = fd;
-    file_ptr->file_size = file_size;
-    file_ptr->file_name = local_path.substr(local_path.find_last_of('/') + 1);
-    if (!file_ptr->calc_hash() || file_ptr->file_hash.empty()) {
-        file_ptr.reset();
-        return nullptr; // 计算哈希失败
+
+    char buffer[8192];
+    while (file.read(buffer, sizeof(buffer))) {
+        if (EVP_DigestUpdate(context, buffer, file.gcount()) != 1) {
+            log_error("Failed to update hash");
+            EVP_MD_CTX_free(context);
+            return "";
+        }
     }
-    return file_ptr;
+
+    // 处理最后一次读取的数据
+    if (file.gcount() > 0) {
+        if (EVP_DigestUpdate(context, buffer, file.gcount()) != 1) {
+            log_error("Failed to update hash");
+            EVP_MD_CTX_free(context);
+            return "";
+        }
+    }
+
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    if (EVP_DigestFinal_ex(context, hash, &hash_len) != 1) {
+        log_error("Failed to finalize hash");
+        EVP_MD_CTX_free(context);
+        return "";
+    }
+
+    EVP_MD_CTX_free(context);
+
+    // 转换为十六进制字符串
+    std::stringstream ss;
+    for (unsigned int i = 0; i < hash_len; ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+    }
+
+    return ss.str();
 }
 
-FilePtr make_fileptr(const std::string& local_path) {
-    if (local_path.empty()) {
-        return nullptr;
-    }
-    int fd = open(local_path.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666);
-    if (fd < 0) {
-        return nullptr;
-    }
-    FilePtr file_ptr = std::make_shared<File>(local_path);
-    file_ptr->fd = fd;
-    file_ptr->file_size = 0;
-    file_ptr->file_name = local_path.substr(local_path.find_last_of('/') + 1);
-    return file_ptr;
+size_t File::get_total_chunks() const {
+    return (file_size + CHUNK_SIZE - 1) / CHUNK_SIZE; // 向上取整
 }
 
-bool File::calc_hash() {
-    std::ifstream _file(local_path, std::ios::binary);
-    if (!_file) return false;
+// ============ ClientFile 实现 ============
 
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-
-    const size_t buf_size = 4096;
-    char buffer[buf_size];
-    while (_file.read(buffer, buf_size)) {
-        SHA256_Update(&ctx, buffer, _file.gcount());
+ClientFile::ClientFile(const std::string& path) : local_path(path) {
+    if (!std::filesystem::exists(path)) {
+        log_error("File does not exist: {}", path);
+        status = FileStatus::FAILED;
+        return;
     }
-    SHA256_Update(&ctx, buffer, _file.gcount()); // 处理最后一块
 
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_Final(hash, &ctx);
+    // 获取文件信息
+    file_name = std::filesystem::path(path).filename().string();
+    file_size = std::filesystem::file_size(path);
+    file_hash = calculate_hash(path);
 
-    std::ostringstream out;
-    for (unsigned char byte : hash)
-        out << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
+    if (file_hash.empty()) {
+        status = FileStatus::FAILED;
+        return;
+    }
 
-    file_hash = out.str(); // 64位
+    status = FileStatus::PENDING;
+    log_info("Created ClientFile for upload: {} (size: {}, hash: {})",
+             file_name, file_size, file_hash);
+}
+
+ClientFile::ClientFile(const std::string& name, const std::string& save_path,
+                       const std::string& hash, size_t size)
+    : File(name, hash, size), local_path(save_path) {
+    status = FileStatus::PENDING;
+    log_info("Created ClientFile for download: {} -> {}", name, save_path);
+}
+
+ClientFile::~ClientFile() {
+    if (input_stream.is_open()) {
+        input_stream.close();
+    }
+    if (output_stream.is_open()) {
+        output_stream.close();
+    }
+}
+
+bool ClientFile::open_for_read() {
+    if (input_stream.is_open()) {
+        input_stream.close();
+    }
+
+    input_stream.open(local_path, std::ios::binary);
+    if (!input_stream.is_open()) {
+        log_error("Failed to open file for reading: {}", local_path);
+        status = FileStatus::FAILED;
+        return false;
+    }
+
+    status = FileStatus::UPLOADING;
+    current_chunk = 0;
     return true;
 }
 
-ChatFilePtr getChatFilePtr(const FilePtr& file) {
-    ChatFilePtr chat_file = std::make_shared<ChatFile>();
-    chat_file->set_type("file");
-    chat_file->set_file_name(file->file_name);
-    chat_file->set_file_hash(file->file_hash);
-    return chat_file;
+std::vector<char> ClientFile::read_next_chunk() {
+    std::vector<char> chunk(CHUNK_SIZE);
+
+    if (!input_stream.is_open() || !has_more_chunks()) {
+        return {};
+    }
+
+    input_stream.read(chunk.data(), CHUNK_SIZE);
+    std::streamsize bytes_read = input_stream.gcount();
+
+    if (bytes_read > 0) {
+        chunk.resize(bytes_read);
+        current_chunk++;
+        log_debug("Read chunk {}/{} ({} bytes) from {}",
+                  current_chunk, get_total_chunks(), bytes_read, file_name);
+        return chunk;
+    }
+
+    return {};
+}
+
+bool ClientFile::has_more_chunks() const {
+    return current_chunk < get_total_chunks();
+}
+
+bool ClientFile::open_for_write() {
+    // 确保目录存在
+    std::filesystem::path file_path(local_path);
+    std::filesystem::create_directories(file_path.parent_path());
+
+    if (output_stream.is_open()) {
+        output_stream.close();
+    }
+
+    output_stream.open(local_path, std::ios::binary);
+    if (!output_stream.is_open()) {
+        log_error("Failed to open file for writing: {}", local_path);
+        status = FileStatus::FAILED;
+        return false;
+    }
+
+    status = FileStatus::DOWNLOADING;
+    return true;
+}
+
+bool ClientFile::write_chunk(const std::vector<char>& data, size_t chunk_index) {
+    if (!output_stream.is_open()) {
+        log_error("Output stream not open for file: {}", file_name);
+        return false;
+    }
+
+    // 计算应该写入的位置
+    std::streampos pos = static_cast<std::streampos>(chunk_index * CHUNK_SIZE);
+    output_stream.seekp(pos);
+
+    output_stream.write(data.data(), data.size());
+    if (output_stream.fail()) {
+        log_error("Failed to write chunk {} to file: {}", chunk_index, file_name);
+        status = FileStatus::FAILED;
+        return false;
+    }
+
+    log_debug("Wrote chunk {} ({} bytes) to {}", chunk_index, data.size(), file_name);
+    return true;
+}
+
+bool ClientFile::finalize_download() {
+    if (output_stream.is_open()) {
+        output_stream.close();
+    }
+
+    // 验证文件hash
+    std::string actual_hash = calculate_hash(local_path);
+    if (actual_hash != file_hash) {
+        log_error("Hash mismatch for downloaded file: {} (expected: {}, actual: {})",
+                  file_name, file_hash, actual_hash);
+        status = FileStatus::FAILED;
+        return false;
+    }
+
+    status = FileStatus::COMPLETED;
+    log_info("Successfully downloaded file: {} -> {}", file_name, local_path);
+    return true;
+}
+
+double ClientFile::get_progress() const {
+    if (get_total_chunks() == 0) return 0.0;
+    return static_cast<double>(current_chunk) / get_total_chunks();
+}
+
+// ============ ServerFile 实现 ============
+
+ServerFile::ServerFile(const std::string& hash, const std::string& file_id,
+                       const std::string& name, size_t size)
+    : File(name, hash, size) {
+    this->file_id = file_id;
+
+    // 设置服务端存储路径
+    storage_path = "./files/" + hash.substr(0, 2) + "/" + hash;
+
+    // 初始化分片接收状态
+    size_t total_chunks = get_total_chunks();
+    received_chunks.resize(total_chunks, false);
+
+    log_info("Created ServerFile: {} (id: {}, chunks: {})", name, file_id, total_chunks);
+}
+
+ServerFile::~ServerFile() {
+    if (input_stream.is_open()) {
+        input_stream.close();
+    }
+    if (output_stream.is_open()) {
+        output_stream.close();
+    }
+}
+
+bool ServerFile::open_for_write() {
+    // 确保存储目录存在
+    std::filesystem::path file_path(storage_path);
+    std::filesystem::create_directories(file_path.parent_path());
+
+    if (output_stream.is_open()) {
+        output_stream.close();
+    }
+
+    output_stream.open(storage_path, std::ios::binary);
+    if (!output_stream.is_open()) {
+        log_error("Failed to open file for writing: {}", storage_path);
+        status = FileStatus::FAILED;
+        return false;
+    }
+
+    status = FileStatus::UPLOADING;
+    return true;
+}
+
+bool ServerFile::write_chunk(const std::vector<char>& data, size_t chunk_index) {
+    if (!output_stream.is_open()) {
+        log_error("Output stream not open for server file: {}", file_name);
+        return false;
+    }
+
+    if (chunk_index >= received_chunks.size()) {
+        log_error("Invalid chunk index: {} (max: {})", chunk_index, received_chunks.size());
+        return false;
+    }
+
+    // 如果这个分片已经接收过了，跳过
+    if (received_chunks[chunk_index]) {
+        log_debug("Chunk {} already received for file: {}", chunk_index, file_name);
+        return true;
+    }
+
+    // 计算写入位置
+    std::streampos pos = static_cast<std::streampos>(chunk_index * CHUNK_SIZE);
+    output_stream.seekp(pos);
+
+    output_stream.write(data.data(), data.size());
+    if (output_stream.fail()) {
+        log_error("Failed to write chunk {} to server file: {}", chunk_index, file_name);
+        status = FileStatus::FAILED;
+        return false;
+    }
+
+    // 标记分片已接收
+    received_chunks[chunk_index] = true;
+    received_count++;
+
+    log_debug("Received chunk {}/{} for file: {}",
+              chunk_index + 1, received_chunks.size(), file_name);
+    return true;
+}
+
+bool ServerFile::is_complete() const {
+    return received_count == received_chunks.size();
+}
+
+bool ServerFile::finalize_upload() {
+    if (output_stream.is_open()) {
+        output_stream.close();
+    }
+
+    if (!is_complete()) {
+        log_error("File upload incomplete: {}/{} chunks received",
+                  received_count, received_chunks.size());
+        status = FileStatus::FAILED;
+        return false;
+    }
+
+    // 验证文件hash
+    std::string actual_hash = calculate_hash(storage_path);
+    if (actual_hash != file_hash) {
+        log_error("Hash mismatch for uploaded file: {} (expected: {}, actual: {})",
+                  file_name, file_hash, actual_hash);
+        status = FileStatus::FAILED;
+        return false;
+    }
+
+    status = FileStatus::COMPLETED;
+    log_info("Successfully received file: {} (id: {})", file_name, file_id);
+    return true;
+}
+
+bool ServerFile::open_for_read() {
+    if (input_stream.is_open()) {
+        input_stream.close();
+    }
+
+    input_stream.open(storage_path, std::ios::binary);
+    if (!input_stream.is_open()) {
+        log_error("Failed to open file for reading: {}", storage_path);
+        return false;
+    }
+
+    return true;
+}
+
+std::vector<char> ServerFile::read_chunk(size_t chunk_index) {
+    if (!input_stream.is_open()) {
+        log_error("Input stream not open for server file: {}", file_name);
+        return {};
+    }
+
+    // 计算读取位置和大小
+    std::streampos pos = static_cast<std::streampos>(chunk_index * CHUNK_SIZE);
+    size_t remaining_size = file_size - (chunk_index * CHUNK_SIZE);
+    size_t chunk_size = std::min(CHUNK_SIZE, remaining_size);
+
+    std::vector<char> chunk(chunk_size);
+
+    input_stream.seekg(pos);
+    input_stream.read(chunk.data(), chunk_size);
+
+    if (input_stream.gcount() != static_cast<std::streamsize>(chunk_size)) {
+        log_error("Failed to read chunk {} from server file: {}", chunk_index, file_name);
+        return {};
+    }
+
+    log_debug("Read chunk {} ({} bytes) from server file: {}",
+              chunk_index, chunk_size, file_name);
+    return chunk;
+}
+
+double ServerFile::get_receive_progress() const {
+    if (received_chunks.empty()) return 0.0;
+    return static_cast<double>(received_count) / received_chunks.size();
+}
+
+bool ServerFile::is_chunk_received(size_t chunk_index) const {
+    return chunk_index < received_chunks.size() && received_chunks[chunk_index];
+}
+
+// ============ FileTransferManager 实现 ============
+
+std::shared_ptr<ClientFile> FileTransferManager::create_upload_file(const std::string& file_path) {
+    auto client_file = std::make_shared<ClientFile>(file_path);
+    if (client_file->status == FileStatus::FAILED) {
+        return nullptr;
+    }
+
+    // 使用file_hash作为key存储
+    client_files[client_file->file_hash] = client_file;
+    return client_file;
+}
+
+std::shared_ptr<ClientFile> FileTransferManager::create_download_file(
+    const std::string& file_id, const std::string& file_name,
+    const std::string& save_path, const std::string& hash, size_t size) {
+
+    auto client_file = std::make_shared<ClientFile>(file_name, save_path, hash, size);
+    client_file->file_id = file_id;
+
+    client_files[file_id] = client_file;
+    return client_file;
+}
+
+std::shared_ptr<ServerFile> FileTransferManager::create_server_file(
+    const std::string& hash, const std::string& file_id,
+    const std::string& name, size_t size) {
+
+    auto server_file = std::make_shared<ServerFile>(hash, file_id, name, size);
+    server_files[file_id] = server_file;
+    return server_file;
+}
+
+bool FileTransferManager::remove_file(const std::string& file_id) {
+    bool removed = false;
+
+    auto client_it = client_files.find(file_id);
+    if (client_it != client_files.end()) {
+        client_files.erase(client_it);
+        removed = true;
+    }
+
+    auto server_it = server_files.find(file_id);
+    if (server_it != server_files.end()) {
+        server_files.erase(server_it);
+        removed = true;
+    }
+
+    return removed;
+}
+
+std::shared_ptr<File> FileTransferManager::get_file(const std::string& file_id) {
+    auto client_it = client_files.find(file_id);
+    if (client_it != client_files.end()) {
+        return client_it->second;
+    }
+
+    auto server_it = server_files.find(file_id);
+    if (server_it != server_files.end()) {
+        return server_it->second;
+    }
+
+    return nullptr;
+}
+
+void FileTransferManager::cleanup_completed_files() {
+    // 清理已完成的客户端文件
+    for (auto it = client_files.begin(); it != client_files.end();) {
+        if (it->second->status == FileStatus::COMPLETED ||
+            it->second->status == FileStatus::FAILED) {
+            it = client_files.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // 清理已完成的服务端文件
+    for (auto it = server_files.begin(); it != server_files.end();) {
+        if (it->second->status == FileStatus::COMPLETED ||
+            it->second->status == FileStatus::FAILED) {
+            it = server_files.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }

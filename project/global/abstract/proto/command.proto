@@ -2,7 +2,7 @@ syntax = "proto3";
 
 // 命令请求
 message CommandRequest {
-    int32 action = 1;           // 命令类型，整数
+    int32 action = 1;           // 命令类型, 整数
     string sender = 2;          // 发送者ID
-    repeated string args = 3;   // 可选参数，字符串数组
+    repeated string args = 3;   // 可选参数, 字符串数组
 }

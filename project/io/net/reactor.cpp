@@ -69,12 +69,12 @@ void event::remove_from_reactor() {
 //     ev.data.ptr = this;
 
 //     if (in_reactor) {
-//         // 如果已经在 reactor 中，使用 MOD
+//         // 如果已经在 reactor 中, 使用 MOD
 //         if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_MOD, fd, &ev) < 0) {
 //             throw std::runtime_error(std::string(__func__) + ": Failed to modify event in reactor - " + strerror(errno));
 //         }
 //     } else {
-//         // 如果不在 reactor 中，使用 ADD
+//         // 如果不在 reactor 中, 使用 ADD
 //         if (epoll_ctl(pr->get_epoll_fd(), EPOLL_CTL_ADD, fd, &ev) < 0) {
 //             throw std::runtime_error(std::string(__func__) + ": Failed to add event to reactor - " + strerror(errno));
 //         }
@@ -85,7 +85,7 @@ void event::remove_from_reactor() {
 void event::add_event_to_fd() {
     // log_debug("add_event_to_fd called: fd={}, events={:#x} (signed: {})", fd, (uint32_t)events, events);
 
-    // // 如果是写事件，检查 socket 状态
+    // // 如果是写事件, 检查 socket 状态
     // if (events & EPOLLOUT) {
     //     // 检查 socket 是否有效
     //     int error = 0;
@@ -140,7 +140,7 @@ void event::remove_event_from_fd() {
     if (pr->fd_events_map[fd] & events) {
         pr->fd_events_map[fd] &= ~events; // 移除事件
         if (pr->fd_events_map[fd] == 0) {
-            pr->fd_events_map.erase(fd); // 如果没有事件了，删除映射
+            pr->fd_events_map.erase(fd); // 如果没有事件了, 删除映射
             epoll_ctl(pr->epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
         } else {
             struct epoll_event ev = {0, {0}};

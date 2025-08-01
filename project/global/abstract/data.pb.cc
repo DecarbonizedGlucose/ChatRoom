@@ -23,10 +23,7 @@ namespace _pbi = _pb::internal;
 PROTOBUF_CONSTEXPR FileChunk::FileChunk(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.file_id_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.filename_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.data_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.sender_id_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.receiver_id_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.chunk_index_)*/0u
   , /*decltype(_impl_.total_chunks_)*/0u
   , /*decltype(_impl_.is_last_chunk_)*/false
@@ -80,13 +77,10 @@ const uint32_t TableStruct_data_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
   ~0u,  // no _weak_field_map_
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::FileChunk, _impl_.file_id_),
-  PROTOBUF_FIELD_OFFSET(::FileChunk, _impl_.filename_),
   PROTOBUF_FIELD_OFFSET(::FileChunk, _impl_.data_),
   PROTOBUF_FIELD_OFFSET(::FileChunk, _impl_.chunk_index_),
   PROTOBUF_FIELD_OFFSET(::FileChunk, _impl_.total_chunks_),
   PROTOBUF_FIELD_OFFSET(::FileChunk, _impl_.is_last_chunk_),
-  PROTOBUF_FIELD_OFFSET(::FileChunk, _impl_.sender_id_),
-  PROTOBUF_FIELD_OFFSET(::FileChunk, _impl_.receiver_id_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::SyncItem, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -106,8 +100,8 @@ const uint32_t TableStruct_data_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
 };
 static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::FileChunk)},
-  { 14, -1, -1, sizeof(::SyncItem)},
-  { 23, -1, -1, sizeof(::OfflineMessages)},
+  { 11, -1, -1, sizeof(::SyncItem)},
+  { 20, -1, -1, sizeof(::OfflineMessages)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -117,23 +111,22 @@ static const ::_pb::Message* const file_default_instances[] = {
 };
 
 const char descriptor_table_protodef_data_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\ndata.proto\032\rmessage.proto\"\246\001\n\tFileChun"
-  "k\022\017\n\007file_id\030\001 \001(\t\022\020\n\010filename\030\002 \001(\t\022\014\n\004"
-  "data\030\003 \001(\014\022\023\n\013chunk_index\030\004 \001(\r\022\024\n\014total"
-  "_chunks\030\005 \001(\r\022\025\n\ris_last_chunk\030\006 \001(\010\022\021\n\t"
-  "sender_id\030\007 \001(\t\022\023\n\013receiver_id\030\010 \001(\t\"\212\001\n"
-  "\010SyncItem\022 \n\004type\030\001 \001(\0162\022.SyncItem.SyncT"
-  "ype\022\017\n\007content\030\002 \001(\t\022\021\n\ttimestamp\030\003 \001(\003\""
-  "8\n\010SyncType\022\025\n\021RELATION_NET_FULL\020\000\022\025\n\021AL"
-  "L_FRIEND_STATUS\020\001\"1\n\017OfflineMessages\022\036\n\010"
-  "messages\030\001 \003(\0132\014.ChatMessageb\006proto3"
+  "\n\ndata.proto\032\rmessage.proto\"l\n\tFileChunk"
+  "\022\017\n\007file_id\030\001 \001(\t\022\014\n\004data\030\002 \001(\014\022\023\n\013chunk"
+  "_index\030\003 \001(\r\022\024\n\014total_chunks\030\004 \001(\r\022\025\n\ris"
+  "_last_chunk\030\005 \001(\010\"\212\001\n\010SyncItem\022 \n\004type\030\001"
+  " \001(\0162\022.SyncItem.SyncType\022\017\n\007content\030\002 \001("
+  "\t\022\021\n\ttimestamp\030\003 \001(\003\"8\n\010SyncType\022\025\n\021RELA"
+  "TION_NET_FULL\020\000\022\025\n\021ALL_FRIEND_STATUS\020\001\"1"
+  "\n\017OfflineMessages\022\036\n\010messages\030\001 \003(\0132\014.Ch"
+  "atMessageb\006proto3"
   ;
 static const ::_pbi::DescriptorTable* const descriptor_table_data_2eproto_deps[1] = {
   &::descriptor_table_message_2eproto,
 };
 static ::_pbi::once_flag descriptor_table_data_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_data_2eproto = {
-    false, false, 396, descriptor_table_protodef_data_2eproto,
+    false, false, 337, descriptor_table_protodef_data_2eproto,
     "data.proto",
     &descriptor_table_data_2eproto_once, descriptor_table_data_2eproto_deps, 1, 3,
     schemas, file_default_instances, TableStruct_data_2eproto::offsets,
@@ -185,10 +178,7 @@ FileChunk::FileChunk(const FileChunk& from)
   FileChunk* const _this = this; (void)_this;
   new (&_impl_) Impl_{
       decltype(_impl_.file_id_){}
-    , decltype(_impl_.filename_){}
     , decltype(_impl_.data_){}
-    , decltype(_impl_.sender_id_){}
-    , decltype(_impl_.receiver_id_){}
     , decltype(_impl_.chunk_index_){}
     , decltype(_impl_.total_chunks_){}
     , decltype(_impl_.is_last_chunk_){}
@@ -203,36 +193,12 @@ FileChunk::FileChunk(const FileChunk& from)
     _this->_impl_.file_id_.Set(from._internal_file_id(), 
       _this->GetArenaForAllocation());
   }
-  _impl_.filename_.InitDefault();
-  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    _impl_.filename_.Set("", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (!from._internal_filename().empty()) {
-    _this->_impl_.filename_.Set(from._internal_filename(), 
-      _this->GetArenaForAllocation());
-  }
   _impl_.data_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.data_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   if (!from._internal_data().empty()) {
     _this->_impl_.data_.Set(from._internal_data(), 
-      _this->GetArenaForAllocation());
-  }
-  _impl_.sender_id_.InitDefault();
-  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    _impl_.sender_id_.Set("", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (!from._internal_sender_id().empty()) {
-    _this->_impl_.sender_id_.Set(from._internal_sender_id(), 
-      _this->GetArenaForAllocation());
-  }
-  _impl_.receiver_id_.InitDefault();
-  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    _impl_.receiver_id_.Set("", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (!from._internal_receiver_id().empty()) {
-    _this->_impl_.receiver_id_.Set(from._internal_receiver_id(), 
       _this->GetArenaForAllocation());
   }
   ::memcpy(&_impl_.chunk_index_, &from._impl_.chunk_index_,
@@ -247,10 +213,7 @@ inline void FileChunk::SharedCtor(
   (void)is_message_owned;
   new (&_impl_) Impl_{
       decltype(_impl_.file_id_){}
-    , decltype(_impl_.filename_){}
     , decltype(_impl_.data_){}
-    , decltype(_impl_.sender_id_){}
-    , decltype(_impl_.receiver_id_){}
     , decltype(_impl_.chunk_index_){0u}
     , decltype(_impl_.total_chunks_){0u}
     , decltype(_impl_.is_last_chunk_){false}
@@ -260,21 +223,9 @@ inline void FileChunk::SharedCtor(
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.file_id_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  _impl_.filename_.InitDefault();
-  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    _impl_.filename_.Set("", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   _impl_.data_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.data_.Set("", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  _impl_.sender_id_.InitDefault();
-  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    _impl_.sender_id_.Set("", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  _impl_.receiver_id_.InitDefault();
-  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    _impl_.receiver_id_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
@@ -290,10 +241,7 @@ FileChunk::~FileChunk() {
 inline void FileChunk::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
   _impl_.file_id_.Destroy();
-  _impl_.filename_.Destroy();
   _impl_.data_.Destroy();
-  _impl_.sender_id_.Destroy();
-  _impl_.receiver_id_.Destroy();
 }
 
 void FileChunk::SetCachedSize(int size) const {
@@ -307,10 +255,7 @@ void FileChunk::Clear() {
   (void) cached_has_bits;
 
   _impl_.file_id_.ClearToEmpty();
-  _impl_.filename_.ClearToEmpty();
   _impl_.data_.ClearToEmpty();
-  _impl_.sender_id_.ClearToEmpty();
-  _impl_.receiver_id_.ClearToEmpty();
   ::memset(&_impl_.chunk_index_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.is_last_chunk_) -
       reinterpret_cast<char*>(&_impl_.chunk_index_)) + sizeof(_impl_.is_last_chunk_));
@@ -333,66 +278,36 @@ const char* FileChunk::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx
         } else
           goto handle_unusual;
         continue;
-      // string filename = 2;
+      // bytes data = 2;
       case 2:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
-          auto str = _internal_mutable_filename();
-          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
-          CHK_(ptr);
-          CHK_(::_pbi::VerifyUTF8(str, "FileChunk.filename"));
-        } else
-          goto handle_unusual;
-        continue;
-      // bytes data = 3;
-      case 3:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
           auto str = _internal_mutable_data();
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
-      // uint32 chunk_index = 4;
-      case 4:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
+      // uint32 chunk_index = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
           _impl_.chunk_index_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
-      // uint32 total_chunks = 5;
-      case 5:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
+      // uint32 total_chunks = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
           _impl_.total_chunks_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
-      // bool is_last_chunk = 6;
-      case 6:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 48)) {
+      // bool is_last_chunk = 5;
+      case 5:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
           _impl_.is_last_chunk_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
-      // string sender_id = 7;
-      case 7:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 58)) {
-          auto str = _internal_mutable_sender_id();
-          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
-          CHK_(ptr);
-          CHK_(::_pbi::VerifyUTF8(str, "FileChunk.sender_id"));
-        } else
-          goto handle_unusual;
-        continue;
-      // string receiver_id = 8;
-      case 8:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 66)) {
-          auto str = _internal_mutable_receiver_id();
-          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
-          CHK_(ptr);
-          CHK_(::_pbi::VerifyUTF8(str, "FileChunk.receiver_id"));
         } else
           goto handle_unusual;
         continue;
@@ -435,58 +350,28 @@ uint8_t* FileChunk::_InternalSerialize(
         1, this->_internal_file_id(), target);
   }
 
-  // string filename = 2;
-  if (!this->_internal_filename().empty()) {
-    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
-      this->_internal_filename().data(), static_cast<int>(this->_internal_filename().length()),
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
-      "FileChunk.filename");
-    target = stream->WriteStringMaybeAliased(
-        2, this->_internal_filename(), target);
-  }
-
-  // bytes data = 3;
+  // bytes data = 2;
   if (!this->_internal_data().empty()) {
     target = stream->WriteBytesMaybeAliased(
-        3, this->_internal_data(), target);
+        2, this->_internal_data(), target);
   }
 
-  // uint32 chunk_index = 4;
+  // uint32 chunk_index = 3;
   if (this->_internal_chunk_index() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteUInt32ToArray(4, this->_internal_chunk_index(), target);
+    target = ::_pbi::WireFormatLite::WriteUInt32ToArray(3, this->_internal_chunk_index(), target);
   }
 
-  // uint32 total_chunks = 5;
+  // uint32 total_chunks = 4;
   if (this->_internal_total_chunks() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteUInt32ToArray(5, this->_internal_total_chunks(), target);
+    target = ::_pbi::WireFormatLite::WriteUInt32ToArray(4, this->_internal_total_chunks(), target);
   }
 
-  // bool is_last_chunk = 6;
+  // bool is_last_chunk = 5;
   if (this->_internal_is_last_chunk() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteBoolToArray(6, this->_internal_is_last_chunk(), target);
-  }
-
-  // string sender_id = 7;
-  if (!this->_internal_sender_id().empty()) {
-    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
-      this->_internal_sender_id().data(), static_cast<int>(this->_internal_sender_id().length()),
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
-      "FileChunk.sender_id");
-    target = stream->WriteStringMaybeAliased(
-        7, this->_internal_sender_id(), target);
-  }
-
-  // string receiver_id = 8;
-  if (!this->_internal_receiver_id().empty()) {
-    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
-      this->_internal_receiver_id().data(), static_cast<int>(this->_internal_receiver_id().length()),
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
-      "FileChunk.receiver_id");
-    target = stream->WriteStringMaybeAliased(
-        8, this->_internal_receiver_id(), target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(5, this->_internal_is_last_chunk(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
@@ -512,45 +397,24 @@ size_t FileChunk::ByteSizeLong() const {
         this->_internal_file_id());
   }
 
-  // string filename = 2;
-  if (!this->_internal_filename().empty()) {
-    total_size += 1 +
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
-        this->_internal_filename());
-  }
-
-  // bytes data = 3;
+  // bytes data = 2;
   if (!this->_internal_data().empty()) {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::BytesSize(
         this->_internal_data());
   }
 
-  // string sender_id = 7;
-  if (!this->_internal_sender_id().empty()) {
-    total_size += 1 +
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
-        this->_internal_sender_id());
-  }
-
-  // string receiver_id = 8;
-  if (!this->_internal_receiver_id().empty()) {
-    total_size += 1 +
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
-        this->_internal_receiver_id());
-  }
-
-  // uint32 chunk_index = 4;
+  // uint32 chunk_index = 3;
   if (this->_internal_chunk_index() != 0) {
     total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(this->_internal_chunk_index());
   }
 
-  // uint32 total_chunks = 5;
+  // uint32 total_chunks = 4;
   if (this->_internal_total_chunks() != 0) {
     total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(this->_internal_total_chunks());
   }
 
-  // bool is_last_chunk = 6;
+  // bool is_last_chunk = 5;
   if (this->_internal_is_last_chunk() != 0) {
     total_size += 1 + 1;
   }
@@ -576,17 +440,8 @@ void FileChunk::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROT
   if (!from._internal_file_id().empty()) {
     _this->_internal_set_file_id(from._internal_file_id());
   }
-  if (!from._internal_filename().empty()) {
-    _this->_internal_set_filename(from._internal_filename());
-  }
   if (!from._internal_data().empty()) {
     _this->_internal_set_data(from._internal_data());
-  }
-  if (!from._internal_sender_id().empty()) {
-    _this->_internal_set_sender_id(from._internal_sender_id());
-  }
-  if (!from._internal_receiver_id().empty()) {
-    _this->_internal_set_receiver_id(from._internal_receiver_id());
   }
   if (from._internal_chunk_index() != 0) {
     _this->_internal_set_chunk_index(from._internal_chunk_index());
@@ -621,20 +476,8 @@ void FileChunk::InternalSwap(FileChunk* other) {
       &other->_impl_.file_id_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
-      &_impl_.filename_, lhs_arena,
-      &other->_impl_.filename_, rhs_arena
-  );
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.data_, lhs_arena,
       &other->_impl_.data_, rhs_arena
-  );
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
-      &_impl_.sender_id_, lhs_arena,
-      &other->_impl_.sender_id_, rhs_arena
-  );
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
-      &_impl_.receiver_id_, lhs_arena,
-      &other->_impl_.receiver_id_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(FileChunk, _impl_.is_last_chunk_)

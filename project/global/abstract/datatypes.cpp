@@ -9,6 +9,7 @@ ChatMessage create_chat_message(
     const std::string& sender,
     const std::string& receiver,
     const bool is_group_msg,
+    const std::time_t timestamp,
     const std::string& text,
     const bool pin,
     const std::string& file_name,
@@ -19,10 +20,10 @@ ChatMessage create_chat_message(
     msg.set_sender(sender);
     msg.set_receiver(receiver);
     msg.set_is_group(is_group_msg);
-    msg.set_timestamp(std::time(nullptr));  // 设置当前时间戳
+    msg.set_timestamp(timestamp);
     msg.set_text(text);
     msg.set_pin(pin);
-    // 如果有文件附件，设置 FilePayload
+    // 如果有文件附件, 设置 FilePayload
     if (pin && !file_name.empty()) {
         FilePayload* payload = msg.mutable_payload();
         payload->set_file_name(file_name);
@@ -46,13 +47,14 @@ std::string create_message_string(
     const std::string& sender,
     const std::string& receiver,
     const bool is_group_msg,
+    const std::time_t timestamp,
     const std::string& text,
     const bool pin,
     const std::string& file_name,
     const std::size_t file_size,
     const std::string& file_hash
 ) {
-    auto msg = create_chat_message(sender, receiver, is_group_msg, text,
+    auto msg = create_chat_message(sender, receiver, is_group_msg, timestamp, text,
                                    pin, file_name, file_size, file_hash);
     return get_message_string(msg);
 }
@@ -104,7 +106,7 @@ std::string get_command_string(const CommandRequest& cmd) {
     google::protobuf::Any any;
     any.PackFrom(cmd);
     Envelope env;
-    env.mutable_payload()->CopyFrom(any); // 只用 CopyFrom，不要 PackFrom
+    env.mutable_payload()->CopyFrom(any); // 只用 CopyFrom, 不要 PackFrom
     //std::cout << "打包测试类型[" << env.payload().type_url() << "]" << std::endl; // 调试输出
     std::string env_out;
     env.SerializeToString(&env_out);
@@ -155,7 +157,7 @@ SyncItem create_sync_item(
     item.set_type(type);
     item.set_content(content);
     if (timestamp == 0) {
-        timestamp = std::time(nullptr); // 如果没有提供时间戳，使用当前时间
+        timestamp = std::time(nullptr); // 如果没有提供时间戳, 使用当前时间
     }
     item.set_timestamp(timestamp);
     return item;
@@ -194,3 +196,40 @@ SyncItem get_sync_item(const std::string& proto_str) {
 }
 
 /* ---------- OfflineMessage ---------- */
+
+OfflineMessages create_offline_messages(const std::vector<ChatMessage>& messages) {
+    OfflineMessages offline_msgs;
+    for (const auto& msg : messages) {
+        ChatMessage* new_msg = offline_msgs.add_messages();
+        new_msg->CopyFrom(msg);
+    }
+    return offline_msgs;
+}
+
+std::string get_offline_messages_string(const OfflineMessages& offline_msgs) {
+    google::protobuf::Any any;
+    any.PackFrom(offline_msgs);
+    Envelope env;
+    env.mutable_payload()->CopyFrom(any);
+    std::string env_out;
+    env.SerializeToString(&env_out);
+    return env_out;
+}
+
+std::string create_offline_messages_string(const std::vector<ChatMessage>& messages) {
+    auto offline_msgs = create_offline_messages(messages);
+    return get_offline_messages_string(offline_msgs);
+}
+
+OfflineMessages get_offline_messages(const std::string& proto_str) {
+    Envelope env;
+    if (!env.ParseFromString(proto_str)) {
+        throw std::runtime_error("Failed to parse Envelope from received data");
+    }
+    const google::protobuf::Any& any = env.payload();
+    OfflineMessages offline_msgs;
+    if (!any.UnpackTo(&offline_msgs)) {
+        throw std::runtime_error("Failed to unpack Any to OfflineMessages");
+    }
+    return offline_msgs;
+}

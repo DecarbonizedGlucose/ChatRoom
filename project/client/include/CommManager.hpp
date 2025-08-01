@@ -57,10 +57,10 @@ public:
     safe_queue<ChatMessage> messages;
 
     // 会话排序管理（实时更新的消息列表顺序）
-    // 原理：当有新消息时，将对应会话移到列表开头，实现类似QQ/微信的效果
+    // 原理：当有新消息时, 将对应会话移到列表开头, 实现类似QQ/微信的效果
     std::vector<std::string> sorted_conversation_list;
 
-    // 更新会话排序（有新消息时调用，自动将会话置顶）
+    // 更新会话排序（有新消息时调用, 自动将会话置顶）
     void update_conversation_order(const std::string& conversation_id);
 
     // 获取排序后的会话列表（UI显示用）
@@ -102,16 +102,19 @@ public:
     void handle_send_command(Action action, const std::string& sender, std::initializer_list<std::string> args, bool nb = true);
 
     // others
-    void handle_get_relation_net(); // 不发请求，主动拉取，不知道发来什么
+    void handle_get_relation_net(); // 不发请求, 主动拉取, 不知道发来什么
     void handle_send_id();
     void handle_get_chat_history();
     void handle_add_friend(const std::string& friend_ID);
     void handle_remove_friend(const std::string& friend_ID);
+    void handle_block_friend(const std::string& friend_ID);
+    void handle_unblock_friend(const std::string& friend_ID);
     void handle_get_friend_status();
-    void handle_join_group(
-        const std::string& user_ID,
-        const std::string& group_ID
-    );
+    void handle_join_group(const std::string& group_ID);
+    void handle_create_group(const std::string& group_ID, const std::string& group_name);
+    void handle_leave_group(const std::string& group_ID);
+    void handle_add_admin(const std::string& group_ID, const std::string& user_ID);
+    void handle_remove_admin(const std::string& group_ID, const std::string& user_ID);
     void handle_reply_heartbeat();
 
     // 会话管理

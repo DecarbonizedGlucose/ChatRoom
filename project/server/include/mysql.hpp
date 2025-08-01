@@ -96,6 +96,32 @@ public:
         const std::size_t file_size = 0,
         const std::string& file_hash = "");
 
+    // 获取用户的离线消息（从last_active时间点之后的消息）
+    std::vector<std::tuple<std::string, std::string, bool, std::time_t, std::string, bool, std::string, std::size_t, std::string>>
+    get_offline_messages(const std::string& user_ID, std::time_t last_active_time, int limit = 200);
+
+    // 获取用户的last_active时间
+    std::time_t get_user_last_active(const std::string& user_ID);
+
 
 /* ---------- 文件 ---------- */
+
+    // 查询目前文件数量
+    int get_file_count();
+
+    // 查询给出的file_hash是否在数据库中存在
+    bool file_hash_exists(const std::string& file_hash);
+
+    // 通过file_hash给出file_id
+    std::string get_file_id_by_hash(const std::string& file_hash);
+
+    // 通过file_id给出file_hash
+    std::string get_file_hash_by_id(const std::string& file_id);
+
+    // 仅生成file_id（不插入数据库）
+    std::string generate_file_id_only(const std::string& file_hash);
+
+    // 通过file_hash生成新的file_id
+    // 如果file_hash存在，返回"", 反之，返回 "File_" + std::tostring(num), num是已存在的文件数量
+    std::string generate_file_id_by_hash(const std::string& file_hash, std::size_t file_size);
 };

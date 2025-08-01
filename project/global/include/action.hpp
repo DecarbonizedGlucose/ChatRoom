@@ -3,12 +3,12 @@
 /*
  * enum class Action 描述了各种用户行为和系统操作
  * 客户端和服务器对命令的反应不同
- * 服务器接收命令后，处理云端数据后，将该命令发送到波及到的用户
- * 客户端接收命令后，修改对应的数据
+ * 服务器接收命令后, 处理云端数据后, 将该命令发送到波及到的用户
+ * 客户端接收命令后, 修改对应的数据
  * 这期间还会有额外数据包的传输
 */
 
-// 由于发送时arg[]外已经有sender字段，以下arg中均不含自己的邮箱/ID
+// 由于发送时arg[]外已经有sender字段, 以下arg中均不含自己的邮箱/ID
 
 enum class Action {
     /*      账号系统      */
@@ -46,9 +46,12 @@ enum class Action {
     Add_Friend_Req,        // 添加好友请求 --time --user_ID
     Remove_Friend,         // 删除好友 --user_ID
     Search_Person,         // 搜索用户 --user_ID
+    Block_Friend,          // 屏蔽好友 --user_ID
+    Unblock_Friend,        // 取消屏蔽好友 --user_ID
 
     /*      群聊管理      */
     Create_Group,          // 创建群组 --time --name
+    Give_Group_ID,         // 给群组ID --group_ID 如果创建失败, group_ID为""
     Join_Group,            // 加入群组 --time --group_ID
     Join_Group_Req,        // 加入群组请求 --time --group_ID
     Leave_Group,           // 退出群组 --time --group_ID
@@ -59,11 +62,11 @@ enum class Action {
     Add_Admin,             // 添加管理员 --time --group_ID --user_ID
     Remove_Admin,          // 移除管理员 --time --group_ID --user_ID
 
-    // Get_Relation_Net,      // 获取关系网
-    Update_Relation_Net,   // 更新关系网 这个似乎轮不到客户端发送
-
     /*      消息行为      */
+    Upload_File,           // 上传文件 --file_hash
     Download_File,         // 下载文件 --file_ID
+    Accept_File,           // 接受文件的传输 --file_hash --file_ID
+    Deny_File,             // 拒绝文件的传输 --file_hash
 
     /*      连接管理      */
     Remember_Connection,   // 记住连接 --idx

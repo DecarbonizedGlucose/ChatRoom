@@ -27,6 +27,7 @@ ChatMessage create_chat_message(
     const std::string& sender,
     const std::string& receiver,
     const bool is_group_msg,
+    const std::time_t timestamp,
     const std::string& text,
     const bool pin = false,
     const std::string& file_name = "",
@@ -40,6 +41,7 @@ std::string create_message_string(
     const std::string& sender,
     const std::string& receiver,
     const bool is_group_msg,
+    const std::time_t timestamp,
     const std::string& text,
     const bool pin = false,
     const std::string& file_name = "",
@@ -104,3 +106,11 @@ std::string create_sync_string(
 SyncItem get_sync_item(const std::string& proto_str);
 
 /* ---------- OfflineMessages ---------- */
+
+OfflineMessages create_offline_messages(const std::vector<ChatMessage>& messages);
+
+std::string get_offline_messages_string(const OfflineMessages& offline_msgs);
+
+std::string create_offline_messages_string(const std::vector<ChatMessage>& messages);
+
+OfflineMessages get_offline_messages(const std::string& proto_str);

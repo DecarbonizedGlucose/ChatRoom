@@ -43,21 +43,29 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
         } else if (state == RecvState::Disconnected) {
             log_info("Connection fd {} disconnected", conn->socket->get_fd());
             if (conn->user_ID.empty()) {
+                // 未登录用户, 直接删除连接
                 delete conn;
                 conn = nullptr;
+            } else {
+                // 已登录用户, 先保存user_ID, 然后执行登出处理
+                std::string user_id = conn->user_ID;
+                log_debug("Processing sign out for user: {}", user_id);
+
+                // 注意：handle_sign_out 内部会调用 remove_user, 这会删除所有该用户的连接
+                // 包括当前的 conn 对象, 所以之后不能再使用 conn
+                command_handler->handle_sign_out(user_id);
+
+                // conn 已经被 remove_user 删除, 设置为 nullptr 防止重复使用
+                conn = nullptr;
             }
-            else {
-                // 执行死刑
-                command_handler->handle_sign_out(conn->user_ID);
-            }
-            return; // 连接断开
+            return; // 连接断开, 退出处理循环
         } else if (state == RecvState::Error) {
             log_error("Error receiving data from connection (fd: {})", conn->socket->get_fd());
             return; // 处理错误
         }
         //log_debug("Received data from connection (fd:{})", conn->socket->get_fd());
 
-        // 收到数据，更新发送的用户活动时间
+        // 收到数据, 更新发送的用户活动时间
         if (!conn->user_ID.empty())
             conn_manager->update_user_activity(conn->user_ID);
 
@@ -134,7 +142,7 @@ void Dispatcher::dispatch_send(TcpServerConnection* conn) {
         }
     }
 
-    // 统一处理：发送完成后，重新添加读事件以继续接收数据
+    // 统一处理：发送完成后, 重新添加读事件以继续接收数据
     //log_debug("dispatch_send: Attempting to re-add read event for fd: {}", conn->socket->get_fd());
 
     if (!conn->read_event) {

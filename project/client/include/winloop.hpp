@@ -8,6 +8,9 @@ class ChatMessage;
 #include <string>
 #include <functional>
 #include <mutex>
+#include <vector>
+#include <atomic>
+#include <sstream>
 #include "output.hpp"
 
 class CommManager;
@@ -52,7 +55,7 @@ private:
     void start_loop();
     void login_loop();
     void register_loop();
-    void main_init(); // 进入主界面前的初始化
+    void main_init();
     void main_loop();
     void message_loop();
     void contacts_loop();
@@ -62,8 +65,7 @@ private:
     void join_group_loop();
     void my_lists_loop();
     void my_loop();
-    void chat_loop();      // 具体聊天页面
-    void chat_loop_traditional();   // 传统聊天模式
+    void chat_loop();
 
     // 聊天相关辅助方法
     void display_conversation_list();

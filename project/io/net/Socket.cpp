@@ -170,7 +170,7 @@ bool DataSocket::receive_protocol(std::string& proto) {
 DataSocket::RecvState DataSocket::receive_protocol_with_state(std::string& proto) {
     if (fd < 0) return RecvState::Error; // Invalid socket
 
-    // 1. 事件内循环读到EAGAIN，拼接到packet_buf
+    // 1. 事件内循环读到EAGAIN, 拼接到packet_buf
     char tmp[4096];
     bool has_new_data = false;
     while (true) {
@@ -191,14 +191,14 @@ DataSocket::RecvState DataSocket::receive_protocol_with_state(std::string& proto
 
     // 2. 拆包
     if (packet_buf.size() < 4) {
-        // 如果没有读到新数据且缓冲区不足4字节，说明暂时没有完整包
+        // 如果没有读到新数据且缓冲区不足4字节, 说明暂时没有完整包
         return RecvState::NoMoreData;
     }
     uint32_t net_len;
     memcpy(&net_len, packet_buf.data(), 4);
     size_t expected_size = ntohl(net_len);
     if (packet_buf.size() < 4 + expected_size) {
-        // 包体不够，需要等待更多数据
+        // 包体不够, 需要等待更多数据
         return RecvState::NoMoreData;
     }
     proto = packet_buf.substr(4, expected_size);

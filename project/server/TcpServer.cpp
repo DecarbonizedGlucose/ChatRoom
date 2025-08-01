@@ -75,7 +75,7 @@ void TcpServer::start() {
             break; // Exit on error
         } else if (num_ready == 0) {
             //log_info("Epoll wait timed out");
-            continue; // 超时，无事发生
+            continue; // 超时, 无事发生
         }
         // 轮询
         for (int i = 0; i < num_ready; ++i) {
@@ -90,7 +90,7 @@ void TcpServer::start() {
                 });
                 continue;
             }
-            // 区分读写，分发事件
+            // 区分读写, 分发事件
             if (ev.events & EPOLLIN) {
                 // 读事件
                 log_info("Reactor read event at fd {}", fd);
