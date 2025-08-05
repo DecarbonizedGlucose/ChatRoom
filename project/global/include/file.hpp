@@ -6,7 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <google/protobuf/message.h>
-#include "../abstract/data.pb.h"
+#include "../abstract/datatypes.hpp"
 
 // 文件分片大小 (64KB)
 constexpr size_t CHUNK_SIZE = 64 * 1024;
@@ -41,7 +41,6 @@ public:
     size_t get_total_chunks() const;
 };
 
-// 客户端文件类 - 用于发送和接收文件
 class ClientFile : public File {
 private:
     std::string local_path;     // 本地文件路径
@@ -66,20 +65,17 @@ public:
     bool write_chunk(const std::vector<char>& data, size_t chunk_index);
     bool finalize_download();
 
-    // 获取本地路径
     const std::string& get_local_path() const { return local_path; }
-
-    // 获取当前进度 (0.0 - 1.0)
     double get_progress() const;
+    size_t get_current_chunk() const { return current_chunk; }
 };
 
-// 服务端文件管理类 - 用于管理文件传输
 class ServerFile : public File {
 private:
     std::string storage_path;   // 服务端存储路径
     std::ofstream output_stream;// 写入文件流
     std::ifstream input_stream; // 读取文件流
-    std::vector<bool> received_chunks; // 记录已接收的分片
+    std::vector<char> received_chunks; // 记录已接收的分片 (使用char避免vector<bool>问题)
     size_t received_count = 0;  // 已接收分片数
 
 public:
@@ -108,34 +104,5 @@ public:
     bool is_chunk_received(size_t chunk_index) const;
 };
 
-// 文件传输管理器
-class FileTransferManager {
-private:
-    std::unordered_map<std::string, std::shared_ptr<ClientFile>> client_files;
-    std::unordered_map<std::string, std::shared_ptr<ServerFile>> server_files;
-
-public:
-    // 客户端方法
-    std::shared_ptr<ClientFile> create_upload_file(const std::string& file_path);
-    std::shared_ptr<ClientFile> create_download_file(const std::string& file_id,
-        const std::string& file_name, const std::string& save_path,
-        const std::string& hash, size_t size);
-
-    // 服务端方法
-    std::shared_ptr<ServerFile> create_server_file(const std::string& hash,
-        const std::string& file_id, const std::string& name, size_t size);
-
-    // 通用方法
-    bool remove_file(const std::string& file_id);
-    std::shared_ptr<File> get_file(const std::string& file_id);
-
-    // 清理完成的文件
-    void cleanup_completed_files();
-};
-
-// 全局文件传输管理器实例
-extern FileTransferManager g_file_manager;
-
-using FilePtr = std::shared_ptr<File>;
-using ClientFilePtr = std::shared_ptr<ClientFile>;
 using ServerFilePtr = std::shared_ptr<ServerFile>;
+using ClientFilePtr = std::shared_ptr<ClientFile>;

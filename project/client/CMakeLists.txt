@@ -8,6 +8,7 @@ add_executable(client
     interface/output.cpp
     chat/CommManager.cpp
     chat/sqlite.cpp
+    chat/cfile_manager.cpp
 )
 
 target_link_libraries(client

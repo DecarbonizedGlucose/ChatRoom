@@ -48,6 +48,15 @@ public:
         return true;
     }
 
+    bool pop() {
+        std::unique_lock<std::mutex> lock(m_Mutex);
+        if (m_Queue.empty()) {
+            return false;
+        }
+        m_Queue.pop();
+        return true;
+    }
+
     // 阻塞等待直到队列非空, 然后取出一个元素
     void wait_and_pop(T& value) {
         std::unique_lock<std::mutex> lock(m_Mutex);

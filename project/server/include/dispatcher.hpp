@@ -15,6 +15,7 @@ class FileHandler;
 class SyncHandler;
 class OfflineMessageHandler;
 class ConnectionManager;
+class SFileManager;
 
 class Dispatcher {
 public:
@@ -22,6 +23,7 @@ public:
     RedisController* redis_con = nullptr;
     MySQLController* mysql_con = nullptr;
     ConnectionManager* conn_manager = nullptr;
+    SFileManager* file_manager = nullptr;
 
     Dispatcher(RedisController* re, MySQLController* my);
     ~Dispatcher();

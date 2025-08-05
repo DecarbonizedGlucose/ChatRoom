@@ -1,15 +1,18 @@
 #pragma once
 #include <string>
 #include "../../global/abstract/datatypes.hpp"
+#include "../../global/include/safe_deque.hpp"
 #include "../../global/include/safe_queue.hpp"
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include "../../global/abstract/datatypes.hpp"
+#include "cfile_manager.hpp"
 using json = nlohmann::json;
 
 class TopClient;
 class TcpClient;
 class SQLiteController;
+class CFileManager;
 
 class ContactCache {
 public:
@@ -53,8 +56,11 @@ public:
     std::unordered_map<std::string, ConversationInfo> conversations;
     std::string current_conversation_id; // 当前打开的会话ID
 
-    // 消息队列（用于实时接收）
-    safe_queue<ChatMessage> messages;
+    // 消息缓存表
+    std::unordered_map<std::string, safe_deque<ChatMessage>> messages;
+
+    // 新消息暂存队列
+    safe_queue<ChatMessage> new_messages;
 
     // 会话排序管理（实时更新的消息列表顺序）
     // 原理：当有新消息时, 将对应会话移到列表开头, 实现类似QQ/微信的效果
@@ -71,6 +77,7 @@ class CommManager {
 public:
     bool* cont = nullptr;
     SQLiteController* sqlite_con = nullptr;
+    CFileManager* file_manager = nullptr;
 
     CommManager(TopClient* client);
 
@@ -101,6 +108,17 @@ public:
     CommandRequest handle_receive_command(bool nb = true);
     void handle_send_command(Action action, const std::string& sender, std::initializer_list<std::string> args, bool nb = true);
 
+    // file chunk
+    FileChunk handle_receive_file_chunk(bool nb = false);
+    void handle_send_file_chunk(
+        const std::string& file_id,
+        const std::vector<char>& data,
+        int chunk_index,
+        int total_chunks,
+        bool is_last_chunk = false,
+        bool nb = false
+    );
+
     // others
     void handle_get_relation_net(); // 不发请求, 主动拉取, 不知道发来什么
     void handle_send_id();
@@ -117,9 +135,10 @@ public:
     void handle_remove_admin(const std::string& group_ID, const std::string& user_ID);
     void handle_reply_heartbeat();
 
-    // 会话管理
+    // 更新会话聊表
     void update_conversation_list();
-    void load_conversation_history(const std::string& conversation_id);
+    // 登录时加载历史聊天记录
+    void load_conversation_history();
     void send_text_message(
         const std::string& receiver_id,
         bool is_group,
@@ -133,12 +152,13 @@ public:
         bool is_group,
         const std::string& text,
         const std::string& file_path);
-    std::vector<ChatMessage> get_conversation_messages(const std::string& conversation_id, int limit = 50);
+    // 进入聊天时瞬间打印充数的记录
+    std::vector<ChatMessage> get_conversation_messages(
+        const std::string& conversation_id, int limit = 200);
 
 /* ---------- Print ---------- */
     void print_friends();
     void print_groups();
-
 
 private:
     // 扔进去全存

@@ -87,6 +87,26 @@ CommandRequest get_command_request(const std::string& proto_str);
 
 /* ---------- FileChunk ---------- */
 
+FileChunk create_file_chunk(
+    const std::string& file_id,
+    const std::vector<char>& data,
+    size_t chunk_index,
+    size_t total_chunks,
+    bool is_last_chunk = false
+);
+
+std::string get_file_chunk_string(const FileChunk& chunk);
+
+std::string create_file_chunk_string(
+    const std::string& file_id,
+    const std::vector<char>& data,
+    size_t chunk_index,
+    size_t total_chunks,
+    bool is_last_chunk = false
+);
+
+FileChunk get_file_chunk(const std::string& proto_str);
+
 /* ---------- SyncItem ----------*/
 
 SyncItem create_sync_item(

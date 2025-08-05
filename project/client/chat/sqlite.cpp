@@ -471,7 +471,8 @@ bool SQLiteController::cache_chat_message(
 std::vector<std::vector<std::string>> SQLiteController::get_private_chat_history(
     const std::string& user_A,
     const std::string& user_B,
-    int limit) {
+    int limit
+) {
 
     std::stringstream sql;
     sql << "SELECT sender_id, receiver_id, timestamp, text, pin, file_name, file_size, file_hash "
@@ -479,7 +480,7 @@ std::vector<std::vector<std::string>> SQLiteController::get_private_chat_history
         << "WHERE is_group = 0 "
         << "AND ((sender_id = '" << user_A << "' AND receiver_id = '" << user_B << "') OR "
         << "(sender_id = '" << user_B << "' AND receiver_id = '" << user_A << "')) "
-        << "ORDER BY timestamp ASC "
+        << "ORDER BY timestamp DESC "
         << "LIMIT " << limit << ";";
 
     return query(sql.str());
@@ -494,7 +495,7 @@ std::vector<std::vector<std::string>> SQLiteController::get_group_chat_history(
         << "FROM chat_messages "
         << "WHERE is_group = 1 "
         << "AND receiver_id = '" << group_ID << "' "
-        << "ORDER BY timestamp ASC "
+        << "ORDER BY timestamp DESC "
         << "LIMIT " << limit << ";";
 
     return query(sql.str());

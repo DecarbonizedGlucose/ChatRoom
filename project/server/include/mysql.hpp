@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <optional>
+#include "../../global/abstract/datatypes.hpp"
 
 class MySQLController {
 private:
@@ -33,6 +35,7 @@ public:
     std::vector<std::vector<std::string>> query(const std::string& sql);
 
 /* ---------- 用户系统---------- */
+
     bool do_email_exist(const std::string& email);
     bool do_user_id_exist(const std::string& user_ID);
     bool insert_user(
@@ -118,10 +121,38 @@ public:
     // 通过file_id给出file_hash
     std::string get_file_hash_by_id(const std::string& file_id);
 
+    // 通过file_id获取文件信息(文件名和大小)
+    // 返回值: optional<pair<file_name, file_size>>
+    std::optional<std::pair<std::string, size_t>> get_file_info(const std::string& file_id);
+
     // 仅生成file_id（不插入数据库）
     std::string generate_file_id_only(const std::string& file_hash);
 
     // 通过file_hash生成新的file_id
     // 如果file_hash存在，返回"", 反之，返回 "File_" + std::tostring(num), num是已存在的文件数量
     std::string generate_file_id_by_hash(const std::string& file_hash, std::size_t file_size);
+
+/* ---------- 通知/请求 ---------- */
+
+    int store_command(const CommandRequest& cmd, bool managed = false);  // 返回命令ID
+    bool delete_command(int command_id);
+    bool update_command_status(int command_id, bool managed);
+    int get_command_status(int command_id);
+    CommandRequest get_command(int command_id);
+
+    bool add_pending_command(const std::string& user_id, int command_id);
+    bool remove_pending_command(const std::string& user_id, int command_id);
+    std::vector<CommandRequest> get_pending_commands(const std::string& user_id);
+    bool clear_pending_commands(const std::string& user_id);
+
+    bool add_command_to_all_admin(
+        int command_id,
+        const std::string& group_ID);
+    bool add_command_to_all_admin_except(
+        const std::string& user_ID,
+        int command_id,
+        const std::string& group_ID);
+    bool remove_command_from_all_admin(
+        int command_id,
+        const std::string& group_ID);
 };

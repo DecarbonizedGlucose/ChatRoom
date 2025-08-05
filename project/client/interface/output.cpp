@@ -16,6 +16,7 @@ void sclear() {
 
 void print_input_sign() {
     std::cout << style("=> ", {ansi::FG_BRIGHT_RED, ansi::BOLD});
+    std::cout.flush(); // 立即刷新输出
 }
 
 std::string selnum(int num) {

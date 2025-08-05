@@ -86,7 +86,11 @@ private:
     void handle_add_friend_req(
         const std::string& friend_ID,
         const std::string& ostr);
-    void handle_remove_friend();
+    void handle_remove_friend(
+        const std::string& user_ID,
+        const std::string& friend_ID,
+        const CommandRequest& cmd,
+        const std::string& ostr);
     void handle_search_person(
         TcpServerConnection* conn,
         const std::string& searched_ID);
@@ -127,14 +131,12 @@ private:
     void handle_post_friends_status(const std::string& user_ID, const json& friends);
     void handle_post_offline_messages(const std::string& user_ID, const json& relation_data);
     void handle_post_unordered_noti_and_req(const std::string& user_ID, const json& relation_data);
-    void handle_notify_friends_online(const std::string& user_ID, const json& friends);
 
     // 封装起来的函数
     void get_friends(const std::string& user_ID, json& friends);
     void get_groups(const std::string& user_ID, json& groups);
     void get_relation_net(const std::string& user_ID, json& relation_net);
     void get_blocked_info(const std::string& user_ID, const json& friends, json& blocked_info);
-
 };
 
 /* -------------- Data -------------- */

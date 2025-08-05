@@ -59,10 +59,10 @@
 
 ## 聊天室数据库设计与消息系统整理
 
-### ✅ 用户信息表
+### 用户信息表
 ```sql
 CREATE TABLE users (
-    user_id VARCHAR(30) PRIMARY KEY NOT NULL,
+    user_id VARCHAR(30) PRIMARY KEY,
     user_email VARCHAR(255) NOT NULL UNIQUE,
     password_hash CHAR(60) NOT NULL,
     last_active TIMESTAMP NULL,
@@ -70,7 +70,7 @@ CREATE TABLE users (
 );
 ```
 
-### ✅ 好友列表表
+### 好友列表表
 ```sql
 CREATE TABLE friends (
     user_id VARCHAR(30) NOT NULL,
@@ -82,7 +82,7 @@ CREATE TABLE friends (
 );
 ```
 
-### ✅ 群组表（群元数据）
+### 群组表（群元数据）
 ```sql
 CREATE TABLE chat_groups (
     group_id VARCHAR(30) PRIMARY KEY NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE chat_groups (
 );
 ```
 
-### ✅ 群成员表（群聊成员）
+### 群成员表（群聊成员）
 ```sql
 CREATE TABLE group_members (
     group_id VARCHAR(30) NOT NULL,
@@ -108,7 +108,7 @@ CREATE TABLE group_members (
 
 ---
 
-### ✅ 如何查找：
+### 如何查找：
 
 **从某个用户查找好友列表：**
 ```sql
@@ -134,7 +134,7 @@ SELECT owner_id FROM groups
 WHERE group_id = 'group123';
 ```
 
-### ✅ 聊天记录数据库表（统一）
+### 聊天记录数据库表
 ```sql
 CREATE TABLE chat_messages (
     message_id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -153,7 +153,7 @@ CREATE TABLE chat_messages (
 
 ---
 
-### ✅ 查询示例
+### 查询示例
 
 **私聊：**
 ```sql
@@ -176,7 +176,7 @@ LIMIT 100;
 
 ---
 
-### ✅ 优化建议
+### 优化建议
 - 为 `(receiver_id, is_group, timestamp)` 建复合索引。
 - 文件内容存在本地或云端, 数据库仅存元数据。
 - 可拆分活跃消息表和归档表, 支持分区。
@@ -201,4 +201,32 @@ CREATE TABLE chat_files (
     file_hash CHAR(64) PRIMARY KEY,
     file_id VARCHAR(36) NOT NULL UNIQUE,
     file_size BIGINT NOT NULL DEFAULT 0);
+~~~
+
+### command表
+~~~sql
+CREATE TABLE chat_commands (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    action TINYINT NOT NULL,
+    sender VARCHAR(255) NOT NULL,
+    para1 VARCHAR(255),
+    para2 VARCHAR(255),
+    para3 VARCHAR(255),
+    managed BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY(sender) REFERENCES users(user_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
+CREATE TABLE user_pending_commands (
+    user_id VARCHAR(255) NOT NULL,
+    command_id INT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(user_id, command_id),
+    FOREIGN KEY(user_id) REFERENCES users(user_id),
+    FOREIGN KEY(command_id) REFERENCES chat_commands(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
 ~~~

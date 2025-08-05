@@ -7,9 +7,6 @@
 #include <filesystem>
 #include <cmath>
 
-// 全局文件传输管理器实例
-FileTransferManager g_file_manager;
-
 // ============ File 基类实现 ============
 
 File::File(const std::string& name, const std::string& hash, size_t size)
@@ -234,7 +231,7 @@ ServerFile::ServerFile(const std::string& hash, const std::string& file_id,
 
     // 初始化分片接收状态
     size_t total_chunks = get_total_chunks();
-    received_chunks.resize(total_chunks, false);
+    received_chunks.resize(total_chunks, 0); // 使用0表示未接收, 1表示已接收
 
     log_info("Created ServerFile: {} (id: {}, chunks: {})", name, file_id, total_chunks);
 }
@@ -297,7 +294,7 @@ bool ServerFile::write_chunk(const std::vector<char>& data, size_t chunk_index) 
     }
 
     // 标记分片已接收
-    received_chunks[chunk_index] = true;
+    received_chunks[chunk_index] = 1; // 使用1表示已接收
     received_count++;
 
     log_debug("Received chunk {}/{} for file: {}",
@@ -381,92 +378,5 @@ double ServerFile::get_receive_progress() const {
 }
 
 bool ServerFile::is_chunk_received(size_t chunk_index) const {
-    return chunk_index < received_chunks.size() && received_chunks[chunk_index];
-}
-
-// ============ FileTransferManager 实现 ============
-
-std::shared_ptr<ClientFile> FileTransferManager::create_upload_file(const std::string& file_path) {
-    auto client_file = std::make_shared<ClientFile>(file_path);
-    if (client_file->status == FileStatus::FAILED) {
-        return nullptr;
-    }
-
-    // 使用file_hash作为key存储
-    client_files[client_file->file_hash] = client_file;
-    return client_file;
-}
-
-std::shared_ptr<ClientFile> FileTransferManager::create_download_file(
-    const std::string& file_id, const std::string& file_name,
-    const std::string& save_path, const std::string& hash, size_t size) {
-
-    auto client_file = std::make_shared<ClientFile>(file_name, save_path, hash, size);
-    client_file->file_id = file_id;
-
-    client_files[file_id] = client_file;
-    return client_file;
-}
-
-std::shared_ptr<ServerFile> FileTransferManager::create_server_file(
-    const std::string& hash, const std::string& file_id,
-    const std::string& name, size_t size) {
-
-    auto server_file = std::make_shared<ServerFile>(hash, file_id, name, size);
-    server_files[file_id] = server_file;
-    return server_file;
-}
-
-bool FileTransferManager::remove_file(const std::string& file_id) {
-    bool removed = false;
-
-    auto client_it = client_files.find(file_id);
-    if (client_it != client_files.end()) {
-        client_files.erase(client_it);
-        removed = true;
-    }
-
-    auto server_it = server_files.find(file_id);
-    if (server_it != server_files.end()) {
-        server_files.erase(server_it);
-        removed = true;
-    }
-
-    return removed;
-}
-
-std::shared_ptr<File> FileTransferManager::get_file(const std::string& file_id) {
-    auto client_it = client_files.find(file_id);
-    if (client_it != client_files.end()) {
-        return client_it->second;
-    }
-
-    auto server_it = server_files.find(file_id);
-    if (server_it != server_files.end()) {
-        return server_it->second;
-    }
-
-    return nullptr;
-}
-
-void FileTransferManager::cleanup_completed_files() {
-    // 清理已完成的客户端文件
-    for (auto it = client_files.begin(); it != client_files.end();) {
-        if (it->second->status == FileStatus::COMPLETED ||
-            it->second->status == FileStatus::FAILED) {
-            it = client_files.erase(it);
-        } else {
-            ++it;
-        }
-    }
-
-    // 清理已完成的服务端文件
-    for (auto it = server_files.begin(); it != server_files.end();) {
-        if (it->second->status == FileStatus::COMPLETED ||
-            it->second->status == FileStatus::FAILED) {
-            it = server_files.erase(it);
-        } else {
-            ++it;
-        }
-    }
+    return chunk_index < received_chunks.size() && received_chunks[chunk_index] != 0;
 }

@@ -65,8 +65,10 @@ enum class Action {
     /*      消息行为      */
     Upload_File,           // 上传文件 --file_hash
     Download_File,         // 下载文件 --file_ID
-    Accept_File,           // 接受文件的传输 --file_hash --file_ID
-    Deny_File,             // 拒绝文件的传输 --file_hash
+    Accept_File,           // 接受文件上传 --file_hash --file_ID
+    Deny_File,             // 拒绝文件上传 --file_hash
+    Accept_File_Req,       // 接受文件下载请求 --file_ID --file_hash
+    Deny_File_Req,         // 拒绝文件下载请求 --file_ID
 
     /*      连接管理      */
     Remember_Connection,   // 记住连接 --idx

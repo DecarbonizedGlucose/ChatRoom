@@ -12,6 +12,7 @@ class ChatMessage;
 #include <atomic>
 #include <sstream>
 #include "output.hpp"
+#include "CommManager.hpp"
 
 class CommManager;
 class thread_pool;
@@ -68,10 +69,13 @@ private:
     void chat_loop();
 
     // 聊天相关辅助方法
-    void display_conversation_list();
+    void display_conversation_list(
+        const std::vector<std::pair<std::string, ContactCache::ConversationInfo*>>&
+        conv_list);
     void display_chat_messages(const std::string& conversation_id);
     void handle_chat_input(const std::string& conversation_id);
     std::string format_message(const ChatMessage& msg);
+    void render_message(const ChatMessage& msg);
 
     // 无界面功能
     void log_out();

@@ -146,6 +146,56 @@ CommandRequest get_command_request(const std::string& proto_str) {
 
 /* ---------- FileChunk ---------- */
 
+FileChunk create_file_chunk(
+    const std::string& file_id,
+    const std::vector<char>& data,
+    size_t chunk_index,
+    size_t total_chunks,
+    bool is_last_chunk
+) {
+    FileChunk chunk;
+    chunk.set_file_id(file_id);
+    chunk.set_data(data.data(), data.size());
+    chunk.set_chunk_index(chunk_index);
+    chunk.set_total_chunks(total_chunks);
+    chunk.set_is_last_chunk(is_last_chunk);
+    return chunk;
+}
+
+std::string get_file_chunk_string(const FileChunk& chunk) {
+    google::protobuf::Any any;
+    any.PackFrom(chunk);
+    Envelope env;
+    env.mutable_payload()->CopyFrom(any);
+    std::string env_out;
+    env.SerializeToString(&env_out);
+    return env_out;
+}
+
+std::string create_file_chunk_string(
+    const std::string& file_id,
+    const std::vector<char>& data,
+    size_t chunk_index,
+    size_t total_chunks,
+    bool is_last_chunk
+) {
+    auto chunk = create_file_chunk(file_id, data, chunk_index, total_chunks, is_last_chunk);
+    return get_file_chunk_string(chunk);
+}
+
+FileChunk get_file_chunk(const std::string& proto_str) {
+    Envelope env;
+    if (!env.ParseFromString(proto_str)) {
+        throw std::runtime_error("Failed to parse Envelope from received data");
+    }
+    const google::protobuf::Any& any = env.payload();
+    FileChunk chunk;
+    if (!any.UnpackTo(&chunk)) {
+        throw std::runtime_error("Failed to unpack Any to FileChunk");
+    }
+    return chunk;
+}
+
 /* ---------- SyncItem ---------- */
 
 SyncItem create_sync_item(

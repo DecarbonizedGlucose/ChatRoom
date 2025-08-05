@@ -1,7 +1,6 @@
 #include "../include/winloop.hpp"
 #include "../include/output.hpp"
 #include "../../global/include/logging.hpp"
-#include "../include/CommManager.hpp"
 #include "../../global/abstract/datatypes.hpp"
 #include "../../global/include/threadpool.hpp"
 #include "../include/TcpClient.hpp"
@@ -437,6 +436,9 @@ void WinLoop::main_init() {
     comm->handle_get_chat_history();
     // 拉取通知和好友请求/群聊邀请/加群申请等
     // ...
+    // 从SQLite加载历史聊天记录
+    std::cout << "正在加载历史聊天记录..." << std::endl;
+    comm->load_conversation_history();
     // Message, Command循环读, Data适时读, 所有通道适时写
     pool->submit([&]{
         comm->clients[0]->socket->set_nonblocking();
@@ -483,34 +485,7 @@ void WinLoop::message_loop() {
         std::cout << selnum(0) << " 返回主菜单" << std::endl;
 
         // 显示会话列表
-        if (conv_list.empty()) {
-            std::cout << "暂无会话。开始与好友或群组聊天吧！" << std::endl;
-        } else {
-            for (size_t i = 0; i < conv_list.size(); ++i) {
-                const auto& info = *conv_list[i].second;
-
-                // 显示序号和名称
-                std::cout << selnum(i + 1) << " ";
-
-                // 显示名称, 如果为空则显示ID
-                std::string display_name;
-                if (!info.name.empty()) {
-                    display_name = info.name;
-                } else if (!info.id.empty()) {
-                    display_name = "ID:" + info.id;
-                } else {
-                    display_name = "ID:EMPTY";
-                }
-                std::cout << display_name;
-
-                // 显示未读计数
-                if (info.unread_count > 0) {
-                    std::cout << " (" << info.unread_count << ")";
-                }
-
-                std::cout << std::endl;
-            }
-        }
+        display_conversation_list(conv_list);
 
         print_input_sign();
 
@@ -553,23 +528,70 @@ void WinLoop::message_loop() {
     }
 }
 
+/*
+chat命令
+<text> 发送消息
+/exit 退出聊天
+/file <path> text 发送带文件的消息
+/file <path> 发送文件
+/download <file_id> <full_path/file.txt>
+*/
+
 void WinLoop::chat_loop() {
-    // 简单的聊天界面
-    std::string conversation_id = comm->cache.current_conversation_id;
+    sclear();
+    auto conv_id = comm->cache.current_conversation_id;
 
-    while (current_page == UIPage::Chat) {
-        sclear();
-
-        // 显示聊天标题
-        auto& conv_info = comm->cache.conversations[conversation_id];
-        std::cout << "-$- 与 " << conv_info.name << " 的聊天 -$-" << std::endl;
-
-        // 显示聊天消息
-        display_chat_messages(conversation_id);
-
-        std::cout << "\n输入消息 (/exit 退出): ";
-        handle_chat_input(conversation_id);
+    auto history = comm->get_conversation_messages(conv_id);
+    for (auto msg : history) {
+        render_message(msg);
     }
+
+    std::string input;
+    bool chatting = true;
+    pool->submit([&]{
+        while (chatting) {
+            ChatMessage msg;
+            comm->cache.new_messages.wait_and_pop(msg);
+            if (msg.receiver() == conv_id || msg.sender() == conv_id) {
+                std::lock_guard<std::mutex> lock(output_mutex);
+                std::cout << '\r' << std::string(50, ' ') << '\r'; // 清除当前行
+                render_message(msg);
+                print_input_sign();
+            }
+
+        }
+    });
+
+    print_input_sign();
+
+    while (chatting) {
+        std::getline(std::cin, input);
+
+        if (input.empty()) continue;
+        if (input == "/exit") {
+            break;
+        }
+
+        if (input.find("/file ") == 0) {
+            std::istringstream iss(input);
+            std::string cmd, path, rest;
+            iss >> cmd >> path;
+            std::getline(iss, rest);
+            comm->send_text_with_file(conv_id,
+                                      comm->cache.conversations[conv_id].is_group,
+                                      rest,
+                                      path);
+        } else {
+            comm->send_text_message(conv_id,
+                                    comm->cache.conversations[conv_id].is_group,
+                                    input);
+        }
+
+        std::cout << std::endl;
+        print_input_sign();
+    }
+
+    switch_to(UIPage::Message);
 }
 
 void WinLoop::contacts_loop() {
@@ -1255,17 +1277,9 @@ void draw_contacts(std::mutex& mtx, CommManager* comm) {
 
 /* ---------- 聊天功能实现 ---------- */
 
-void WinLoop::display_conversation_list() {
-    std::cout << "-$- 消息列表 -$-" << std::endl;
-
-    if (comm->cache.conversations.empty()) {
-        std::cout << "暂无会话。开始与好友或群组聊天吧！" << std::endl;
-        return;
-    }
-
-    // 使用cache维护的排序列表
-    auto conv_list = comm->cache.get_sorted_conversations();
-
+void WinLoop::display_conversation_list(
+    const std::vector<std::pair<std::string, ContactCache::ConversationInfo*>>& conv_list
+) {
     for (size_t i = 0; i < conv_list.size(); ++i) {
         const auto& info = *conv_list[i].second;
         std::cout << selnum(i + 1) << " ";
@@ -1362,4 +1376,51 @@ void WinLoop::handle_chat_input(const std::string& conversation_id) {
     // 发送文本消息
     auto& conv_info = comm->cache.conversations[conversation_id];
     comm->send_text_message(conversation_id, conv_info.is_group, input);
+}
+
+void WinLoop::render_message(const ChatMessage& msg) {
+    std::string header = "[" + style(msg.sender(), {ansi::BOLD, ansi::FG_BRIGHT_BLUE}) + "]";
+    if (comm->cache.group_list.find(msg.receiver()) != comm->cache.group_list.end() && msg.is_group()) {
+        const auto& group = comm->cache.group_list[msg.receiver()];
+        if (msg.sender() == group.owner_ID) {
+            header += "[群主]";
+        } else if (group.is_user_admin) {
+            header += "[管理员]";
+        }
+    }
+
+    // 时间戳转格式化时间
+    std::time_t t = msg.timestamp();
+    char time_buf[64];
+    std::strftime(time_buf, sizeof(time_buf), "%Y.%m.%d %H:%M:%S", std::localtime(&t));
+    std::string time_part = "<" + std::string(time_buf) + ">";
+
+    std::cout << '\r' << header << style(time_part, {ansi::BOLD, ansi::FG_GREEN}) << std::endl;
+
+    // 文本消息
+    if (!msg.text().empty()) {
+        std::istringstream iss(msg.text());
+        std::string line;
+        while (std::getline(iss, line)) {
+            std::cout << line << "\n";
+        }
+    }
+
+    // 文件信息
+    if (msg.pin()) {
+        const auto& file = msg.payload();
+        std::string file_line = "~~(" + file.file_name() + ")[" +
+                                std::to_string(file.file_size()) + ", ";
+        double size_kb = file.file_size() / 1024.0;
+        std::ostringstream oss;
+        if (size_kb < 1024) {
+            oss << std::fixed << std::setprecision(1) << size_kb << "KB";
+        } else {
+            oss << std::fixed << std::setprecision(1) << size_kb / 1024.0 << "MB";
+        }
+        file_line += oss.str() + "]~~";
+        std::cout << style(file_line, {ansi::FG_GRAY}) << "\n";
+    }
+
+    std::cout << std::endl;  // 空一行
 }

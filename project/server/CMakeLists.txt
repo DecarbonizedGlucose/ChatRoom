@@ -8,6 +8,7 @@ add_executable(server
     connection_manager.cpp
     chat/dispatcher.cpp
     chat/handler.cpp
+    chat/sfile_manager.cpp
     database/redis.cpp
     database/mysql.cpp
 )

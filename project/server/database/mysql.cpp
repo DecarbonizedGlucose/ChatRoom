@@ -465,7 +465,7 @@ bool MySQLController::file_hash_exists(const std::string& file_hash) {
         log_error("Invalid file_hash length: {}", file_hash.length());
         return false;
     }
-    
+
     std::string sql = "SELECT 1 FROM chat_files WHERE file_hash = '" + file_hash + "' LIMIT 1;";
     auto rows = query(sql);
     return !rows.empty();
@@ -477,7 +477,7 @@ std::string MySQLController::get_file_id_by_hash(const std::string& file_hash) {
         log_error("Invalid file_hash length: {}", file_hash.length());
         return "";
     }
-    
+
     std::string sql = "SELECT file_id FROM chat_files WHERE file_hash = '" + file_hash + "';";
     auto rows = query(sql);
     if (!rows.empty() && rows[0].size() > 0) {
@@ -496,6 +496,38 @@ std::string MySQLController::get_file_hash_by_id(const std::string& file_id) {
     return ""; // 未找到
 }
 
+// 通过file_id获取文件信息(文件名和大小)
+std::optional<std::pair<std::string, size_t>> MySQLController::get_file_info(const std::string& file_id) {
+    // 首先从chat_files表获取file_hash和file_size
+    std::string sql = "SELECT file_hash, file_size FROM chat_files WHERE file_id = '" + file_id + "';";
+    auto rows = query(sql);
+    if (rows.empty() || rows[0].size() < 2) {
+        log_error("File not found in chat_files table for file_id: {}", file_id);
+        return std::nullopt;
+    }
+
+    std::string file_hash = rows[0][0];
+    size_t file_size = std::stoull(rows[0][1]);
+
+    // 然后从chat_messages表获取最新的文件名
+    // 使用file_hash查找最新的文件名（可能有多个消息使用同一个文件）
+    std::string name_sql = "SELECT file_name FROM chat_messages WHERE file_hash = '" + file_hash +
+                          "' AND file_name IS NOT NULL AND file_name != '' ORDER BY timestamp DESC LIMIT 1;";
+    auto name_rows = query(name_sql);
+
+    std::string file_name;
+    if (!name_rows.empty() && name_rows[0].size() > 0) {
+        file_name = name_rows[0][0];
+    } else {
+        // 如果没找到文件名，使用默认名称
+        file_name = "unknown_file_" + file_id;
+        log_error("No file name found for file_id: {}, using default name: {}", file_id, file_name);
+    }
+
+    log_debug("Found file info for file_id: {} - name: {}, size: {}", file_id, file_name, file_size);
+    return std::make_pair(file_name, file_size);
+}
+
 // 通过file_hash生成新的file_id
 // 仅生成file_id（不插入数据库）
 std::string MySQLController::generate_file_id_only(const std::string& file_hash) {
@@ -504,7 +536,7 @@ std::string MySQLController::generate_file_id_only(const std::string& file_hash)
         log_error("Invalid file_hash length: {}", file_hash.length());
         return "";
     }
-    
+
     // 首先检查file_hash是否已存在
     if (file_hash_exists(file_hash)) {
         log_info("File hash {} already exists in database", file_hash);
@@ -514,7 +546,7 @@ std::string MySQLController::generate_file_id_only(const std::string& file_hash)
     // 获取当前文件数量并生成新的file_id
     int file_count = get_file_count();
     std::string new_file_id = "File_" + std::to_string(file_count);
-    
+
     log_info("Generated new file_id: {} for hash: {}", new_file_id, file_hash);
     return new_file_id;
 }
@@ -526,7 +558,7 @@ std::string MySQLController::generate_file_id_by_hash(const std::string& file_ha
         log_error("Invalid file_hash length: {}", file_hash.length());
         return "";
     }
-    
+
     // 首先检查file_hash是否已存在
     if (file_hash_exists(file_hash)) {
         log_info("File hash {} already exists in database", file_hash);
@@ -551,3 +583,144 @@ std::string MySQLController::generate_file_id_by_hash(const std::string& file_ha
         return "";
     }
 }
+
+/* ---------- 通知/请求 ---------- */
+
+int MySQLController::store_command(const CommandRequest& cmd, bool managed) {
+    std::string sql = "INSERT INTO chat_commands (action, sender, receiver, para1, para2, para3, managed) VALUES ("
+        + std::to_string(static_cast<int>(cmd.action())) + ", '"
+        + cmd.sender() + "', '"
+        + (cmd.args_size() > 0 ? cmd.args(0) : "") + "', '"
+        + (cmd.args_size() > 1 ? cmd.args(1) : "") + "', '"
+        + (cmd.args_size() > 2 ? cmd.args(2) : "") + "', "
+        + (managed ? "TRUE" : "FALSE") + ");";
+
+    if (execute(sql)) {
+        return mysql_insert_id(conn); // 返回新插入记录的ID
+    } else {
+        return -1;
+    }
+}
+
+bool MySQLController::delete_command(int command_id) {
+    std::string sql = "DELETE FROM chat_commands WHERE id = " + std::to_string(command_id) + ";";
+    if (execute(sql)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool MySQLController::update_command_status(int command_id, bool managed) {
+    std::string sql = "UPDATE chat_commands SET managed = "
+        + (managed ? std::string("TRUE") : std::string("FALSE")) + " WHERE id = " + std::to_string(command_id) + ";";
+    return execute(sql);
+}
+
+int MySQLController::get_command_status(int command_id) {
+    std::string sql = "SELECT managed FROM chat_commands WHERE id = " + std::to_string(command_id) + ";";
+    // 执行查询并返回结果
+    if (execute(sql)) {
+        // 查询成功，获取结果
+        MYSQL_RES* result = mysql_store_result(conn);
+        if (result) {
+            MYSQL_ROW row = mysql_fetch_row(result);
+            if (row) {
+                bool managed = (row[0] && row[0][0] == '1');
+                mysql_free_result(result);
+                return managed;
+            }
+            mysql_free_result(result);
+        }
+    }
+    return -1;
+}
+
+CommandRequest MySQLController::get_command(int command_id) {
+    std::string sql = "SELECT action, sender, receiver, para1, para2, para3 FROM chat_commands WHERE id = " + std::to_string(command_id) + ";";
+    auto rows = query(sql);
+    if (!rows.empty() && rows[0].size() >= 6) {
+        CommandRequest cmd;
+        cmd.set_action(std::stoi(rows[0][0]));
+        cmd.set_sender(rows[0][1]);
+        if (rows[0].size() > 2) cmd.add_args(rows[0][2]);
+        if (rows[0].size() > 3) cmd.add_args(rows[0][3]);
+        if (rows[0].size() > 4) cmd.add_args(rows[0][4]);
+        return cmd;
+    }
+    return CommandRequest();
+}
+
+bool MySQLController::add_pending_command(const std::string& user_id, int command_id) {
+    std::string sql = "INSERT INTO user_pending_commands (user_id, command_id) VALUES ('"
+        + user_id + "', " + std::to_string(command_id) + ");";
+    return execute(sql);
+}
+
+bool MySQLController::remove_pending_command(const std::string& user_id, int command_id) {
+    std::string sql = "DELETE FROM user_pending_commands WHERE user_id = '"
+        + user_id + "' AND command_id = " + std::to_string(command_id) + ";";
+    return execute(sql);
+}
+
+std::vector<CommandRequest> MySQLController::get_pending_commands(const std::string& user_id) {
+    std::vector<CommandRequest> commands;
+    std::string sql = "SELECT command_id FROM user_pending_commands WHERE user_id = '" + user_id + "';";
+    auto rows = query(sql);
+    for (const auto& row : rows) {
+        if (!row.empty()) {
+            int command_id = std::stoi(row[0]);
+            CommandRequest cmd = get_command(command_id);
+            commands.push_back(cmd);
+        }
+    }
+    return commands;
+}
+
+bool MySQLController::clear_pending_commands(const std::string& user_id) {
+    std::string sql = "DELETE FROM user_pending_commands WHERE user_id = '" + user_id + "';";
+    bool result = execute(sql);
+    log_debug("Cleared all pending commands for user: {}", user_id);
+    return result;
+}
+
+bool MySQLController::add_command_to_all_admin(
+    int command_id,
+    const std::string& group_ID
+) {
+    std::string sql = "INSERT INTO user_pending_commands (user_id, command_id) "
+                      "SELECT user_id, " + std::to_string(command_id) + " "
+                      "FROM group_members "
+                      "WHERE group_id = '" + group_ID + "' AND is_admin = TRUE;";
+    bool result = execute(sql);
+    return result;
+}
+
+bool MySQLController::add_command_to_all_admin_except(
+    const std::string& user_ID,
+    int command_id,
+    const std::string& group_ID
+) {
+    std::string sql = "INSERT INTO user_pending_commands (user_id, command_id) "
+                      "SELECT user_id, " + std::to_string(command_id) + " "
+                      "FROM group_members "
+                      "WHERE group_id = '" + group_ID + "' AND is_admin = TRUE "
+                      "AND user_id != '" + user_ID + "';";
+    bool result = execute(sql);
+    return result;
+}
+
+bool MySQLController::remove_command_from_all_admin(
+    int command_id,
+    const std::string& group_ID
+) {
+    std::string sql = "DELETE FROM user_pending_commands "
+                      "WHERE command_id = " + std::to_string(command_id) + " "
+                      "AND user_id IN ("
+                      "SELECT user_id FROM group_members "
+                      "WHERE group_id = '" + group_ID + "' AND is_admin = TRUE"
+                      ");";
+    bool result = execute(sql);
+    return result;
+}
+

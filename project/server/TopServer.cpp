@@ -4,6 +4,7 @@
 #include "../global/include/threadpool.hpp"
 #include "../global/include/logging.hpp"
 #include "include/connection_manager.hpp"
+#include "include/sfile_manager.hpp"
 
 TopServer::TopServer() {
     pool = new thread_pool(20);
@@ -39,6 +40,10 @@ void TopServer::launch() {
         log_error("Failed to connect to MySQL");
         return;
     }
+
+    // 设置 SFileManager 的线程池
+    disp->file_manager->set_thread_pool(pool);
+
     message_server->init(pool, redis, disp);
     command_server->init(pool, redis, disp);
     data_server->init(pool, redis, disp);
