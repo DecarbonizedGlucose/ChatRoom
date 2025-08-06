@@ -241,20 +241,33 @@ std::vector<std::pair<std::string, bool>> MySQLController::get_friends_with_bloc
 
 /* ---------- 群组 ---------- */
 
-bool MySQLController::create_group(const std::string& group_ID,
-                                  const std::string& group_name,
-                                  const std::string& owner_ID) {
-    // 1. 创建群组
-    std::string sql = "INSERT INTO chat_groups (group_id, group_name, owner_id) VALUES ('"
+std::string MySQLController::create_group(
+    const std::string& group_name,
+    const std::string& owner_ID) {
+    // 1. 查询已有群组数量,获取新的群组ID
+    std::string sql = "SELECT COUNT(*) FROM chat_groups;";
+    auto rows = query(sql);
+    std::string count;
+    if (rows.empty() || rows[0].empty()) {
+        count = "0";
+    } else {
+        count = std::to_string(std::stoi(rows[0][0]));
+    }
+    std::string group_ID = "Group_" + count;
+
+    // 2. 占领该Id, 保存
+    sql = "INSERT INTO chat_groups (group_id, group_name, owner_id) VALUES ('"
         + group_ID + "', '" + group_name + "', '" + owner_ID + "');";
     if (!execute(sql)) {
-        return false;
+        return ""; // 创建失败
     }
 
-    // 2. 将群主添加到群成员表中
-    std::string member_sql = "INSERT INTO group_members (group_id, user_id, is_admin) VALUES ('"
-        + group_ID + "', '" + owner_ID + "', FALSE);";
-    return execute(member_sql);
+    // 3. 将群主添加到群成员表中
+    add_user_to_group(group_ID, owner_ID);
+    // 4. 设为管理员
+    add_group_admin(group_ID, owner_ID);
+
+    return group_ID;
 }
 
 bool MySQLController::add_user_to_group(const std::string& group_ID,
@@ -395,23 +408,23 @@ std::vector<std::tuple<std::string, std::string, bool, std::time_t, std::string,
 MySQLController::get_offline_messages(const std::string& user_ID, std::time_t last_active_time, int limit) {
     std::vector<std::tuple<std::string, std::string, bool, std::time_t, std::string, bool, std::string, std::size_t, std::string>> messages;
 
-    // 构建SQL查询 - 获取用户离线期间收到的消息
-    // 包括：1) 好友发给他的私聊消息, 2) 他所在群组的群聊消息
+    // 构建SQL查询 - 获取用户离线期间收到的消息，但只包括当前关系网内的消息
     std::string sql = "("
-        // 私聊消息：好友发给他的
-        "SELECT sender_id, receiver_id, is_group, timestamp, text, pin, "
-        "COALESCE(file_name, '') as file_name, COALESCE(file_size, 0) as file_size, "
-        "COALESCE(file_hash, '') as file_hash "
-        "FROM chat_messages "
-        "WHERE receiver_id = '" + user_ID + "' AND is_group = FALSE "
-        "AND timestamp > " + std::to_string(last_active_time) + " "
-        ") UNION ("
-        // 群聊消息：他所在群组的消息（排除他自己发的）
+        // 私聊消息：只包括当前好友发给他的消息（排除已删除的好友）
         "SELECT cm.sender_id, cm.receiver_id, cm.is_group, cm.timestamp, cm.text, cm.pin, "
         "COALESCE(cm.file_name, '') as file_name, COALESCE(cm.file_size, 0) as file_size, "
         "COALESCE(cm.file_hash, '') as file_hash "
         "FROM chat_messages cm "
-        "JOIN group_members gm ON cm.receiver_id = gm.group_id "
+        "INNER JOIN friends f ON cm.sender_id = f.friend_id AND f.user_id = '" + user_ID + "' "
+        "WHERE cm.receiver_id = '" + user_ID + "' AND cm.is_group = FALSE "
+        "AND cm.timestamp > " + std::to_string(last_active_time) + " "
+        ") UNION ("
+        // 群聊消息：只包括用户当前所在群组的消息（排除已退出的群聊）
+        "SELECT cm.sender_id, cm.receiver_id, cm.is_group, cm.timestamp, cm.text, cm.pin, "
+        "COALESCE(cm.file_name, '') as file_name, COALESCE(cm.file_size, 0) as file_size, "
+        "COALESCE(cm.file_hash, '') as file_hash "
+        "FROM chat_messages cm "
+        "INNER JOIN group_members gm ON cm.receiver_id = gm.group_id "
         "WHERE gm.user_id = '" + user_ID + "' AND cm.is_group = TRUE "
         "AND cm.sender_id != '" + user_ID + "' "
         "AND cm.timestamp > " + std::to_string(last_active_time) + " "

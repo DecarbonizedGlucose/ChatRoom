@@ -15,7 +15,6 @@ void try_send(ConnectionManager* conn_manager,
     DataType type
 ) {
     // 首先设置要发送的数据
-    conn->send_status = SendStatus::Sending;
     conn->socket->set_write_buf(proto);
     conn->set_send_type(type);
 
@@ -24,17 +23,14 @@ void try_send(ConnectionManager* conn_manager,
     if (sent == 0) {
         // 可能是缓冲区空或者socket不可写, 注册写事件等待
         //log_debug("Socket not ready for writing or no data, registering write event for fd: {}", conn->socket->get_fd());
-        conn->send_status = SendStatus::Waiting;
         conn->write_event->add_to_reactor();
     } else if (sent > 0) {
         // 数据发送成功
-        conn->send_status = SendStatus::Free;
         if (!conn->user_ID.empty())
             conn_manager->update_user_activity(conn->user_ID);
         log_debug("Sent immediately to fd={}, bytes={}, user_ID={}", conn->socket->get_fd(), sent, conn->user_ID);
     } else {
         // 发送出错 (sent < 0)
-        conn->send_status = SendStatus::Error;
         log_error("Failed to send (fd:{}): {}", conn->socket->get_fd(), strerror(errno));
     }
 }
@@ -62,23 +58,15 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
                     if (conn) {
                         // 在线, 直接发送
                         try_send(disp->conn_manager, conn, ostr);
-                        return;
                     }
                 }
                 // 不在线
             } else {
                 // 被屏蔽了
-                log_info("User {} blocked message from {}", receiver, sender);
+                return;
             }
         } else {
-            // 不是好友
-            // auto conn = disp->conn_manager->get_connection(sender, 1);
-            // auto env_str = create_command_string(
-            //     Action::Warn,
-            //     "ChatRoom Team",
-            //     { "You are not friends with " + receiver + ", message not sent." }
-            // );
-            // try_send(disp->conn_manager, conn, env_str, DataType::Command);
+            return;
         }
     } else { // 群组消息
         // 判断他在不在群里
@@ -116,8 +104,6 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
 
 void MessageHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
-    conn->send_status = SendStatus::Free;
-    log_debug("MessageHandler::handle_send completed, status set to Free");
 }
 
 /* ---------- CommandHandler ---------- */
@@ -194,7 +180,7 @@ void CommandHandler::handle_recv(
         }
         case Action::Create_Group: {
             handle_create_group(
-                subj, args[0], args[1]);
+                args[0], subj, args[0]);
             break;
         }
         case Action::Block_Friend: {
@@ -250,7 +236,6 @@ void CommandHandler::handle_recv(
             conn->user_ID = subj; // 这里的subj是user_ID
             int server_index = std::stoi(args[0]);
             disp->conn_manager->add_conn(conn, server_index);
-            break;
         }
         case Action::Online_Init: {
             handle_online_init(subj);
@@ -265,7 +250,7 @@ void CommandHandler::handle_recv(
 
 void CommandHandler::handle_send(TcpServerConnection* conn) {
     auto sent = conn->socket->send_with_size();
-    conn->send_status = SendStatus::Free; // 设置发送状态为Free
+    conn->socket->send_with_size();
     log_debug("CommandHandler::handle_send called, sent to fd={}, size={}, user_ID={}", conn->socket->get_fd(), sent, conn->user_ID);
 }
 
@@ -604,6 +589,8 @@ void CommandHandler::handle_create_group(
     const std::string& user_ID,
     const std::string& time) {
     log_debug("handle_create_group called");
+    // 创建群组
+
 }
 
 void CommandHandler::handle_join_group_req() {}
@@ -646,7 +633,7 @@ void CommandHandler::handle_post_relation_net(const std::string& user_ID, const 
     );
     auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
     if (data_conn) {
-        data_conn->write_queue.push({sync_str, DataType::SyncItem});
+        try_send(disp->conn_manager, data_conn, sync_str, DataType::SyncItem);
     } else {
         log_error("Data connection not found for user: {}", user_ID);
     }
@@ -780,15 +767,6 @@ void CommandHandler::handle_online_init(const std::string& user_ID) {
     handle_post_offline_messages(user_ID, relation_data);
     // 发送未接收的通知和未处理的好友请求/群聊邀请等
     handle_post_unordered_noti_and_req(user_ID, relation_data);
-    auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
-    data_conn->to_send_type = DataType::SyncItem;
-    while (data_conn && !data_conn->write_queue.empty()) {
-        if (data_conn->send_status == SendStatus::Free) {
-            std::pair<std::string, DataType> task;
-            data_conn->write_queue.pop(task);
-            try_send(disp->conn_manager, data_conn, task.first, task.second);
-        }
-    }
     log_info("Online initialization completed for user: {}", user_ID);
 }
 
@@ -807,7 +785,12 @@ void CommandHandler::handle_post_friends_status(
     );
     auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
     if (data_conn) {
-        data_conn->write_queue.push({sync_str, DataType::SyncItem});
+        try_send(
+            disp->conn_manager,
+            data_conn,
+            sync_str,
+            DataType::SyncItem
+        );
     } else {
         log_error("Data connection not found for user: {}", user_ID);
     }
@@ -858,7 +841,13 @@ void CommandHandler::handle_post_offline_messages(
         // 发送到data连接通道（通道2）
         auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
         if (data_conn) {
-            data_conn->write_queue.push({env_str, DataType::OfflineMessages});
+            try_send(
+                disp->conn_manager,
+                data_conn,
+                env_str,
+                DataType::OfflineMessages
+            );
+            log_info("Sent {} offline messages to user: {}", chat_messages.size(), user_ID);
         } else {
             log_error("Data connection not found for user: {}", user_ID);
         }
@@ -961,7 +950,6 @@ void FileHandler::handle_recv(
 
 void FileHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
-    conn->send_status = SendStatus::Free;
     log_debug("FileHandler::handle_send called");
 }
 
@@ -971,7 +959,6 @@ SyncHandler::SyncHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
 void SyncHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
-    conn->send_status = SendStatus::Free;
     log_debug("SyncHandler::handle_send called");
 }
 
@@ -981,6 +968,5 @@ OfflineMessageHandler::OfflineMessageHandler(Dispatcher* dispatcher) : Handler(d
 
 void OfflineMessageHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
-    conn->send_status = SendStatus::Free;
     log_debug("OfflineMessageHandler::handle_send called");
 }

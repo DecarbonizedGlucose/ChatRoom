@@ -130,15 +130,13 @@ void Dispatcher::dispatch_send(TcpServerConnection* conn) {
             break;
         }
         case DataType::FileChunk: {
-            file_handler->handle_send(conn);
+            // 不知道
             break;
         }
         case DataType::SyncItem: {
-            sync_handler->handle_send(conn);
             break;
         }
         case DataType::OfflineMessages: {
-            offline_message_handler->handle_send(conn);
             break;
         }
         default: {

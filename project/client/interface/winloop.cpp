@@ -8,10 +8,10 @@
 #include <iostream>
 #include <regex>
 #include <chrono>
-#include <thread>
 #include <cstdlib>
 #include "../../global/include/time_utils.hpp"
 #include <sstream>
+#include <algorithm>
 
 namespace {
 
@@ -990,10 +990,12 @@ void WinLoop::my_lists_loop() {
     std::cout << std::endl;
     // /exit /delete /block /unblock /quit /disband
     // /remove_admin /add_admin /create_group
+    // /show_members /show_admins
     std::cout << "语法: /cmd [group_ID/name] [friend_ID]" << std::endl;
     std::cout << "可用命令：" << std::endl;
     std::cout << "/delete  /block  /unblock  /quit  /disband" << std::endl;
     std::cout << "/remove_admin  /add_admin  /create_group" << std::endl;
+    std::cout << "/show_members" << std::endl;
     std::cout << "输入 /exit 返回上一级菜单。" << std::endl;
     std::string input, command;
     std::string user_ID, group_ID;
@@ -1191,7 +1193,74 @@ void WinLoop::my_lists_loop() {
                 // 将群组信息写入本地缓存
                 comm->handle_create_group(group_ID, group_name);
             } else {
+                // 失败时返回的group ID 是空的
                 std::cout << "创建群组失败, 请重试。" << std::endl;
+            }
+        } else if (input.find("/show_members") == 0) {
+            ss >> command >> group_ID;
+            if (group_ID.empty()) {
+                std::cout << "群组ID不能为空" << std::endl;
+                continue;
+            } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
+                std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
+                continue;
+            } else {
+                // 显示群组成员
+                auto members = comm->sqlite_con->get_cached_group_members_with_admin_status(group_ID);
+                std::cout << "群组 " << group_ID << " 的成员列表：" << std::endl;
+                std::cout << "共计 " << members.size() << " 名成员。" << std::endl;
+                auto owner = comm->cache.group_list[group_ID].owner_ID;
+                std::cout <<
+                    (owner == comm->cache.user_ID ? style(owner, {ansi::BOLD, ansi::FG_YELLOW}) : owner)
+                    << " (群主)" << std::endl;
+                auto new_end = std::remove_if(members.begin(), members.end(),
+                    [&](const auto& member) {
+                        return member.first == owner;
+                    });
+                members.erase(new_end, members.end());
+                sort(members.begin(), members.end(),
+                    [](const auto& a, const auto& b) {
+                        // 管理员优先，然后按字母顺序排序
+                        if (a.second != b.second) {
+                            return a.second > b.second; // true if a is admin and b is not
+                        }
+                        return a.first < b.first; // 按字母顺序排序
+                    });
+                for (const auto& [member, is_admin] : members) {
+                    std::cout <<
+                        (member == comm->cache.user_ID ? style(member, {ansi::BOLD, ansi::FG_YELLOW}) : member)
+                        << " (管理员)" << std::endl;
+                }
+                std::cout <<  "====================================" << std::endl;
+            }
+        } else if (input.find("/show_admins") == 0) {
+            ss >> command >> group_ID;
+            if (group_ID.empty()) {
+                std::cout << "群组ID不能为空" << std::endl;
+                continue;
+            } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
+                std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
+                continue;
+            } else {
+                // 显示群组管理员
+                auto members = comm->sqlite_con->get_cached_group_members_with_admin_status(group_ID);
+                std::cout << "群组 " << group_ID << " 的管理员列表：" << std::endl;
+                auto owner = comm->cache.group_list[group_ID].owner_ID;
+                auto new_end = std::remove_if(members.begin(), members.end(),
+                    [&](const auto& member) {
+                        return member.first == owner;
+                    });
+                members.erase(new_end, members.end());
+                std::cout << "群主: "
+                    << (owner == comm->cache.user_ID ? style(owner, {ansi::BOLD, ansi::FG_YELLOW}) : owner)
+                    << std::endl;
+                for (const auto& [member, is_admin] : members) {
+                    if (is_admin)
+                        std::cout <<
+                            (member == comm->cache.user_ID ? style(member, {ansi::BOLD, ansi::FG_YELLOW}) : member)
+                            << (is_admin ? " (管理员)" : " (成员)") << std::endl;
+                }
+                std::cout <<  "====================================" << std::endl;
             }
         } else {
             std::cout << "无效的命令, 请重新输入。" << std::endl;

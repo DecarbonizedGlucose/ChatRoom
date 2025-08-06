@@ -63,22 +63,29 @@ public:
 
 /* ---------- 群组 ---------- */
 
-    bool create_group(const std::string& group_ID,
-                      const std::string& group_name,
-                      const std::string& owner_ID);
-    bool add_user_to_group(const std::string& group_ID,
-                           const std::string& user_ID);
-    bool kick_user_from_group(const std::string& group_ID,
-                                const std::string& user_ID);
-    bool remove_user_from_group(const std::string& group_ID,
-                                const std::string& user_ID);
+    std::string create_group(
+        const std::string& group_name,
+        const std::string& owner_ID);
+    bool add_user_to_group(
+        const std::string& group_ID,
+        const std::string& user_ID);
+    bool kick_user_from_group(
+        const std::string& group_ID,
+        const std::string& user_ID);
+    bool remove_user_from_group(
+        const std::string& group_ID,
+        const std::string& user_ID);
     bool disband_group(const std::string& group_ID);
     bool search_group(const std::string& group_ID);
-    bool is_user_in_group(const std::string& group_ID, const std::string& user_ID);
-    bool add_group_admin(const std::string& group_ID,
-                         const std::string& user_ID);
-    bool remove_group_admin(const std::string& group_ID,
-                            const std::string& user_ID);
+    bool is_user_in_group(
+        const std::string& group_ID,
+        const std::string& user_ID);
+    bool add_group_admin(
+        const std::string& group_ID,
+        const std::string& user_ID);
+    bool remove_group_admin(
+        const std::string& group_ID,
+        const std::string& user_ID);
 
     // 查询函数
     std::vector<std::string> get_user_groups(const std::string& user_ID);

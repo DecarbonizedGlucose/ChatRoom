@@ -48,7 +48,7 @@ void CFileManager::download_file(
         return r_status == OperationType::Free;
     });
     auto file = std::make_shared<ClientFile>(file_name, save_path, file_hash, file_size);
-    file->open_for_write(); // 下载时应该用write模式
+    file->open_for_read();
     pool->submit([this, file]() {
         r_status = OperationType::Downloading;
         process_download_task(file);
@@ -78,29 +78,12 @@ void CFileManager::process_upload_task(const ClientFilePtr& file) {
 
 void CFileManager::process_download_task(const ClientFilePtr& file) {
     // 客户端下载
-    log_info("Starting download for file: {}, expecting {} chunks", file->file_name, file->get_total_chunks());
-
     while (file->has_more_chunks()) {
-        try {
-            auto chunk = comm->handle_receive_file_chunk();
-            std::vector<char> data(chunk.data().begin(), chunk.data().end());
-
-            log_debug("Received file chunk: file={}, index={}, size={} bytes",
-                     file->file_name, chunk.chunk_index(), data.size());
-
-            if (!file->write_chunk(data, chunk.chunk_index())) {
-                log_error("Failed to write chunk {} for file: {}", chunk.chunk_index(), file->file_name);
-                break;
-            }
-        } catch (const std::exception& e) {
-            log_error("Exception while receiving chunk for file {}: {}", file->file_name, e.what());
-            break;
-        }
+        auto chunk = comm->handle_receive_file_chunk();
+        std::vector<char> data(chunk.data().begin(), chunk.data().end());
+        file->write_chunk(data, chunk.chunk_index());
+        log_debug("Receive file chunk: {}, index: {}", file->file_id, chunk.chunk_index());
     }
-
-    if (file->finalize_download()) {
-        log_info("File download completed successfully: {}", file->get_local_path());
-    } else {
-        log_error("File download failed during finalization: {}", file->get_local_path());
-    }
+    file->finalize_download();
+    log_info("File download completed: {}", file->get_local_path());
 }
