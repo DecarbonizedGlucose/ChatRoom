@@ -120,8 +120,8 @@ public:
     );
 
     // others
-    void handle_get_relation_net(); // 不发请求, 主动拉取, 不知道发来什么
     void handle_send_id();
+    void handle_get_relation_net(); // 不发请求, 主动拉取, 不知道发来什么
     void handle_get_chat_history();
     void handle_add_friend(const std::string& friend_ID);
     void handle_remove_friend(const std::string& friend_ID);
@@ -146,7 +146,8 @@ public:
     void send_file_message(
         const std::string& receiver_id,
         bool is_group,
-        const std::string& file_path);
+        const ClientFilePtr& file,
+        const std::string& file_id);
     void send_text_with_file(
         const std::string& receiver_id,
         bool is_group,

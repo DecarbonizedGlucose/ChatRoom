@@ -94,7 +94,7 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
             FileChunk file_chunk;
             any.UnpackTo(&file_chunk);
             // 文件分片
-            file_handler->handle_recv(file_chunk, proto_str);
+            file_handler->handle_recv(conn, file_chunk);
         } else { // 剩下的不用服务器收
             log_error("Unknown payload type");
             continue;
@@ -130,13 +130,15 @@ void Dispatcher::dispatch_send(TcpServerConnection* conn) {
             break;
         }
         case DataType::FileChunk: {
-            // 不知道
+            file_handler->handle_send(conn);
             break;
         }
         case DataType::SyncItem: {
+            sync_handler->handle_send(conn);
             break;
         }
         case DataType::OfflineMessages: {
+            offline_message_handler->handle_send(conn);
             break;
         }
         default: {

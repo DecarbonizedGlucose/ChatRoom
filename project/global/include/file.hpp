@@ -46,7 +46,8 @@ private:
     std::string local_path;     // 本地文件路径
     std::ifstream input_stream; // 读取文件流
     std::ofstream output_stream;// 写入文件流
-    size_t current_chunk = 0;   // 当前分片索引
+    size_t current_chunk = 0;   // 当前分片索引（用于上传）
+    size_t received_chunks_count = 0;  // 已接收分片数量（用于下载）
 
 public:
     ClientFile(const std::string& path);  // 用于上传
@@ -80,7 +81,7 @@ private:
 
 public:
     ServerFile(const std::string& hash, const std::string& file_id,
-               const std::string& name, size_t size);
+               const std::string& name, size_t size, const std::string& storage);
 
     ~ServerFile();
 

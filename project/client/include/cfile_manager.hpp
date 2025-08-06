@@ -27,6 +27,7 @@ public:
 
     // 上传文件
     void upload_file(const std::string& file_path);
+    void upload_file(const ClientFilePtr& file);
     // 下载文件
     void download_file(
         const std::string& file_name,

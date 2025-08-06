@@ -116,7 +116,8 @@ private:
     void handle_remove_admin();
     void handle_upload_file(
         TcpServerConnection* conn,
-        const std::string& file_hash);
+        const std::string& file_hash,
+        size_t file_size);
     void handle_download_file(
         const std::string& user_ID,
         const std::string& file_ID);
@@ -145,7 +146,9 @@ class FileHandler : public Handler {
 public:
     FileHandler(Dispatcher* dispatcher);
 
-    void handle_recv(const FileChunk& file_chunk, const std::string& ostr);
+    void handle_recv(
+        TcpServerConnection* conn,
+        const FileChunk& file_chunk);
     void handle_send(TcpServerConnection* conn);
 };
 

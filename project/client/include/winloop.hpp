@@ -73,8 +73,8 @@ private:
         const std::vector<std::pair<std::string, ContactCache::ConversationInfo*>>&
         conv_list);
     void display_chat_messages(const std::string& conversation_id);
-    void handle_chat_input(const std::string& conversation_id);
     std::string format_message(const ChatMessage& msg);
+    void print_header();
     void render_message(const ChatMessage& msg);
 
     // 无界面功能

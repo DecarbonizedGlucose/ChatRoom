@@ -8,10 +8,15 @@
 #include <iostream>
 #include <regex>
 #include <chrono>
+#include <thread>
+#include <cstdlib>
 #include "../../global/include/time_utils.hpp"
 #include <sstream>
 
 namespace {
+
+/* ---------- 注册输入检查 ---------- */
+
     // 密码合规性
     bool is_password_valid(const std::string& password) {
         // 8-16位, 至少包含一个大写字母、小写字母、数字和特殊字符, 且不能包含空格, 在ascii 127范围内
@@ -59,6 +64,23 @@ namespace {
     bool is_email_valid(const std::string& email) {
         const std::regex pattern(R"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})");
         return std::regex_match(email, pattern);
+    }
+
+/* ---------- 消息输入检查 ---------- */
+
+    bool is_to_exit(const std::string& input) {
+        const std::regex pattern(R"(^\s*/exit\s*$)");
+        return std::regex_match(input, pattern);
+    }
+
+    bool is_to_upload(const std::string& input) {
+        const std::regex pattern(R"(^\s*/up\s+(/[^\s]+)\s*$)");
+        return std::regex_match(input, pattern);
+    }
+
+    bool is_to_download(const std::string& input) {
+        const std::regex pattern(R"(^\s*/down\s+([a-zA-Z0-9_-]+)\s+(\S+)\s*$)");
+        return std::regex_match(input, pattern);
     }
 
 }
@@ -173,6 +195,22 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
             // 管理员会收到通知, 被移除的管理员也会
             comm->cache.notices.push(cmd);
             // 还要有磁盘IO
+            return;
+        }
+        case Action::Accept_File: {
+            comm->cache.real_time_notices.push(cmd);
+            break;
+        }
+        case Action::Deny_File: {
+            comm->cache.real_time_notices.push(cmd);
+            return;
+        }
+        case Action::Accept_File_Req: {
+            comm->cache.real_time_notices.push(cmd);
+            return;
+        }
+        case Action::Deny_File_Req: {
+            comm->cache.real_time_notices.push(cmd);
             return;
         }
         case Action::HEARTBEAT: {             // 心跳检测
@@ -528,69 +566,123 @@ void WinLoop::message_loop() {
     }
 }
 
-/*
-chat命令
-<text> 发送消息
-/exit 退出聊天
-/file <path> text 发送带文件的消息
-/file <path> 发送文件
-/download <file_id> <full_path/file.txt>
-*/
-
 void WinLoop::chat_loop() {
     sclear();
     auto conv_id = comm->cache.current_conversation_id;
-
     auto history = comm->get_conversation_messages(conv_id);
     for (auto msg : history) {
         render_message(msg);
     }
-
     std::string input;
     bool chatting = true;
     pool->submit([&]{
         while (chatting) {
             ChatMessage msg;
-            comm->cache.new_messages.wait_and_pop(msg);
-            if (msg.receiver() == conv_id || msg.sender() == conv_id) {
+            bool got = comm->cache.new_messages.wait_for_and_pop(msg, std::chrono::milliseconds(100));
+            if (!got) continue; // 这样能及时跳出，避免线程池被占用
+            if ((msg.receiver() == conv_id || msg.sender() == conv_id)) {
                 std::lock_guard<std::mutex> lock(output_mutex);
                 std::cout << '\r' << std::string(50, ' ') << '\r'; // 清除当前行
                 render_message(msg);
+                print_header();
                 print_input_sign();
             }
-
         }
     });
-
-    print_input_sign();
-
     while (chatting) {
+        print_header();
+        print_input_sign();
         std::getline(std::cin, input);
-
         if (input.empty()) continue;
-        if (input == "/exit") {
+        if (is_to_exit(input)) {
+            // 退出聊天
+            chatting = false;
             break;
         }
-
-        if (input.find("/file ") == 0) {
+        if (is_to_upload(input)) {
+            // 上传文件
             std::istringstream iss(input);
-            std::string cmd, path, rest;
+            std::string cmd, path;
             iss >> cmd >> path;
-            std::getline(iss, rest);
-            comm->send_text_with_file(conv_id,
-                                      comm->cache.conversations[conv_id].is_group,
-                                      rest,
-                                      path);
+            auto file = std::make_shared<ClientFile>(path);
+            if (file->status == FileStatus::FAILED) {
+                std::cout << "[系统消息] 文件不存在。" << std::endl << std::endl;
+                continue;
+            }
+            // 发送上传请求
+            comm->handle_send_command(Action::Upload_File,
+                comm->cache.user_ID,
+                {file->file_hash, std::to_string(file->file_size)});
+            CommandRequest resp;
+            bool got = comm->cache.real_time_notices.wait_for_and_pop(resp, std::chrono::seconds(5));
+            if (!got) {
+                std::cout << "\r[系统消息] 上传请求超时，请稍后重试。" << std::endl << std::endl;
+                continue;
+            }
+            if (resp.action() != static_cast<int>(Action::Accept_File)) {
+                if (resp.args_size() > 1 && resp.args(1) == "1") {
+                    std::cout << "\r[系统消息] 服务器已有该文件，无需重复上传。" << std::endl;
+                    // Deny_File with sendable="1": args(0)=file_hash, args(1)="1", args(2)=file_id
+                    if (resp.args_size() > 2) {
+                        comm->send_file_message(
+                            conv_id,
+                            comm->cache.conversations[conv_id].is_group,
+                            file,
+                            resp.args(2));  // file_id
+                    } else {
+                        std::cout << "\r[系统消息] 服务器响应格式错误。" << std::endl;
+                    }
+                    continue;
+                } else {
+                    std::cout << "\r[系统消息] 服务器拒绝上传。" << std::endl << std::endl;
+                    continue;
+                }
+            }
+            std::cout << "\r[系统消息] 上传请求已发送，正在上传文件" << std::endl << std::endl;
+            comm->file_manager->upload_file(path);
+            comm->send_file_message(
+                conv_id,
+                comm->cache.conversations[conv_id].is_group,
+                file,
+                resp.args(1));
+        } else if (is_to_download(input)) {
+            // 下载文件
+            std::regex pattern(R"(^\s*/down\s+([a-zA-Z0-9_-]+)\s+(\S+)\s*$)");
+            std::smatch matches;
+            if (std::regex_match(input, matches, pattern)) {
+                std::string file_id = matches[1].str();
+                std::string file_name = matches[2].str();
+                comm->handle_send_command(Action::Download_File,
+                    comm->cache.user_ID,
+                    {file_id});
+                std::cout << "\r[系统消息] 正在发送下载请求，请稍候..." << std::endl;
+                CommandRequest resp;
+                bool got = comm->cache.real_time_notices.wait_for_and_pop(resp, std::chrono::seconds(5));
+                if (!got) {
+                    std::cout << "\r[系统消息] 下载请求超时，请稍后重试。" << std::endl << std::endl;
+                    continue;
+                }
+                if (resp.action() != static_cast<int>(Action::Accept_File_Req)) {
+                    std::cout << "\r[系统消息] 文件不存在。" << std::endl << std::endl;
+                    continue;
+                }
+                std::cout << "\r[系统消息] 下载请求已发送，正在下载文件..." << std::endl;
+                std::string download_path = std::string(std::getenv("HOME")) + "/Downloads/" + file_name;
+                comm->file_manager->download_file( // 包含了线程池操作
+                    file_name,
+                    download_path,
+                    resp.args(1),
+                    std::stol(resp.args(2))
+                );
+            }
         } else {
+            // 普通文本消息
             comm->send_text_message(conv_id,
-                                    comm->cache.conversations[conv_id].is_group,
-                                    input);
+                comm->cache.conversations[conv_id].is_group,
+                input);
+            std::cout << std::endl;
         }
-
-        std::cout << std::endl;
-        print_input_sign();
     }
-
     switch_to(UIPage::Message);
 }
 
@@ -617,11 +709,17 @@ void WinLoop::notice_loop() {
     // 显示所有通知
     for (const auto& cmd : notices_copy) {
         Action action = static_cast<Action>(cmd.action());
-        auto time = cmd.args(0);
-        std::cout << '[' << time << "] ";
+        if (cmd.args_size() > 0) {
+            auto time = cmd.args(0);
+            std::cout << '[' << time << "] ";
+        }
         switch (action) {
             case Action::Notify: {
-                std::cout << cmd.args(1) << std::endl;
+                if (cmd.args_size() > 1) {
+                    std::cout << cmd.args(1) << std::endl;
+                } else {
+                    std::cout << "通知消息" << std::endl;
+                }
                 break;
             }
             case Action::Accept_FReq: {
@@ -1345,37 +1443,18 @@ std::string WinLoop::format_message(const ChatMessage& msg) {
     return result;
 }
 
-void WinLoop::handle_chat_input(const std::string& conversation_id) {
-    std::string input;
-    std::getline(std::cin, input);
-
-    if (input.empty()) {
-        return;
-    }
-
-    if (input == "/exit") {
-        comm->cache.current_conversation_id.clear(); // 退出当前会话
-        switch_to(UIPage::Message);
-        return;
-    }
-
-    if (input == "/file") {
-        std::cout << "请输入文件路径: ";
-        std::string file_path;
-        std::getline(std::cin, file_path);
-
-        if (!file_path.empty()) {
-            auto& conv_info = comm->cache.conversations[conversation_id];
-            comm->send_file_message(conversation_id, conv_info.is_group, file_path);
-            std::cout << "文件发送请求已提交。" << std::endl;
-            pause();
+void WinLoop::print_header() {
+    std::string header = "[" + style(comm->cache.user_ID, {ansi::BOLD, ansi::FG_BRIGHT_YELLOW}) + "]";
+    if (comm->cache.group_list.find(comm->cache.current_conversation_id) != comm->cache.group_list.end()) {
+        const auto& group = comm->cache.group_list[comm->cache.current_conversation_id];
+        if (comm->cache.user_ID == group.owner_ID) {
+            header += "[群主]";
+        } else if (group.is_user_admin) {
+            header += "[管理员]";
         }
-        return;
     }
-
-    // 发送文本消息
-    auto& conv_info = comm->cache.conversations[conversation_id];
-    comm->send_text_message(conversation_id, conv_info.is_group, input);
+    std::cout << header;
+    std::cout.flush();
 }
 
 void WinLoop::render_message(const ChatMessage& msg) {
@@ -1409,8 +1488,21 @@ void WinLoop::render_message(const ChatMessage& msg) {
     // 文件信息
     if (msg.pin()) {
         const auto& file = msg.payload();
-        std::string file_line = "~~(" + file.file_name() + ")[" +
-                                std::to_string(file.file_size()) + ", ";
+        auto name = file.file_name();
+        size_t at_pos = name.find_last_of('@');
+        std::string display_name, file_id;
+
+        if (at_pos != std::string::npos) {
+            // 找到@符号，分离文件名和ID
+            display_name = name.substr(0, at_pos);
+            file_id = name.substr(at_pos + 1);
+        } else {
+            // 没有@符号，无法获取文件ID
+            display_name = name;
+            file_id = "未知"; // 不再使用hash前8位作为ID
+        }
+
+        std::string file_line = "~~(" + display_name + ")[ID:" + file_id + ", ";
         double size_kb = file.file_size() / 1024.0;
         std::ostringstream oss;
         if (size_kb < 1024) {

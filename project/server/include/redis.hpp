@@ -149,6 +149,10 @@ public:
     // 检查群组信息是否已缓存
     bool is_group_info_cached(const std::string& group_ID);
 
+/* ==================== 文件存储 ==================== */
+
+    std::string get_file_storage_path();
+
 /* ==================== 在线消息缓存 ==================== */
 //         (待实现：缓存最近2000条消息)
 

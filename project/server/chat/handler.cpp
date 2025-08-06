@@ -15,6 +15,7 @@ void try_send(ConnectionManager* conn_manager,
     DataType type
 ) {
     // 首先设置要发送的数据
+    conn->send_status = SendStatus::Sending;
     conn->socket->set_write_buf(proto);
     conn->set_send_type(type);
 
@@ -23,14 +24,17 @@ void try_send(ConnectionManager* conn_manager,
     if (sent == 0) {
         // 可能是缓冲区空或者socket不可写, 注册写事件等待
         //log_debug("Socket not ready for writing or no data, registering write event for fd: {}", conn->socket->get_fd());
+        conn->send_status = SendStatus::Waiting;
         conn->write_event->add_to_reactor();
     } else if (sent > 0) {
         // 数据发送成功
+        conn->send_status = SendStatus::Free;
         if (!conn->user_ID.empty())
             conn_manager->update_user_activity(conn->user_ID);
         log_debug("Sent immediately to fd={}, bytes={}, user_ID={}", conn->socket->get_fd(), sent, conn->user_ID);
     } else {
         // 发送出错 (sent < 0)
+        conn->send_status = SendStatus::Error;
         log_error("Failed to send (fd:{}): {}", conn->socket->get_fd(), strerror(errno));
     }
 }
@@ -112,6 +116,8 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
 
 void MessageHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
+    conn->send_status = SendStatus::Free;
+    log_debug("MessageHandler::handle_send completed, status set to Free");
 }
 
 /* ---------- CommandHandler ---------- */
@@ -128,7 +134,7 @@ void CommandHandler::handle_recv(
 
     if (action == Action::HEARTBEAT) {
         // 专门的心跳包
-        log_debug("Heartbeat received from user: {}", subj);
+        log_info("Heartbeat received from user: {}", subj);
         return;
     }
 
@@ -232,7 +238,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Upload_File: {
-            handle_upload_file(conn, args[0]);
+            handle_upload_file(conn, args[0], std::stoul(args[1]));
             break;
         }
         case Action::Download_File: {
@@ -244,6 +250,7 @@ void CommandHandler::handle_recv(
             conn->user_ID = subj; // 这里的subj是user_ID
             int server_index = std::stoi(args[0]);
             disp->conn_manager->add_conn(conn, server_index);
+            break;
         }
         case Action::Online_Init: {
             handle_online_init(subj);
@@ -258,7 +265,7 @@ void CommandHandler::handle_recv(
 
 void CommandHandler::handle_send(TcpServerConnection* conn) {
     auto sent = conn->socket->send_with_size();
-    conn->socket->send_with_size();
+    conn->send_status = SendStatus::Free; // 设置发送状态为Free
     log_debug("CommandHandler::handle_send called, sent to fd={}, size={}, user_ID={}", conn->socket->get_fd(), sent, conn->user_ID);
 }
 
@@ -281,6 +288,11 @@ void CommandHandler::handle_sign_in(
     }
     auto user_ID = is_email ? ret : subj; // user_ID
     auto user_email = is_email ? subj : ret; // email
+    std::string err_msg;
+    if (disp->redis_con->get_user_status(user_ID).first) {
+        res = false;
+        err_msg = "用户已在线";
+    }
     if (res) {
         // 登录成功
         auto env_out = create_command_string(
@@ -289,7 +301,7 @@ void CommandHandler::handle_sign_in(
         try_send(disp->conn_manager, conn, env_out);
     } else {
         // 登录失败
-        std::string err_msg = "用户名/邮箱与密码不匹配";
+        if (err_msg.empty()) err_msg = "用户名/邮箱与密码不匹配";
         auto env_out = create_command_string(
             Action::Refuse_Login, "", {err_msg});
         try_send(disp->conn_manager, conn, env_out);
@@ -634,7 +646,7 @@ void CommandHandler::handle_post_relation_net(const std::string& user_ID, const 
     );
     auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
     if (data_conn) {
-        try_send(disp->conn_manager, data_conn, sync_str, DataType::SyncItem);
+        data_conn->write_queue.push({sync_str, DataType::SyncItem});
     } else {
         log_error("Data connection not found for user: {}", user_ID);
     }
@@ -642,10 +654,10 @@ void CommandHandler::handle_post_relation_net(const std::string& user_ID, const 
 }
 
 void CommandHandler::handle_upload_file(
-    TcpServerConnection* conn, const std::string& file_hash) {
+    TcpServerConnection* conn, const std::string& file_hash, size_t file_size) {
     log_debug("handle_upload_file called for file hash: {}", file_hash);
 
-    // 直接尝试生成file_id，如果文件已存在会返回空字符串
+    // 直接尝试生成file_id
     std::string new_file_id = disp->mysql_con->generate_file_id_only(file_hash);
 
     if (new_file_id.empty()) {
@@ -655,7 +667,7 @@ void CommandHandler::handle_upload_file(
         auto env_str = create_command_string(
             Action::Deny_File,
             "ChatRoom Server",
-            {file_hash}
+            {file_hash, "1", new_file_id}
         );
         try_send(disp->conn_manager, conn, env_str);
         return;
@@ -666,9 +678,19 @@ void CommandHandler::handle_upload_file(
     auto env_str = create_command_string(
         Action::Accept_File,
         "ChatRoom Server",
-        {new_file_id}
+        {file_hash, new_file_id}
     );
     try_send(disp->conn_manager, conn, env_str);
+
+    // 写进mysql
+    disp->mysql_con->add_file_record(
+        file_hash, new_file_id, file_size);
+    // 添加文件接收任务到文件管理器
+    auto file = std::make_shared<ServerFile>(
+        file_hash, new_file_id, new_file_id, file_size,
+        disp->file_manager->storage);
+    file->open_for_write();
+    disp->file_manager->add_upload_task(conn->user_ID, file);
 }
 
 void CommandHandler::handle_download_file(
@@ -677,7 +699,7 @@ void CommandHandler::handle_download_file(
 
     // 通过file_ID获取文件信息
     std::string file_hash = disp->mysql_con->get_file_hash_by_id(file_ID);
-    if (file_hash.empty()) {
+    if (file_hash.empty()) { // 文件不存在
         log_error("File not found for file_ID: {}", file_ID);
 
         // 发送错误响应
@@ -722,7 +744,7 @@ void CommandHandler::handle_download_file(
         auto env_str = create_command_string(
             Action::Accept_File_Req,
             "ChatRoom Server",
-            {file_ID}
+            {file_ID, file_hash, std::to_string(file_size)}
         );
         try_send(disp->conn_manager, conn, env_str);
     }
@@ -758,6 +780,15 @@ void CommandHandler::handle_online_init(const std::string& user_ID) {
     handle_post_offline_messages(user_ID, relation_data);
     // 发送未接收的通知和未处理的好友请求/群聊邀请等
     handle_post_unordered_noti_and_req(user_ID, relation_data);
+    auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
+    data_conn->to_send_type = DataType::SyncItem;
+    while (data_conn && !data_conn->write_queue.empty()) {
+        if (data_conn->send_status == SendStatus::Free) {
+            std::pair<std::string, DataType> task;
+            data_conn->write_queue.pop(task);
+            try_send(disp->conn_manager, data_conn, task.first, task.second);
+        }
+    }
     log_info("Online initialization completed for user: {}", user_ID);
 }
 
@@ -776,12 +807,7 @@ void CommandHandler::handle_post_friends_status(
     );
     auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
     if (data_conn) {
-        try_send(
-            disp->conn_manager,
-            data_conn,
-            sync_str,
-            DataType::SyncItem
-        );
+        data_conn->write_queue.push({sync_str, DataType::SyncItem});
     } else {
         log_error("Data connection not found for user: {}", user_ID);
     }
@@ -832,13 +858,7 @@ void CommandHandler::handle_post_offline_messages(
         // 发送到data连接通道（通道2）
         auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
         if (data_conn) {
-            try_send(
-                disp->conn_manager,
-                data_conn,
-                env_str,
-                DataType::OfflineMessages
-            );
-            log_info("Sent {} offline messages to user: {}", chat_messages.size(), user_ID);
+            data_conn->write_queue.push({env_str, DataType::OfflineMessages});
         } else {
             log_error("Data connection not found for user: {}", user_ID);
         }
@@ -920,11 +940,28 @@ void CommandHandler::get_blocked_info(const std::string& user_ID, const json& fr
 
 FileHandler::FileHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
-void FileHandler::handle_recv(const FileChunk& file_chunk, const std::string& ostr) {
+void FileHandler::handle_recv(
+    TcpServerConnection* conn,
+    const FileChunk& file_chunk) {
+    // 获取文件指针
+    auto file = disp->file_manager->upload_tasks[conn->user_ID].server_file;
+    // 写入数据
+    std::vector<char> data(file_chunk.data().begin(), file_chunk.data().end());
+    file->write_chunk(data, file_chunk.chunk_index());
+    if (file->is_complete()) {
+        bool success = file->finalize_upload();
+        disp->file_manager->upload_tasks.erase(conn->user_ID);
+        if (success) {
+            log_info("File upload completed successfully: {}", file->file_name);
+        } else {
+            log_error("File upload failed during finalization: {}", file->file_name);
+        }
+    }
 }
 
 void FileHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
+    conn->send_status = SendStatus::Free;
     log_debug("FileHandler::handle_send called");
 }
 
@@ -934,6 +971,7 @@ SyncHandler::SyncHandler(Dispatcher* dispatcher) : Handler(dispatcher) {}
 
 void SyncHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
+    conn->send_status = SendStatus::Free;
     log_debug("SyncHandler::handle_send called");
 }
 
@@ -943,5 +981,6 @@ OfflineMessageHandler::OfflineMessageHandler(Dispatcher* dispatcher) : Handler(d
 
 void OfflineMessageHandler::handle_send(TcpServerConnection* conn) {
     conn->socket->send_with_size();
+    conn->send_status = SendStatus::Free;
     log_debug("OfflineMessageHandler::handle_send called");
 }

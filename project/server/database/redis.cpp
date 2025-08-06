@@ -559,3 +559,9 @@ bool RedisController::is_group_info_cached(const std::string& group_ID) {
     }
 }
 
+/* ==================== 文件存储 ==================== */
+
+std::string RedisController::get_file_storage_path() {
+    std::string key = "chat:file:storage";
+    return redis_conn.get(key).value();
+}

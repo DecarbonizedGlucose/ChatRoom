@@ -9,7 +9,9 @@
 extern void try_send(ConnectionManager* conn_manager, TcpServerConnection* conn,
                     const std::string& proto, DataType type = DataType::Command);
 
-SFileManager::SFileManager(Dispatcher* dispatcher) : disp(dispatcher) {}
+SFileManager::SFileManager(Dispatcher* dispatcher) : disp(dispatcher) {
+    storage = disp->redis_con->get_file_storage_path();
+}
 
 SFileManager::~SFileManager() {}
 
@@ -40,6 +42,7 @@ void SFileManager::add_upload_task(const std::string& user_id, ServerFilePtr ser
     FileUploadTask task;
     task.user_id = user_id;
     task.server_file = server_file;
+    upload_tasks[user_id] = task;
     log_debug("Adding upload task for user: {}, file: {}", user_id, server_file->file_name);
     // 直接提交单个任务到线程池处理
     if (pool) {
@@ -54,7 +57,13 @@ void SFileManager::add_upload_task(const std::string& user_id, ServerFilePtr ser
 void SFileManager::process_single_download_task(const FileDownloadTask& task) {
     log_debug("Processing download task for user: {}, file_id: {}", task.user_id, task.file_id);
     // 创建服务端文件对象用于读取
-    auto server_file = std::make_shared<ServerFile>(task.file_hash, task.file_id, task.file_name, task.file_size);
+    auto server_file = std::make_shared<ServerFile>(
+        task.file_hash,
+        task.file_id,
+        task.file_name,
+        task.file_size,
+        storage
+    );
     // 打开文件进行读取
     if (!server_file->open_for_read()) {
         log_error("Failed to open file for reading: {}", task.file_id);

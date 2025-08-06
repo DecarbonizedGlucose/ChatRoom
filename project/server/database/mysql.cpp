@@ -458,6 +458,21 @@ int MySQLController::get_file_count() {
     return 0;
 }
 
+bool MySQLController::add_file_record(
+    const std::string& file_hash,
+    const std::string& file_id,
+    std::size_t file_size) {
+    // 对file_hash进行基本验证（应该是64字符的十六进制字符串）
+    if (file_hash.length() != 64) {
+        log_error("Invalid file_hash length: {}", file_hash.length());
+        return false;
+    }
+
+    std::string sql = "INSERT INTO chat_files (file_hash, file_id, file_size) VALUES ('"
+        + file_hash + "', '" + file_id + "', " + std::to_string(file_size) + ");";
+    return execute(sql);
+}
+
 // 查询给出的file_hash是否在数据库中存在
 bool MySQLController::file_hash_exists(const std::string& file_hash) {
     // 对file_hash进行基本验证（应该是64字符的十六进制字符串）
@@ -509,23 +524,7 @@ std::optional<std::pair<std::string, size_t>> MySQLController::get_file_info(con
     std::string file_hash = rows[0][0];
     size_t file_size = std::stoull(rows[0][1]);
 
-    // 然后从chat_messages表获取最新的文件名
-    // 使用file_hash查找最新的文件名（可能有多个消息使用同一个文件）
-    std::string name_sql = "SELECT file_name FROM chat_messages WHERE file_hash = '" + file_hash +
-                          "' AND file_name IS NOT NULL AND file_name != '' ORDER BY timestamp DESC LIMIT 1;";
-    auto name_rows = query(name_sql);
-
-    std::string file_name;
-    if (!name_rows.empty() && name_rows[0].size() > 0) {
-        file_name = name_rows[0][0];
-    } else {
-        // 如果没找到文件名，使用默认名称
-        file_name = "unknown_file_" + file_id;
-        log_error("No file name found for file_id: {}, using default name: {}", file_id, file_name);
-    }
-
-    log_debug("Found file info for file_id: {} - name: {}, size: {}", file_id, file_name, file_size);
-    return std::make_pair(file_name, file_size);
+    return std::make_pair(file_hash, file_size);
 }
 
 // 通过file_hash生成新的file_id

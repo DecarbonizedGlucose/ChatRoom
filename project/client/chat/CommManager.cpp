@@ -678,23 +678,12 @@ void CommManager::send_text_message(const std::string& receiver_id, bool is_grou
     }
 }
 
-void CommManager::send_file_message(const std::string& receiver_id, bool is_group, const std::string& file_path) {
-    // TODO: 实现文件读取和哈希计算
-    std::ifstream file(file_path, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
-        log_error("Failed to open file: {}", file_path);
-        return;
-    }
-
-    std::size_t file_size = file.tellg();
-    file.close();
-
-    // 获取文件名
-    std::string file_name = file_path.substr(file_path.find_last_of("/\\") + 1);
-
-    // TODO: 计算文件哈希
-    std::string file_hash = "hash_placeholder";
-
+void CommManager::send_file_message(
+    const std::string& receiver_id,
+    bool is_group,
+    const ClientFilePtr& file,
+    const std::string& file_id
+) {
     // 发送文件消息
     handle_send_message(
         cache.user_ID,          // sender
@@ -702,17 +691,17 @@ void CommManager::send_file_message(const std::string& receiver_id, bool is_grou
         is_group,               // is_group_msg
         "",                     // text (empty for file)
         true,                   // pin (file message)
-        file_name,              // file_name
-        file_size,              // file_size
-        file_hash,              // file_hash
+        file->file_name + "@" + file_id, // 丑陋的解决方案
+        file->file_size,        // file_size
+        file->file_hash,        // file_hash
         true                    // nb (non-blocking)
     );
 
-    log_info("Sent file message to {}: {}", receiver_id, file_name);
+    log_info("Sent file message to {}: {}", receiver_id, file->file_name);
 
     // 更新会话信息
     if (cache.conversations.find(receiver_id) != cache.conversations.end()) {
-        cache.conversations[receiver_id].last_message = "[文件] " + file_name;
+        cache.conversations[receiver_id].last_message = "[文件] " + file->file_name;
         cache.conversations[receiver_id].last_time = std::time(nullptr);
         // 更新会话排序
         cache.update_conversation_order(receiver_id);

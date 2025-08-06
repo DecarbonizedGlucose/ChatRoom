@@ -1,5 +1,6 @@
 
 #include "datatypes.hpp"
+#include "../include/logging.hpp"
 #include <iostream>
 #include <ctime>
 
@@ -193,6 +194,7 @@ FileChunk get_file_chunk(const std::string& proto_str) {
     if (!any.UnpackTo(&chunk)) {
         throw std::runtime_error("Failed to unpack Any to FileChunk");
     }
+    log_debug("FileChunk unpacked successfully, file_id: {}, chunk_index: {}", chunk.file_id(), chunk.chunk_index());
     return chunk;
 }
 

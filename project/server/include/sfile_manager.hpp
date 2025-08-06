@@ -3,6 +3,7 @@
 #include <utility>
 #include <string>
 #include <functional>
+#include <unordered_map>
 #include "../../global/include/safe_queue.hpp"
 #include "../../global/include/file.hpp"
 
@@ -26,6 +27,9 @@ class SFileManager {
 public:
     Dispatcher* disp = nullptr;
     thread_pool* pool = nullptr;
+    std::unordered_map<std::string, FileUploadTask> upload_tasks;
+    std::unordered_map<std::string, FileDownloadTask> download_tasks;
+    std::string storage;
 
     SFileManager(Dispatcher* dispatcher);
     ~SFileManager();

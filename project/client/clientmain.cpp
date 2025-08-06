@@ -6,12 +6,12 @@
 
 int main() {
     // 创建日志目录
-    std::filesystem::create_directories("/tmp/chatroom");
+    std::filesystem::create_directories(std::getenv("HOME") + std::string("/.local/share/ChatRoom/log/"));
 
     try {
         // 配置日志输出到文件而不是终端, 避免与UI冲突
         auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            "/tmp/chatroom/client.log", 1024*1024*5, 3); // 5MB, 3个文件
+            std::getenv("HOME") + std::string("/.local/share/ChatRoom/log/client.log"), 1024*1024*5, 3); // 5MB, 3个文件
 
         auto logger = std::make_shared<spdlog::logger>("client", file_sink);
         logger->set_level(spdlog::level::debug);

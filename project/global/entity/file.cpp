@@ -100,6 +100,8 @@ ClientFile::ClientFile(const std::string& name, const std::string& save_path,
                        const std::string& hash, size_t size)
     : File(name, hash, size), local_path(save_path) {
     status = FileStatus::PENDING;
+    current_chunk = 0; // 初始化上传时的chunk计数器
+    received_chunks_count = 0; // 初始化下载时的接收计数器
     log_info("Created ClientFile for download: {} -> {}", name, save_path);
 }
 
@@ -141,9 +143,9 @@ std::vector<char> ClientFile::read_next_chunk() {
 
     if (bytes_read > 0) {
         chunk.resize(bytes_read);
-        current_chunk++;
         log_debug("Read chunk {}/{} ({} bytes) from {}",
                   current_chunk, get_total_chunks(), bytes_read, file_name);
+        current_chunk++; // 在返回分片数据后才递增索引
         return chunk;
     }
 
@@ -151,6 +153,11 @@ std::vector<char> ClientFile::read_next_chunk() {
 }
 
 bool ClientFile::has_more_chunks() const {
+    // 对于下载：检查是否还有分片未接收
+    if (status == FileStatus::DOWNLOADING) {
+        return received_chunks_count < get_total_chunks();
+    }
+    // 对于上传：检查是否还有分片未读取
     return current_chunk < get_total_chunks();
 }
 
@@ -180,22 +187,38 @@ bool ClientFile::write_chunk(const std::vector<char>& data, size_t chunk_index) 
         return false;
     }
 
+    if (data.empty()) {
+        log_debug("Received empty chunk {} for file: {}", chunk_index, file_name);
+        return false;
+    }
+
     // 计算应该写入的位置
     std::streampos pos = static_cast<std::streampos>(chunk_index * CHUNK_SIZE);
     output_stream.seekp(pos);
 
+    if (output_stream.fail()) {
+        log_error("Failed to seek to position {} for chunk {} in file: {}", pos, chunk_index, file_name);
+        return false;
+    }
+
+    log_debug("Writing chunk {} at position {} ({} bytes) to {}", chunk_index, pos, data.size(), file_name);
+
     output_stream.write(data.data(), data.size());
+    output_stream.flush(); // 立即刷新到磁盘
+
     if (output_stream.fail()) {
         log_error("Failed to write chunk {} to file: {}", chunk_index, file_name);
         status = FileStatus::FAILED;
         return false;
     }
 
-    log_debug("Wrote chunk {} ({} bytes) to {}", chunk_index, data.size(), file_name);
-    return true;
-}
+    // 递增已接收的分片数量
+    received_chunks_count++;
 
-bool ClientFile::finalize_download() {
+    log_info("Successfully wrote chunk {} ({} bytes) to {}, received {}/{}",
+             chunk_index, data.size(), file_name, received_chunks_count, get_total_chunks());
+    return true;
+}bool ClientFile::finalize_download() {
     if (output_stream.is_open()) {
         output_stream.close();
     }
@@ -222,12 +245,13 @@ double ClientFile::get_progress() const {
 // ============ ServerFile 实现 ============
 
 ServerFile::ServerFile(const std::string& hash, const std::string& file_id,
-                       const std::string& name, size_t size)
+                       const std::string& name, size_t size, const std::string& storage)
     : File(name, hash, size) {
     this->file_id = file_id;
 
     // 设置服务端存储路径
-    storage_path = "./files/" + hash.substr(0, 2) + "/" + hash;
+    storage_path = storage;
+    storage_path += (storage.back() == '/' ? "" : "/") + file_id;
 
     // 初始化分片接收状态
     size_t total_chunks = get_total_chunks();

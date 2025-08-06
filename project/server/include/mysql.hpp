@@ -112,6 +112,12 @@ public:
     // 查询目前文件数量
     int get_file_count();
 
+    // 添加文件记录
+    bool add_file_record(
+        const std::string& file_hash,
+        const std::string& file_id,
+        std::size_t file_size);
+
     // 查询给出的file_hash是否在数据库中存在
     bool file_hash_exists(const std::string& file_hash);
 
