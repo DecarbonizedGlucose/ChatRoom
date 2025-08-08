@@ -158,8 +158,20 @@ void CommManager::handle_manage_message(const ChatMessage& msg) {
     // 如果会话还没有正确的ID和名称, 设置它们
     if (conv.id.empty()) {
         conv.id = conv_id;
-        conv.name = conv_id;
         conv.is_group = msg.is_group();
+
+        // 设置会话名称
+        if (conv.is_group) {
+            // 对于群聊，使用群组名称
+            if (cache.group_list.find(conv_id) != cache.group_list.end()) {
+                conv.name = cache.group_list[conv_id].group_name;
+            } else {
+                conv.name = conv_id; // fallback to ID if group not found
+            }
+        } else {
+            // 对于私聊，使用好友ID
+            conv.name = conv_id;
+        }
     }
 
     if (msg.timestamp() > conv.last_time) {
@@ -294,12 +306,23 @@ void CommManager::store_relation_network_data(const json& relation_data) {
             sqlite_con->cache_group(group_id, group_name, owner_id);
             log_debug("Cached group: {} ({})", group_id, group_name);
 
-            // 加载到内存
+            // 先检查当前用户的管理员状态
+            bool user_is_admin = false;
+            if (group_info.contains("members") && group_info["members"].is_array()) {
+                for (const auto& member_info : group_info["members"]) {
+                    if (member_info["id"] == cache.user_ID) {
+                        user_is_admin = member_info["is_admin"];
+                        break;
+                    }
+                }
+            }
+
+            // 加载到内存，使用正确的管理员状态
             cache.group_list[group_id] = {
                 group_name,
                 owner_id,
                 static_cast<int>(group_info["members"].size()),
-                false
+                user_is_admin
             };
 
             // 解析群成员数据
@@ -307,11 +330,6 @@ void CommManager::store_relation_network_data(const json& relation_data) {
                 for (const auto& member_info : group_info["members"]) {
                     std::string member_id = member_info["id"];
                     bool is_admin = member_info["is_admin"];
-
-                    if (member_id == cache.user_ID) {
-                        // 如果是当前用户, 更新管理员状态
-                        cache.group_list[group_id].is_user_admin = is_admin;
-                    }
 
                     // 缓存群成员信息到本地数据库
                     sqlite_con->cache_group_member(group_id, member_id, is_admin);
@@ -340,38 +358,28 @@ void CommManager::handle_get_relation_net() {
 
 void CommManager::handle_get_chat_history() {
     log_debug("handle_get_chat_history called");
-
     try {
         // 从数据连接（连接2）读取离线消息
         std::string env_str = this->read(2);
-
         // 解析OfflineMessages
         auto offline_msgs = get_offline_messages(env_str);
-
         int message_count = offline_msgs.messages_size();
         log_info("Received {} offline messages", message_count);
-
         if (message_count == 0) {
             log_debug("No offline messages to process");
             return;
         }
-
         // 处理每个离线消息
         for (int i = 0; i < message_count; ++i) {
             const ChatMessage& msg = offline_msgs.messages(i);
-
             // 存储到本地数据库并更新缓存
             handle_manage_message(msg);
-
             log_debug("Processed offline message from {} to {} (group: {}) at timestamp {}",
                      msg.sender(), msg.receiver(), msg.is_group(), msg.timestamp());
         }
-
         // 更新会话列表（如果有新的会话）
         update_conversation_list();
-
         log_info("Successfully processed {} offline messages", message_count);
-
     } catch (const std::exception& e) {
         log_error("Error handling offline messages: {}", e.what());
     }
@@ -424,12 +432,12 @@ void CommManager::handle_remove_friend(const std::string& friend_ID) {
     }
 
     // 从会话排序列表中删除该好友ID
-    auto it = std::find(cache.sorted_conversation_list.begin(),
-                       cache.sorted_conversation_list.end(), friend_ID);
-    if (it != cache.sorted_conversation_list.end()) {
-        cache.sorted_conversation_list.erase(it);
-        log_debug("Removed friend {} from sorted conversation list", friend_ID);
-    }
+    // auto it = std::find(cache.sorted_conversation_list.begin(),
+    //                    cache.sorted_conversation_list.end(), friend_ID);
+    // if (it != cache.sorted_conversation_list.end()) {
+    //     cache.sorted_conversation_list.erase(it);
+    //     log_debug("Removed friend {} from sorted conversation list", friend_ID);
+    // }
 
     // 从数据库中删除好友记录
     sqlite_con->remove_friend_cache(cache.user_ID, friend_ID);
@@ -485,11 +493,83 @@ void CommManager::handle_get_friend_status() {
 }
 
 void CommManager::handle_create_group(const std::string& group_ID, const std::string& group_name) {
-
+    cache.group_list[group_ID] = {
+        group_name,
+        cache.user_ID,
+        1,
+        true // 当前用户是群主
+    };
+    // 创建会话
+    cache.conversations[group_ID] = {
+        group_ID,
+        group_name,
+        true, // 是群组
+        "",
+        0,
+        0
+    };
+    sqlite_con->cache_group(group_ID, group_name, cache.user_ID);
+    sqlite_con->cache_group_member(group_ID, cache.user_ID, true);
+    cache.group_members[group_ID][cache.user_ID] = true;
+    handle_add_admin(group_ID, cache.user_ID);
 }
 
-void CommManager::handle_join_group(const std::string& group_ID) {
+void CommManager::handle_join_group(
+    const std::string& group_ID,
+    const std::string& group_name,
+    int member_count, // 本账号加入前的数量
+    const std::string& owner_ID
+) {
+    // 检查是否已经在群组中
+    if (cache.group_list.find(group_ID) != cache.group_list.end()) {
+        log_info("Already in group {}", group_ID);
+        return;
+    }
 
+    // 添加到缓存
+    cache.group_list[group_ID] = {
+        group_name,
+        owner_ID,
+        member_count + 1, // 加上当前用户
+        (cache.user_ID == owner_ID)
+    };
+
+    // 创建会话
+    cache.conversations[group_ID] = {
+        group_ID,
+        group_name,
+        true, // 是群组
+        "",
+        0,
+        0
+    };
+
+    // 存起来
+    if (sqlite_con->cache_group(group_ID, group_name, owner_ID)) {
+        log_info("Joined group {}: {}", group_ID, group_name);
+    } else {
+        log_error("Failed to join group {}: {}", group_ID, group_name);
+    }
+
+    // 获取群组成员列表（包括自己）
+    auto str = read(2);
+    auto sync = get_sync_item(str);
+    if (sync.type() != SyncItem::GROUP_MEMBERS) {
+        log_error("Unexpected sync type: {}", static_cast<int>(sync.type()));
+        return;
+    }
+    // 解析群组成员信息
+    json group_members = json::parse(sync.content());
+    cache.group_list[group_ID].member_count = group_members.size();
+    for (auto& item : group_members) {
+        if (item.is_object()) {
+            std::string member_id = item["id"];
+            bool is_admin = item["is_admin"];
+            // 更新群组成员信息
+            cache.group_members[group_ID][member_id] = is_admin;
+        }
+    }
+    log_debug("获取群聊{}存成员列表：{}成员", group_ID, group_members.size());
 }
 
 void CommManager::handle_leave_group(const std::string& group_ID) {
@@ -506,21 +586,122 @@ void CommManager::handle_leave_group(const std::string& group_ID) {
     }
 
     // 从会话排序列表中删除该群组ID
-    auto it = std::find(cache.sorted_conversation_list.begin(),
-                       cache.sorted_conversation_list.end(), group_ID);
-    if (it != cache.sorted_conversation_list.end()) {
-        cache.sorted_conversation_list.erase(it);
-        log_debug("Removed group {} from sorted conversation list", group_ID);
-    }
+    // auto it = std::find(cache.sorted_conversation_list.begin(),
+    //                    cache.sorted_conversation_list.end(), group_ID);
+    // if (it != cache.sorted_conversation_list.end()) {
+    //     cache.sorted_conversation_list.erase(it);
+    //     log_debug("Removed group {} from sorted conversation list", group_ID);
+    // }
 
     // 从数据库中删除群组记录
     sqlite_con->remove_group_cache(group_ID);
     log_info("Left group: {}", group_ID);
 }
 
-void CommManager::handle_add_admin(const std::string& group_ID, const std::string& user_ID) {}
+void CommManager::handle_add_person(const std::string& group_ID, const std::string& user_ID) {
+    // 将新成员添加到群组成员列表
+    sqlite_con->cache_group_member(group_ID, user_ID, false); // 默认不是管理员
 
-void CommManager::handle_remove_admin(const std::string& group_ID, const std::string& user_ID) {}
+    // 更新内存中的群组成员信息
+    // 如果群组成员信息还没加载到内存中，就初始化它
+    if (cache.group_members.find(group_ID) == cache.group_members.end()) {
+        // 从数据库加载所有群组成员信息
+        auto members = sqlite_con->get_cached_group_members_with_admin_status(group_ID);
+        for (auto& [member, is_admin] : members) {
+            cache.group_members[group_ID][member] = is_admin;
+        }
+    }
+    cache.group_members[group_ID][user_ID] = false; // 不是管理员
+
+    // 增加群组成员数量
+    if (cache.group_list.find(group_ID) != cache.group_list.end()) {
+        cache.group_list[group_ID].member_count++;
+    }
+
+    log_info("Added user {} to group {}", user_ID, group_ID);
+}
+
+void CommManager::handle_remove_person(const std::string& group_ID, const std::string& user_ID) {
+    // 从数据库中删除群组成员
+    sqlite_con->remove_group_member_cache(group_ID, user_ID);
+
+    // 从内存中删除群组成员信息
+    if (cache.group_members.find(group_ID) != cache.group_members.end()) {
+        if (cache.group_members[group_ID].find(user_ID) != cache.group_members[group_ID].end()) {
+            cache.group_members[group_ID].erase(user_ID);
+        }
+    }
+
+    // 减少群组成员数量
+    if (cache.group_list.find(group_ID) != cache.group_list.end() &&
+        cache.group_list[group_ID].member_count > 0) {
+        int old_count = cache.group_list[group_ID].member_count;
+        cache.group_list[group_ID].member_count--;
+        log_debug("Group {} member count: {} -> {}", group_ID, old_count, cache.group_list[group_ID].member_count);
+    }
+
+    log_info("Removed user {} from group {}", user_ID, group_ID);
+}
+
+void CommManager::handle_disband_group(const std::string& group_ID) {
+    // 数据库
+    handle_leave_group(group_ID);
+    // 内存
+    cache.group_list.erase(group_ID);
+    cache.group_members.erase(group_ID);
+    cache.conversations.erase(group_ID);
+    if (cache.messages.find(group_ID) != cache.messages.end()) {
+        cache.messages.erase(group_ID);
+    }
+    auto it = std::find(cache.sorted_conversation_list.begin(),
+                        cache.sorted_conversation_list.end(), group_ID);
+    if (it != cache.sorted_conversation_list.end()) {
+        cache.sorted_conversation_list.erase(it);
+        log_debug("Removed group {} from sorted conversation list", group_ID);
+    }
+    log_info("Group {} has been disbanded", group_ID);
+}
+
+void CommManager::handle_add_admin(const std::string& group_ID, const std::string& user_ID) {
+    sqlite_con->update_group_admin_status(group_ID, user_ID, true);
+    if (user_ID == cache.user_ID) {
+        // 用户自己
+        if (cache.group_list.find(group_ID) != cache.group_list.end()) {
+            cache.group_list[group_ID].is_user_admin = true;
+            cache.group_members[group_ID][user_ID] = true;
+            log_info("You are now an admin of group {}", group_ID);
+        } else {
+            log_error("Group {} not found in cache when adding admin", group_ID);
+        }
+    } else {
+        if (cache.group_list.find(group_ID) != cache.group_list.end()) {
+            cache.group_members[group_ID][user_ID] = true;
+            log_info("User {} is now an admin of group {}", user_ID, group_ID);
+        } else {
+            log_error("Group {} not found in cache when adding admin", group_ID);
+        }
+    }
+}
+
+void CommManager::handle_remove_admin(const std::string& group_ID, const std::string& user_ID) {
+    sqlite_con->update_group_admin_status(group_ID, user_ID, false);
+    if (user_ID == cache.user_ID) {
+        if (cache.group_list.find(group_ID) != cache.group_list.end()) {
+            cache.group_list[group_ID].is_user_admin = false;
+            cache.group_members[group_ID][user_ID] = false;
+            log_info("You are no longer an admin of group {}", group_ID);
+        } else {
+            log_error("Group {} not found in cache when removing admin", group_ID);
+        }
+    } else {
+        if (cache.group_list.find(group_ID) != cache.group_list.end()) {
+            cache.group_members[group_ID][user_ID] = false;
+            log_info("User {} is no longer an admin of group {}", user_ID, group_ID);
+        } else {
+            log_error("Group {} not found in cache when removing admin", group_ID);
+        }
+    }
+}
 
 void CommManager::handle_reply_heartbeat() {
     log_debug("Received heartbeat from server, sending response");
@@ -592,24 +773,32 @@ void CommManager::update_conversation_list() {
         }
     }
     // 清理不再属于关系网的会话
+    // 先收集要删除的会话ID，避免在遍历时修改容器导致迭代器失效
+    std::vector<std::string> conversations_to_remove;
     for (const auto& [conv_id, conv_info] : cache.conversations) {
         if (valid_relationship_ids.find(conv_id) == valid_relationship_ids.end()) {
-            cache.conversations.erase(conv_id);
-            if (cache.messages.find(conv_id) != cache.messages.end()) {
-                cache.messages.erase(conv_id);
-            }
-            auto it = std::find(cache.sorted_conversation_list.begin(),
-                                cache.sorted_conversation_list.end(), conv_id);
-            if (it != cache.sorted_conversation_list.end()) {
-                cache.sorted_conversation_list.erase(it);
-            }
-            if (cache.current_conversation_id == conv_id) {
-                cache.current_conversation_id = "";
-            }
+            conversations_to_remove.push_back(conv_id);
         }
     }
 
-    // 为所有有效的关系创建会话（如果不存在,比如新好友）
+    // 删除无效的会话
+    for (const auto& conv_id : conversations_to_remove) {
+        cache.conversations.erase(conv_id);
+        if (cache.messages.find(conv_id) != cache.messages.end()) {
+            cache.messages.erase(conv_id);
+        }
+        auto it = std::find(cache.sorted_conversation_list.begin(),
+                            cache.sorted_conversation_list.end(), conv_id);
+        if (it != cache.sorted_conversation_list.end()) {
+            cache.sorted_conversation_list.erase(it);
+        }
+        if (cache.current_conversation_id == conv_id) {
+            cache.current_conversation_id = "";
+        }
+        log_debug("Removed invalid conversation: {}", conv_id);
+    }
+
+    // 为所有有效的关系创建或更新会话
     for (const auto& id : valid_relationship_ids) {
         if (cache.conversations.find(id) == cache.conversations.end()) {
             // 创建新会话
@@ -633,6 +822,18 @@ void CommManager::update_conversation_list() {
 
             log_debug("Created conversation for {}: '{}'",
                      conv_info.is_group ? "group" : "friend", id);
+        } else {
+            // 更新现有会话的名称（防止名称不正确）
+            auto& conv = cache.conversations[id];
+            bool is_group = cache.group_list.find(id) != cache.group_list.end();
+
+            if (is_group) {
+                conv.name = cache.group_list[id].group_name;
+                conv.is_group = true;
+            } else {
+                conv.name = id; // 好友使用ID作为名称
+                conv.is_group = false;
+            }
         }
     }
 }
@@ -640,6 +841,13 @@ void CommManager::update_conversation_list() {
 void CommManager::load_conversation_history() {
     // 从SQLite加载聊天历史
     for (auto friend_info : cache.friend_list) {
+        // 已经有了
+        if (cache.messages.find(friend_info.first) != cache.messages.end() &&
+            !cache.messages[friend_info.first].empty()) {
+            log_debug("Skipping load for friend {} - messages already exist in cache", friend_info.first);
+            continue;
+        }
+
         auto chat_history = sqlite_con->get_private_chat_history(cache.user_ID, friend_info.first);
         for (const auto& row : chat_history) {
             if (row.size() >= 8) {  // 从数据库表拿了8个字段
@@ -660,6 +868,13 @@ void CommManager::load_conversation_history() {
         }
     }
     for (auto group_info : cache.group_list) {
+        // 已经有这个会话的消息
+        if (cache.messages.find(group_info.first) != cache.messages.end() &&
+            !cache.messages[group_info.first].empty()) {
+            log_debug("Skipping load for group {} - messages already exist in cache", group_info.first);
+            continue;
+        }
+
         auto chat_history = sqlite_con->get_group_chat_history(group_info.first);
         for (const auto& row : chat_history) {
             if (row.size() >= 8) {  // 从数据库表拿了8个字段

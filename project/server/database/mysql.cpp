@@ -244,16 +244,16 @@ std::vector<std::pair<std::string, bool>> MySQLController::get_friends_with_bloc
 std::string MySQLController::create_group(
     const std::string& group_name,
     const std::string& owner_ID) {
-    // 1. 查询已有群组数量,获取新的群组ID
-    std::string sql = "SELECT COUNT(*) FROM chat_groups;";
+    // 1. 查询现有群组ID中的最大数字，生成新的群组ID
+    std::string sql = "SELECT COALESCE(MAX(CAST(SUBSTRING(group_id, 7) AS UNSIGNED)), -1) + 1 FROM chat_groups WHERE group_id REGEXP '^Group_[0-9]+$';";
     auto rows = query(sql);
-    std::string count;
+    std::string next_id;
     if (rows.empty() || rows[0].empty()) {
-        count = "0";
+        next_id = "0";
     } else {
-        count = std::to_string(std::stoi(rows[0][0]));
+        next_id = rows[0][0];
     }
-    std::string group_ID = "Group_" + count;
+    std::string group_ID = "Group_" + next_id;
 
     // 2. 占领该Id, 保存
     sql = "INSERT INTO chat_groups (group_id, group_name, owner_id) VALUES ('"
@@ -599,12 +599,15 @@ std::string MySQLController::generate_file_id_by_hash(const std::string& file_ha
 /* ---------- 通知/请求 ---------- */
 
 int MySQLController::store_command(const CommandRequest& cmd, bool managed) {
-    std::string sql = "INSERT INTO chat_commands (action, sender, receiver, para1, para2, para3, managed) VALUES ("
+    std::string sql = "INSERT INTO chat_commands (action, sender, para1, para2, para3, para4, para5, para6, managed) VALUES ("
         + std::to_string(static_cast<int>(cmd.action())) + ", '"
         + cmd.sender() + "', '"
         + (cmd.args_size() > 0 ? cmd.args(0) : "") + "', '"
         + (cmd.args_size() > 1 ? cmd.args(1) : "") + "', '"
-        + (cmd.args_size() > 2 ? cmd.args(2) : "") + "', "
+        + (cmd.args_size() > 2 ? cmd.args(2) : "") + "', '"
+        + (cmd.args_size() > 3 ? cmd.args(3) : "") + "', '"
+        + (cmd.args_size() > 4 ? cmd.args(4) : "") + "', '"
+        + (cmd.args_size() > 5 ? cmd.args(5) : "") + "', "
         + (managed ? "TRUE" : "FALSE") + ");";
 
     if (execute(sql)) {
@@ -649,15 +652,18 @@ int MySQLController::get_command_status(int command_id) {
 }
 
 CommandRequest MySQLController::get_command(int command_id) {
-    std::string sql = "SELECT action, sender, receiver, para1, para2, para3 FROM chat_commands WHERE id = " + std::to_string(command_id) + ";";
+    std::string sql = "SELECT action, sender, para1, para2, para3, para4, para5, para6 FROM chat_commands WHERE id = " + std::to_string(command_id) + ";";
     auto rows = query(sql);
-    if (!rows.empty() && rows[0].size() >= 6) {
+    if (!rows.empty() && rows[0].size() >= 8) {
         CommandRequest cmd;
         cmd.set_action(std::stoi(rows[0][0]));
         cmd.set_sender(rows[0][1]);
-        if (rows[0].size() > 2) cmd.add_args(rows[0][2]);
-        if (rows[0].size() > 3) cmd.add_args(rows[0][3]);
-        if (rows[0].size() > 4) cmd.add_args(rows[0][4]);
+        if (!rows[0][2].empty()) cmd.add_args(rows[0][2]);  // para1
+        if (!rows[0][3].empty()) cmd.add_args(rows[0][3]);  // para2
+        if (!rows[0][4].empty()) cmd.add_args(rows[0][4]);  // para3
+        if (!rows[0][5].empty()) cmd.add_args(rows[0][5]);  // para4
+        if (!rows[0][6].empty()) cmd.add_args(rows[0][6]);  // para5
+        if (!rows[0][7].empty()) cmd.add_args(rows[0][7]);  // para6
         return cmd;
     }
     return CommandRequest();
@@ -726,12 +732,10 @@ bool MySQLController::remove_command_from_all_admin(
     int command_id,
     const std::string& group_ID
 ) {
-    std::string sql = "DELETE FROM user_pending_commands "
-                      "WHERE command_id = " + std::to_string(command_id) + " "
-                      "AND user_id IN ("
-                      "SELECT user_id FROM group_members "
-                      "WHERE group_id = '" + group_ID + "' AND is_admin = TRUE"
-                      ");";
+    std::string sql = "DELETE upc FROM user_pending_commands upc "
+                      "INNER JOIN group_members gm ON upc.user_id = gm.user_id "
+                      "WHERE upc.command_id = " + std::to_string(command_id) + " "
+                      "AND gm.group_id = '" + group_ID + "' AND gm.is_admin = TRUE;";
     bool result = execute(sql);
     return result;
 }

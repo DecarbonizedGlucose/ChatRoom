@@ -26,25 +26,25 @@ enum class Action {
     Accept_Regi,           // 接受注册
     Refuse_Login,          // 拒绝登录 --description
     Accept_Login,          // 接受登录 --user_ID/email
-    Refuse_FReq,           // 拒绝好友请求 --user_ID
-    Accept_FReq,           // 接受好友请求 --user_ID
-    Refuse_GReq,           // 拒绝群组请求 --group_ID --user_ID
-    Accept_GReq,           // 接受群组请求 --group_ID --user_ID
+    Refuse_FReq,           // 拒绝好友请求 --time --user_ID
+    Accept_FReq,           // 接受好友请求 --time --user_ID
+    Refuse_GReq,           // 拒绝群组请求 --time (--group_ID --user_ID)/(--cmd_id)
+    Accept_GReq,           // 接受群组请求 --time (--group_ID --user_ID --group_name --member_count --owner_ID)/(--cmd_id)
     Refuse_Post_Code,      // 拒绝获取验证码 --description
     Accept_Post_Code,      // 接受获取验证码
     Success_Auth,          // 成功验证
     Failed_Auth,           // 验证失败 --description
-    Notify,                // 通知 --description
-    Notify_Exist,          // 通知已存在 --user_ID/group_ID
-    Notify_Not_Exist,      // 通知不存在 --user_ID/group_ID
+    Notify,                // 通知 --time --description
+    Notify_Exist,          // 通知已存在 --user_ID/group_ID --group_name
+    Notify_Not_Exist,      // 通知不存在 --user_ID/group_ID [--group_name]
     Friend_Online,         // 好友上线 --user_ID
     Friend_Offline,        // 好友下线 --user_ID
-    Warn,                  // 警告 --description(非好友/非群成员发消息)
+    Success,               // 群聊事务处理成功
+    Managed,               // 请求已经被其他管理员处理
 
     /*      私信行为      */
-    Add_Friend,            // 添加好友 --user_ID
     Add_Friend_Req,        // 添加好友请求 --time --user_ID
-    Remove_Friend,         // 删除好友 --user_ID
+    Remove_Friend,         // 删除好友 --time --user_ID
     Search_Person,         // 搜索用户 --user_ID
     Block_Friend,          // 屏蔽好友 --user_ID
     Unblock_Friend,        // 取消屏蔽好友 --user_ID
@@ -52,11 +52,10 @@ enum class Action {
     /*      群聊管理      */
     Create_Group,          // 创建群组 --time --name
     Give_Group_ID,         // 给群组ID --group_ID 如果创建失败, group_ID为""
-    Join_Group,            // 加入群组 --time --group_ID
-    Join_Group_Req,        // 加入群组请求 --time --group_ID
+    Join_Group_Req,        // 加入群组请求 --time --group_ID [--cmd_id]
     Leave_Group,           // 退出群组 --time --group_ID
     Disband_Group,         // 解散群组 --time --group_ID
-    Invite_To_Group_Req,   // 邀请加入群组 --time --group_ID --user_ID
+    Invite_To_Group_Req,   // 邀请加入群组 --time --group_ID --group_name --user_ID
     Remove_From_Group,     // 从群组中移除 --time --group_ID --user_ID
     Search_Group,          // 搜索群组* --time --group_ID
     Add_Admin,             // 添加管理员 --time --group_ID --user_ID

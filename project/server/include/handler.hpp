@@ -78,11 +78,13 @@ private:
         const std::string& ori_user_ID,
         const std::string& ostr);
     void handle_accept_group_request(
-        const std::string& ori_user_ID,
-        const std::string& ostr);
+        TcpServerConnection* conn,
+        const std::string& time,
+        int command_id);
     void handle_refuse_group_request(
-        const std::string& ori_user_ID,
-        const std::string& ostr);
+        TcpServerConnection* conn,
+        const std::string& time,
+        int command_id);
     void handle_add_friend_req(
         const std::string& friend_ID,
         const std::string& ostr);
@@ -104,16 +106,39 @@ private:
         const std::string& user_ID,
         const std::string& time,
         const std::string& group_name);
-    void handle_join_group_req();
-    void handle_leave_group();
-    void handle_disband_group();
-    void handle_invite_to_group_req();
-    void handle_remove_from_group();
+    void handle_join_group_req(
+        const std::string& group_ID,
+        const std::string& user_ID,
+        CommandRequest cmd);
+    void handle_leave_group(
+        const std::string& group_ID,
+        const std::string& user_ID,
+        const std::string& ostr);
+    void handle_disband_group(
+        const std::string& group_ID,
+        const std::string& owner_ID,
+        const std::string& ostr);
+    void handle_invite_to_group_req(
+        const std::string& ostr,
+        const std::string& friend_ID);
+    void handle_remove_from_group(
+        const std::string& group_ID,
+        const std::string& admin_ID,
+        const std::string& member_ID,
+        const std::string& ostr);
     void handle_search_group(
         TcpServerConnection* conn,
         const std::string& group_ID);
-    void handle_add_admin();
-    void handle_remove_admin();
+    void handle_add_admin(
+        const std::string& group_ID,
+        const std::string& owner_ID,
+        const std::string& member_ID,
+        const std::string& ostr);
+    void handle_remove_admin(
+        const std::string& group_ID,
+        const std::string& owner_ID,
+        const std::string& member_ID,
+        const std::string& ostr);
     void handle_upload_file(
         TcpServerConnection* conn,
         const std::string& file_hash,
@@ -131,12 +156,13 @@ private:
     void handle_post_relation_net(const std::string& user_ID, const json& relation_data);
     void handle_post_friends_status(const std::string& user_ID, const json& friends);
     void handle_post_offline_messages(const std::string& user_ID, const json& relation_data);
-    void handle_post_unordered_noti_and_req(const std::string& user_ID, const json& relation_data);
+    // void handle_post_unordered_noti_and_req(const std::string& user_ID, const json& relation_data);
 
     // 封装起来的函数
     void get_friends(const std::string& user_ID, json& friends);
     void get_groups(const std::string& user_ID, json& groups);
     void get_relation_net(const std::string& user_ID, json& relation_net);
+    void update_group_info(const std::string& user_ID, const std::string& group_ID);
     void get_blocked_info(const std::string& user_ID, const json& friends, json& blocked_info);
 };
 

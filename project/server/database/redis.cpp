@@ -47,6 +47,24 @@ void RedisController::del_veri_code(const std::string& user_email) {
     redis_conn.del(key);
 }
 
+std::string RedisController::get_auth_code() {
+    auto key = "chat:email:auth_code";
+    auto val = redis_conn.get(key);
+    if (!val) {
+        return ""; // 如果没有设置过验证码
+    }
+    return *val;
+}
+
+std::string RedisController::get_email_addr() {
+    auto key = "chat:email:server_addr";
+    auto val = redis_conn.get(key);
+    if (!val) {
+        return ""; // 如果没有设置过邮箱地址
+    }
+    return *val;
+}
+
 /* ---------- 好友系统 ---------- */
 
 bool RedisController::load_user_relations(const std::string& user_ID, json& relation_data, const json& blocked_by_data) {
@@ -74,7 +92,7 @@ bool RedisController::load_user_relations(const std::string& user_ID, json& rela
             redis_conn.expire(friends_key, 24 * 3600); // 24小时过期
         }
 
-        // 缓存群组信息 - relation_data["groups"] 是数组格式, 包含完整群组信息
+        // 缓存群组信息 - 只缓存用户的群组列表，群组详细信息只在未缓存时才加载
         if (relation_data.contains("groups") && relation_data["groups"].is_array()) {
             std::string groups_key = "chat:user:" + user_ID + ":groups";
             redis_conn.del(groups_key); // 清空现有数据
@@ -84,40 +102,45 @@ bool RedisController::load_user_relations(const std::string& user_ID, json& rela
                     std::string group_id = group_info["id"];
                     redis_conn.sadd(groups_key, group_id);
 
-                    // 同时将群组详细信息缓存到群组缓存中
-                    if (group_info.contains("name") && group_info.contains("owner")) {
-                        json group_cache_info;
-                        group_cache_info["name"] = group_info["name"];
-                        group_cache_info["owner"] = group_info["owner"];
+                    // 只有当群组信息未缓存时才进行缓存，避免重复缓存
+                    if (!is_group_cached(group_id)) {
+                        log_debug("Group {} not cached, loading group data for first time", group_id);
 
-                        // 缓存群组基本信息
-                        cache_group_info(group_id, group_cache_info);
+                        if (group_info.contains("name") && group_info.contains("owner")) {
+                            json group_cache_info;
+                            group_cache_info["name"] = group_info["name"];
+                            group_cache_info["owner"] = group_info["owner"];
 
-                        // 缓存群组成员和管理员
-                        if (group_info.contains("members") && group_info["members"].is_array()) {
-                            std::vector<std::string> members;
-                            std::vector<std::string> admins;
+                            // 缓存群组成员和管理员
+                            if (group_info.contains("members") && group_info["members"].is_array()) {
+                                std::vector<std::string> members;
+                                std::vector<std::string> admins;
 
-                            for (const auto& member_info : group_info["members"]) {
-                                if (member_info.contains("id")) {
-                                    std::string member_id = member_info["id"];
-                                    members.push_back(member_id);
+                                for (const auto& member_info : group_info["members"]) {
+                                    if (member_info.contains("id")) {
+                                        std::string member_id = member_info["id"];
+                                        members.push_back(member_id);
 
-                                    if (member_info.contains("is_admin") && member_info["is_admin"].get<bool>()) {
-                                        admins.push_back(member_id);
+                                        if (member_info.contains("is_admin") && member_info["is_admin"].get<bool>()) {
+                                            admins.push_back(member_id);
+                                        }
                                     }
                                 }
+
+                                // 更新成员计数
+                                group_cache_info["member_count"] = static_cast<int>(members.size());
+
+                                // 缓存群组基本信息、成员和管理员列表
+                                cache_group_info(group_id, group_cache_info);
+                                cache_group_members(group_id, members);
+                                cache_group_admins(group_id, admins);
+
+                                log_info("Cached group {} info with {} members, {} admins",
+                                        group_id, members.size(), admins.size());
                             }
-
-                            // 更新成员计数
-                            json updated_group_info = group_cache_info;
-                            updated_group_info["member_count"] = static_cast<int>(members.size());
-                            cache_group_info(group_id, updated_group_info);
-
-                            // 缓存成员和管理员列表
-                            cache_group_members(group_id, members);
-                            cache_group_admins(group_id, admins);
                         }
+                    } else {
+                        log_debug("Group {} already cached, skipping group data loading", group_id);
                     }
                 }
             }
@@ -134,14 +157,8 @@ bool RedisController::load_user_relations(const std::string& user_ID, json& rela
 
 bool RedisController::unload_user_relations(const std::string& user_ID, const json& relation_data) {
     try {
-        std::vector<std::string> keys_to_delete = {
-            "chat:user:" + user_ID + ":friends",
-            "chat:user:" + user_ID + ":groups"
-        };
-
-        for (const auto& key : keys_to_delete) {
-            redis_conn.del(key);
-        }
+        auto key = "chat:user:" + user_ID + ":friends";
+        redis_conn.del(key);
 
         log_info("Unloaded user relations for {} from Redis cache", user_ID);
         return true;

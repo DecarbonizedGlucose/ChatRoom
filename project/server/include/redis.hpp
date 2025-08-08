@@ -64,6 +64,9 @@ public:
     // 删除邮箱验证码
     void del_veri_code(const std::string& user_email);
 
+    std::string get_auth_code();
+    std::string get_email_addr();
+
 /* ==================== 用户关系网管理 ==================== */
 
     // 加载用户关系数据到Redis缓存

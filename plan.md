@@ -212,6 +212,9 @@ CREATE TABLE chat_commands (
     para1 VARCHAR(255),
     para2 VARCHAR(255),
     para3 VARCHAR(255),
+    para4 VARCHAR(255),
+    para5 VARCHAR(255),
+    para6 VARCHAR(255),
     managed BOOLEAN DEFAULT FALSE,
     FOREIGN KEY(sender) REFERENCES users(user_id)
         ON UPDATE CASCADE
@@ -219,7 +222,7 @@ CREATE TABLE chat_commands (
 );
 
 CREATE TABLE user_pending_commands (
-    user_id VARCHAR(255) NOT NULL,
+    user_id VARCHAR(30) NOT NULL,
     command_id INT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY(user_id, command_id),

@@ -9,7 +9,7 @@
 #include "../abstract/datatypes.hpp"
 
 // 文件分片大小 (64KB)
-constexpr size_t CHUNK_SIZE = 64 * 1024;
+constexpr size_t CHUNK_SIZE = 4 * 1024 * 1024;  // 4MB
 
 // 文件状态枚举
 enum class FileStatus {

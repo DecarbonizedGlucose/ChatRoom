@@ -114,19 +114,19 @@ const char descriptor_table_protodef_data_2eproto[] PROTOBUF_SECTION_VARIABLE(pr
   "\n\ndata.proto\032\rmessage.proto\"l\n\tFileChunk"
   "\022\017\n\007file_id\030\001 \001(\t\022\014\n\004data\030\002 \001(\014\022\023\n\013chunk"
   "_index\030\003 \001(\r\022\024\n\014total_chunks\030\004 \001(\r\022\025\n\ris"
-  "_last_chunk\030\005 \001(\010\"\212\001\n\010SyncItem\022 \n\004type\030\001"
+  "_last_chunk\030\005 \001(\010\"\235\001\n\010SyncItem\022 \n\004type\030\001"
   " \001(\0162\022.SyncItem.SyncType\022\017\n\007content\030\002 \001("
-  "\t\022\021\n\ttimestamp\030\003 \001(\003\"8\n\010SyncType\022\025\n\021RELA"
-  "TION_NET_FULL\020\000\022\025\n\021ALL_FRIEND_STATUS\020\001\"1"
-  "\n\017OfflineMessages\022\036\n\010messages\030\001 \003(\0132\014.Ch"
-  "atMessageb\006proto3"
+  "\t\022\021\n\ttimestamp\030\003 \001(\003\"K\n\010SyncType\022\025\n\021RELA"
+  "TION_NET_FULL\020\000\022\025\n\021ALL_FRIEND_STATUS\020\001\022\021"
+  "\n\rGROUP_MEMBERS\020\002\"1\n\017OfflineMessages\022\036\n\010"
+  "messages\030\001 \003(\0132\014.ChatMessageb\006proto3"
   ;
 static const ::_pbi::DescriptorTable* const descriptor_table_data_2eproto_deps[1] = {
   &::descriptor_table_message_2eproto,
 };
 static ::_pbi::once_flag descriptor_table_data_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_data_2eproto = {
-    false, false, 337, descriptor_table_protodef_data_2eproto,
+    false, false, 356, descriptor_table_protodef_data_2eproto,
     "data.proto",
     &descriptor_table_data_2eproto_once, descriptor_table_data_2eproto_deps, 1, 3,
     schemas, file_default_instances, TableStruct_data_2eproto::offsets,
@@ -147,6 +147,7 @@ bool SyncItem_SyncType_IsValid(int value) {
   switch (value) {
     case 0:
     case 1:
+    case 2:
       return true;
     default:
       return false;
@@ -156,6 +157,7 @@ bool SyncItem_SyncType_IsValid(int value) {
 #if (__cplusplus < 201703) && (!defined(_MSC_VER) || (_MSC_VER >= 1900 && _MSC_VER < 1912))
 constexpr SyncItem_SyncType SyncItem::RELATION_NET_FULL;
 constexpr SyncItem_SyncType SyncItem::ALL_FRIEND_STATUS;
+constexpr SyncItem_SyncType SyncItem::GROUP_MEMBERS;
 constexpr SyncItem_SyncType SyncItem::SyncType_MIN;
 constexpr SyncItem_SyncType SyncItem::SyncType_MAX;
 constexpr int SyncItem::SyncType_ARRAYSIZE;

@@ -36,6 +36,7 @@ public:
         bool is_user_admin = false; // 当前用户是否为管理员
     };
     std::unordered_map<std::string, GroupInfo> group_list;
+    std::unordered_map<std::string, std::unordered_map<std::string, bool>> group_members;
 
     // 通知队列
     safe_queue<CommandRequest> notices;
@@ -128,11 +129,18 @@ public:
     void handle_block_friend(const std::string& friend_ID);
     void handle_unblock_friend(const std::string& friend_ID);
     void handle_get_friend_status();
-    void handle_join_group(const std::string& group_ID);
+    void handle_join_group(
+        const std::string& group_ID,
+        const std::string& group_name,
+        int member_count,
+        const std::string& owner_ID);
     void handle_create_group(const std::string& group_ID, const std::string& group_name);
     void handle_leave_group(const std::string& group_ID);
     void handle_add_admin(const std::string& group_ID, const std::string& user_ID);
     void handle_remove_admin(const std::string& group_ID, const std::string& user_ID);
+    void handle_add_person(const std::string& group_ID, const std::string& user_ID);
+    void handle_remove_person(const std::string& group_ID, const std::string& user_ID);
+    void handle_disband_group(const std::string& group_ID);
     void handle_reply_heartbeat();
 
     // 更新会话聊表

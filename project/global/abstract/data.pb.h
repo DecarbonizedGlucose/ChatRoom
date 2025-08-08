@@ -64,12 +64,13 @@ PROTOBUF_NAMESPACE_CLOSE
 enum SyncItem_SyncType : int {
   SyncItem_SyncType_RELATION_NET_FULL = 0,
   SyncItem_SyncType_ALL_FRIEND_STATUS = 1,
+  SyncItem_SyncType_GROUP_MEMBERS = 2,
   SyncItem_SyncType_SyncItem_SyncType_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   SyncItem_SyncType_SyncItem_SyncType_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool SyncItem_SyncType_IsValid(int value);
 constexpr SyncItem_SyncType SyncItem_SyncType_SyncType_MIN = SyncItem_SyncType_RELATION_NET_FULL;
-constexpr SyncItem_SyncType SyncItem_SyncType_SyncType_MAX = SyncItem_SyncType_ALL_FRIEND_STATUS;
+constexpr SyncItem_SyncType SyncItem_SyncType_SyncType_MAX = SyncItem_SyncType_GROUP_MEMBERS;
 constexpr int SyncItem_SyncType_SyncType_ARRAYSIZE = SyncItem_SyncType_SyncType_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* SyncItem_SyncType_descriptor();
@@ -413,6 +414,8 @@ class SyncItem final :
     SyncItem_SyncType_RELATION_NET_FULL;
   static constexpr SyncType ALL_FRIEND_STATUS =
     SyncItem_SyncType_ALL_FRIEND_STATUS;
+  static constexpr SyncType GROUP_MEMBERS =
+    SyncItem_SyncType_GROUP_MEMBERS;
   static inline bool SyncType_IsValid(int value) {
     return SyncItem_SyncType_IsValid(value);
   }

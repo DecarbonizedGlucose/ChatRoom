@@ -42,5 +42,4 @@ public:
     void start();
     void stop();
     void auto_accept();
-    void heartbeat_monitor_loop(int interval_sec = 60, int timeout_sec = 90); // 心跳监控
 };

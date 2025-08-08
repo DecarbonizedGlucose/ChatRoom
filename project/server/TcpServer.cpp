@@ -146,5 +146,3 @@ void TcpServer::auto_accept() {
     read_event->add_to_reactor();
     write_event->add_to_reactor();
 }
-
-void TcpServer::heartbeat_monitor_loop(int interval_sec, int timeout_sec) {}

@@ -74,6 +74,7 @@ void CFileManager::process_upload_task(const ClientFilePtr& file) {
             !file->has_more_chunks()
         );
     }
+    log_info("File upload completed: {}", file->get_local_path());
 }
 
 void CFileManager::process_download_task(const ClientFilePtr& file) {

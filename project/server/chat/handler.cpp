@@ -83,16 +83,6 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
                 // 离线
             }
         }
-        else {
-            // 不在群里
-            // auto conn = disp->conn_manager->get_connection(sender, 1);
-            // auto env_str = create_command_string(
-            //     Action::Warn,
-            //     "ChatRoom Team",
-            //     { "You are not a member of group " + receiver + ", message not sent." }
-            // );
-            // try_send(disp->conn_manager, conn, env_str, DataType::Command);
-        }
     }
     // 存起来
     disp->mysql_con->add_chat_message(
@@ -157,12 +147,12 @@ void CommandHandler::handle_recv(
         }
         case Action::Refuse_GReq: {
             handle_refuse_group_request(
-                args[1], ostr);
+                conn, args[0], std::stoi(args[1]));
             break;
         }
         case Action::Accept_GReq: {
             handle_accept_group_request(
-                args[1], ostr);
+                conn, args[0], std::stoi(args[1]));
             break;
         }
         case Action::Add_Friend_Req: {
@@ -180,7 +170,7 @@ void CommandHandler::handle_recv(
         }
         case Action::Create_Group: {
             handle_create_group(
-                args[0], subj, args[0]);
+                args[1], subj, args[0]);
             break;
         }
         case Action::Block_Friend: {
@@ -192,23 +182,23 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Join_Group_Req: {
-            handle_join_group_req();
+            handle_join_group_req(args[1], subj, command);
             break;
         }
         case Action::Leave_Group: {
-            handle_leave_group();
+            handle_leave_group(args[1], subj, ostr);
             break;
         }
         case Action::Disband_Group: {
-            handle_disband_group();
+            handle_disband_group(args[1], subj, ostr);
             break;
         }
         case Action::Invite_To_Group_Req: {
-            handle_invite_to_group_req();
+            handle_invite_to_group_req(ostr, args[3]);
             break;
         }
         case Action::Remove_From_Group: {
-            handle_remove_from_group();
+            handle_remove_from_group(args[1], subj, args[2], ostr);
             break;
         }
         case Action::Search_Group: {
@@ -216,11 +206,11 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Add_Admin: {
-            handle_add_admin();
+            handle_add_admin(args[1], subj, args[2], ostr);
             break;
         }
         case Action::Remove_Admin: {
-            handle_remove_admin();
+            handle_remove_admin(args[1], subj, args[2], ostr);
             break;
         }
         case Action::Upload_File: {
@@ -236,6 +226,7 @@ void CommandHandler::handle_recv(
             conn->user_ID = subj; // 这里的subj是user_ID
             int server_index = std::stoi(args[0]);
             disp->conn_manager->add_conn(conn, server_index);
+            break;
         }
         case Action::Online_Init: {
             handle_online_init(subj);
@@ -374,8 +365,8 @@ void CommandHandler::handle_send_veri_code(
         try_send(disp->conn_manager, conn, env_out);
         return;
     }
-    const std::string qq_email = "decglu@qq.com";
-    const std::string auth_code = "gowkltdykhdmgehh";
+    auto qq_email = disp->redis_con->get_email_addr();
+    auto auth_code = disp->redis_con->get_auth_code();
     std::string veri_code = std::to_string(rand() % 900000 + 100000); // 生成6位随机验证码
     try {
         QQMailSender sender;
@@ -436,9 +427,9 @@ void CommandHandler::handle_authentication(
 }
 
 void CommandHandler::handle_refuse_friend_request(
-        const std::string& sender,
-        const std::string& ori_user_ID,
-        const std::string& ostr) {
+    const std::string& sender,
+    const std::string& ori_user_ID,
+    const std::string& ostr) {
     log_debug("handle_refuse_friend_request called");
     auto user_online = disp->redis_con->get_user_status(ori_user_ID);
     if (user_online.first) {
@@ -452,14 +443,12 @@ void CommandHandler::handle_refuse_friend_request(
             log_debug("Refuse friend request sent to online user: {}", ori_user_ID);
         }
     }
-    // 不在线, 存到mysql
-    // ...
 }
 
 void CommandHandler::handle_accept_friend_request(
-        const std::string& sender,
-        const std::string& ori_user_ID,
-        const std::string& ostr) {
+    const std::string& sender,
+    const std::string& ori_user_ID,
+    const std::string& ostr) {
     log_debug("handle_accept_friend_request called");
     auto user_online = disp->redis_con->get_user_status(ori_user_ID);
     if (user_online.first) {
@@ -485,15 +474,146 @@ void CommandHandler::handle_accept_friend_request(
 }
 
 void CommandHandler::handle_refuse_group_request(
-        const std::string& ori_user_ID,
-        const std::string& ostr) {
+    TcpServerConnection* conn,
+    const std::string& time,
+    int command_id) {
     log_debug("handle_refuse_group_request called");
+    // 先判断有没有被处理
+    bool managed = disp->mysql_con->get_command_status(command_id);
+    if (managed) {
+        // 已经被处理
+        auto fail_str = create_command_string(
+            Action::Managed, "", {});
+        try_send(disp->conn_manager, conn, fail_str);
+        log_debug("{}试图拒绝群组请求, 但已被处理", conn->user_ID);
+        return;
+    }
+    // 没有被处理
+    auto suc_str = create_command_string(
+        Action::Success, "", {});
+    try_send(disp->conn_manager, conn, suc_str);
+    // 更新数据库
+    disp->mysql_con->update_command_status(command_id, true);
+    // 生成统一通知
+    auto ori_cmd = disp->mysql_con->get_command(command_id);
+    auto user_ID = ori_cmd.sender();
+    auto group_ID = ori_cmd.args(1);
+    auto ref_str = create_command_string(
+        Action::Refuse_GReq,
+        conn->user_ID,
+        {time, group_ID, user_ID}
+    );
+    // 通知管理员，除了上面那个
+    auto admin_list = disp->redis_con->get_group_admins(group_ID);
+    for (const auto& admin_ID : admin_list) {
+        if (admin_ID == conn->user_ID) continue; // 不通知自己
+        auto admin_conn = disp->conn_manager->get_connection(admin_ID, 1);
+        if (admin_conn) {
+            try_send(disp->conn_manager, admin_conn, ref_str);
+        }
+    }
+    // 通知申请人，自己被拒了
+    auto new_person_conn = disp->conn_manager->get_connection(user_ID, 1);
+    try_send(disp->conn_manager, new_person_conn, ref_str);
+    log_info(conn->user_ID + "拒绝让" + user_ID + "加入群组" + group_ID);
 }
 
 void CommandHandler::handle_accept_group_request(
-        const std::string& ori_user_ID,
-        const std::string& ostr) {
+    TcpServerConnection* conn,
+    const std::string& time,
+    int command_id) {
     log_debug("handle_accept_group_request called");
+
+    try {
+        // 先判断有没有被处理
+        bool managed = disp->mysql_con->get_command_status(command_id);
+        if (managed) {
+            // 已经被处理
+            auto fail_str = create_command_string(
+                Action::Managed, "", {});
+            try_send(disp->conn_manager, conn, fail_str);
+            log_debug("{}试图同意群组请求, 但已被处理", conn->user_ID);
+            return;
+        }
+        // 没有被处理
+        auto suc_str = create_command_string(
+            Action::Success, "", {});
+        try_send(disp->conn_manager, conn, suc_str);
+        // 更新命令处理状态
+        disp->mysql_con->update_command_status(command_id, true);
+        // 生成统一通知
+        auto ori_cmd = disp->mysql_con->get_command(command_id);
+        auto user_ID = ori_cmd.sender();
+        log_debug("申请用户ID: {}", user_ID);
+
+        // 检查args是否有足够的参数
+        if (ori_cmd.args_size() < 2) {
+            log_error("command_id {} 参数不足, args_size: {}", command_id, ori_cmd.args_size());
+            return;
+        }
+
+        auto group_ID = ori_cmd.args(1);
+        log_debug("群组ID: {}", group_ID);
+
+        auto group_info = disp->redis_con->get_group_info(group_ID);
+        if (group_info.empty()) {
+            log_error("群组 {} 信息获取失败", group_ID);
+            return;
+        }
+
+        // 检查group_info是否包含必要字段
+        if (!group_info.contains("name") || !group_info.contains("member_count") || !group_info.contains("owner")) {
+            log_error("群组 {} 信息不完整, 缺少必要字段", group_ID);
+            log_debug("group_info内容: {}", group_info.dump());
+            return;
+        }
+
+        auto acc_str = create_command_string(
+            Action::Accept_GReq,
+            conn->user_ID,
+            {time, group_ID, user_ID,
+            group_info["name"],
+            std::to_string(group_info["member_count"].get<int>()),
+            group_info["owner"]}
+        );
+        // 通知所有人，除了上面那个
+        auto member_list = disp->redis_con->get_group_members(group_ID);
+        for (const auto& member_ID : member_list) {
+            if (member_ID == conn->user_ID) continue; // 不通知自己
+            auto member_conn = disp->conn_manager->get_connection(member_ID, 1);
+            if (member_conn) {
+                try_send(disp->conn_manager, member_conn, acc_str);
+            }
+        }
+        // mysql中添加群成员
+        disp->mysql_con->add_user_to_group(group_ID, user_ID);
+        // redis中添加群成员
+        disp->redis_con->add_user_to_group(user_ID, group_ID);
+        disp->redis_con->add_group_member(group_ID, user_ID);
+        group_info["member_count"] = group_info["member_count"].get<int>() + 1;
+        disp->redis_con->cache_group_info(group_ID, group_info);
+        // 通知申请人进群
+        if (disp->redis_con->get_user_status(user_ID).first) {
+            // 申请人在线
+            auto new_person_conn = disp->conn_manager->get_connection(user_ID, 1);
+            if (new_person_conn) {
+                try_send(disp->conn_manager, new_person_conn, acc_str);
+                log_debug("通知申请人 {} 进群成功", user_ID);
+                // 发送群成员列表
+                update_group_info(user_ID, group_ID);
+            } else {
+                log_error("申请人 {} 在线但无法找到连接", user_ID);
+            }
+        } else {
+            log_info("申请人 {} 离线，无法立即通知", user_ID);
+        }
+        log_info(conn->user_ID + "同意了让" + user_ID + "加入群组" + group_ID);
+
+    } catch (const std::exception& e) {
+        log_error("handle_accept_group_request异常: command_id={}, error={}", command_id, e.what());
+    } catch (...) {
+        log_error("handle_accept_group_request未知异常: command_id={}", command_id);
+    }
 }
 
 void CommandHandler::handle_add_friend_req(
@@ -512,8 +632,6 @@ void CommandHandler::handle_add_friend_req(
             //log_debug("Friend request sent to online user: {}", friend_ID);
         }
     }
-    // 不在线, 存到mysql
-    // ...
 }
 
 void CommandHandler::handle_remove_friend(
@@ -533,9 +651,6 @@ void CommandHandler::handle_remove_friend(
             disp->conn_manager->get_connection(friend_ID, 1),
             ostr
         );
-    } else {
-        // 命令存到mysql
-        // ...
     }
     // 数据存到mysql
     disp->mysql_con->delete_friend(user_ID, friend_ID);
@@ -590,18 +705,194 @@ void CommandHandler::handle_create_group(
     const std::string& time) {
     log_debug("handle_create_group called");
     // 创建群组
-
+    std::string group_ID = disp->mysql_con->create_group(group_name, user_ID);
+    if (group_ID.empty()) {
+        log_error("Failed to create group with name: {}", group_name);
+        // 发送创建失败的通知
+        auto env_str = create_command_string(
+            Action::Give_Group_ID,
+            "",
+            {group_ID}
+        );
+        try_send(
+            disp->conn_manager,
+            disp->conn_manager->get_connection(user_ID, 1),
+            env_str
+        );
+        return;
+    }
+    json info = {
+        {"name", group_name},
+        {"owner", user_ID},
+        {"member_count", 1}
+    };
+    // 写入redis
+    disp->redis_con->cache_group_info(group_ID, info);
+    disp->redis_con->add_group_admin(group_ID, user_ID);
+    disp->redis_con->add_group_member(group_ID, user_ID);
+    disp->redis_con->add_user_to_group(user_ID, group_ID);
+    // 创建成功
+    // 服务端数据已经处理好
+    log_info("Group created successfully with ID: {}", group_ID);
+    auto env_str = create_command_string(
+        Action::Give_Group_ID,
+        "",
+        {group_ID}
+    );
+    try_send(
+        disp->conn_manager,
+        disp->conn_manager->get_connection(user_ID, 1),
+        env_str
+    );
+    log_info("{}创建了群聊{}:{}", user_ID, group_name, group_ID);
 }
 
-void CommandHandler::handle_join_group_req() {}
+void CommandHandler::handle_join_group_req(
+    const std::string& group_ID,
+    const std::string& user_ID,
+    CommandRequest cmd
+) {
+    auto admins = disp->redis_con->get_group_admins(group_ID);
+    // 存起来
+    int cmd_id = disp->mysql_con->store_command(cmd);
+    cmd.add_args(std::to_string(cmd_id));
+    auto str = get_command_string(cmd);
+    // 发给所有管理员
+    for (auto admin_ID : admins) {
+        auto conn = disp->conn_manager->get_connection(admin_ID, 1);
+        if (conn) {
+            try_send(
+                disp->conn_manager,
+                conn,
+                str
+            );
+        }
+    }
+    log_info("{}申请加入群{}", user_ID, group_ID);
+}
 
-void CommandHandler::handle_leave_group() {}
+void CommandHandler::handle_leave_group(
+    const std::string& group_ID,
+    const std::string& user_ID,
+    const std::string& ostr
+) {
+    // 通知所有人,除了跑的
+    auto members = disp->redis_con->get_group_members(group_ID);
+    for (auto& member_ID : members) {
+        if (user_ID == member_ID) continue;
+        auto conn = disp->conn_manager->get_connection(member_ID, 1);
+        if (conn) {
+            try_send(
+                disp->conn_manager,
+                conn,
+                ostr
+            );
+        }
+    }
+    // 从redis删除
+    disp->redis_con->remove_user_from_group(user_ID, group_ID);
+    disp->redis_con->remove_group_member(group_ID, user_ID);
+    auto group_info = disp->redis_con->get_group_info(group_ID);
+    group_info["member_count"] = group_info["member_count"].get<int>() - 1;
+    disp->redis_con->cache_group_info(group_ID, group_info);
+    // 从mysql删除
+    disp->mysql_con->remove_user_from_group(group_ID, user_ID);
+    log_info("{}离开了群组{}", user_ID, group_ID);
+}
 
-void CommandHandler::handle_disband_group() {}
+void CommandHandler::handle_disband_group(
+    const std::string& group_ID,
+    const std::string& owner_ID,
+    const std::string& ostr
+) {
+    log_debug("handle_disband_group called for group: {}, owner: {}", group_ID, owner_ID);
+    // 先判断是不是群主
+    auto info = disp->redis_con->get_group_info(group_ID);
+    if (info.empty()) {
+        log_error("Group {} not found", group_ID);
+        return;
+    }
+    if (info["owner"] != owner_ID) {
+        log_error("User {} is not the owner of group {}", owner_ID, group_ID);
+        return;
+    }
+    // 通知所有人
+    auto member_list = disp->redis_con->get_group_members(group_ID);
+    for (const auto& member_ID : member_list) {
+        if (member_ID == owner_ID) continue; // 不通知执行的
+        auto conn = disp->conn_manager->get_connection(member_ID, 1);
+        if (conn) {
+            try_send(disp->conn_manager, conn, ostr);
+        }
+    }
+    // 从redis删除
+    for (auto& member_ID : member_list) {
+        disp->redis_con->remove_user_from_group(member_ID, group_ID);
+        disp->redis_con->remove_group_member(group_ID, member_ID);
+    }
+    disp->redis_con->remove_group(group_ID);
+    // 从mysql删除
+    disp->mysql_con->disband_group(group_ID);
+    log_info("群组{}被{}解散", group_ID, owner_ID);
+}
 
-void CommandHandler::handle_invite_to_group_req() {}
+void CommandHandler::handle_invite_to_group_req(
+    const std::string& ostr,
+    const std::string& friend_ID
+) {
+    log_debug("handle_invite_to_group_req called");
+    if (disp->conn_manager->get_connection(friend_ID, 1)) {
+        // 在线
+        try_send(
+            disp->conn_manager,
+            disp->conn_manager->get_connection(friend_ID, 1),
+            ostr
+        );
+        log_info("{}被邀请加入群组", friend_ID);
+        return;
+    }
+}
 
-void CommandHandler::handle_remove_from_group() {}
+void CommandHandler::handle_remove_from_group(
+    const std::string& group_ID,
+    const std::string& admin_ID,
+    const std::string& member_ID,
+    const std::string& ostr
+) {
+    log_debug("handle_remove_from_group called for group: {}, admin: {}, member: {}", group_ID, admin_ID, member_ID);
+    // 先判断是不是管理员
+    auto admin_list = disp->redis_con->get_group_admins(group_ID);
+    if (std::find(admin_list.begin(), admin_list.end(), admin_ID) == admin_list.end()) {
+        log_error("User {} is not an admin of group {}", admin_ID, group_ID);
+        return;
+    }
+    // 身份合法，继续
+    // 从redis删除
+    auto member_list = disp->redis_con->get_group_members(group_ID);
+    if (std::find(member_list.begin(), member_list.end(), member_ID) == member_list.end()) {
+        log_error("试图删除非群聊{}成员{}", group_ID, member_ID);
+        return;
+    }
+    if (std::find(admin_list.begin(), admin_list.end(), member_ID) != admin_list.end()) {
+        // 被删除的是管理员
+        disp->redis_con->remove_group_admin(group_ID, member_ID);
+        disp->mysql_con->remove_group_admin(group_ID, member_ID);
+    }
+    disp->redis_con->remove_user_from_group(member_ID, group_ID);
+    disp->redis_con->remove_group_member(group_ID, member_ID);
+    auto group_info = disp->redis_con->get_group_info(group_ID);
+    group_info["member_count"] = group_info["member_count"].get<int>() - 1;
+    disp->redis_con->cache_group_info(group_ID, group_info);
+    disp->mysql_con->remove_user_from_group(group_ID, member_ID);
+    // 通知所有人
+    for (const auto& member : member_list) { // 这里目前还是包括他的
+        if (member == admin_ID) continue; // 不通知执行的
+        auto conn = disp->conn_manager->get_connection(member, 1);
+        if (conn) {
+            try_send(disp->conn_manager, conn, ostr);
+        }
+    }
+}
 
 void CommandHandler::handle_search_group(
     TcpServerConnection* conn, const std::string& group_ID) {
@@ -609,8 +900,9 @@ void CommandHandler::handle_search_group(
     bool group_exists = disp->mysql_con->search_group(group_ID);
     std::string env_str;
     if (group_exists) {
+        auto group_name = disp->mysql_con->get_group_name(group_ID);
         env_str = create_command_string(
-            Action::Notify_Exist, conn->user_ID, {group_ID});
+            Action::Notify_Exist, conn->user_ID, {group_ID, group_name});
         log_debug("Group {} exists, sending Notify_Exist", group_ID);
     } else {
         env_str = create_command_string(
@@ -620,9 +912,71 @@ void CommandHandler::handle_search_group(
     try_send(disp->conn_manager, conn, env_str);
 }
 
-void CommandHandler::handle_add_admin() {}
+void CommandHandler::handle_add_admin(
+    const std::string& group_ID,
+    const std::string& owner_ID,
+    const std::string& member_ID,
+    const std::string& ostr
+) {
+    log_debug("handle_add_admin called for group: {}, owner: {}, member: {}", group_ID, owner_ID, member_ID);
+    // 先判断是不是群主
+    auto info = disp->redis_con->get_group_info(group_ID);
+    if (info.empty()) {
+        log_error("Group {} not found", group_ID);
+        return;
+    }
+    if (info["owner"] != owner_ID) {
+        log_error("User {} is not the owner of group {}", owner_ID, group_ID);
+        return;
+    }
+    // 添加管理员
+    disp->redis_con->add_group_admin(group_ID, member_ID);
+    disp->mysql_con->add_group_admin(group_ID, member_ID);
+    // 通知所有人，包括新的(这里都是群成员)
+    auto member_list = disp->redis_con->get_group_members(group_ID);
+    for (const auto& member_ID : member_list) {
+        if (member_ID == owner_ID) continue;
+        try_send(
+            disp->conn_manager,
+            disp->conn_manager->get_connection(member_ID, 1),
+            ostr
+        );
+    }
+    log_debug("添加{}为群组{}的管理员", member_ID, group_ID);
+}
 
-void CommandHandler::handle_remove_admin() {}
+void CommandHandler::handle_remove_admin(
+    const std::string& group_ID,
+    const std::string& owner_ID,
+    const std::string& member_ID,
+    const std::string& ostr
+) {
+    log_debug("handle_remove_admin called for group: {}, owner: {}, member: {}", group_ID, owner_ID, member_ID);
+    // 先判断是不是群主
+    auto info = disp->redis_con->get_group_info(group_ID);
+    if (info.empty()) {
+        log_error("Group {} not found", group_ID);
+        return;
+    }
+    if (info["owner"] != owner_ID) {
+        log_error("User {} is not the owner of group {}", owner_ID, group_ID);
+        return;
+    }
+    // 删除管理员
+    disp->redis_con->remove_group_admin(group_ID, member_ID);
+    disp->mysql_con->remove_group_admin(group_ID, member_ID);
+    // 通知所有人，包括被删除的(这里都是群成员)
+    auto member_list = disp->redis_con->get_group_members(group_ID);
+    for (const auto& member_ID : member_list) {
+        if (member_ID == owner_ID) continue;
+        try_send(
+            disp->conn_manager,
+            disp->conn_manager->get_connection(member_ID, 1),
+            ostr
+        );
+    }
+    log_debug("把{}从群组{}的管理员中移除", member_ID, group_ID);
+}
 
 void CommandHandler::handle_post_relation_net(const std::string& user_ID, const json& relation_data) {
     log_debug("handle_post_relation_net called for user: {}", user_ID);
@@ -766,7 +1120,12 @@ void CommandHandler::handle_online_init(const std::string& user_ID) {
     // 发送用户离线消息（消息记录）
     handle_post_offline_messages(user_ID, relation_data);
     // 发送未接收的通知和未处理的好友请求/群聊邀请等
-    handle_post_unordered_noti_and_req(user_ID, relation_data);
+    //handle_post_unordered_noti_and_req(user_ID, relation_data);
+    /**
+     * 本来想接着写的
+     * 您猜怎么着？
+     * 突然发现没有要求这个实现
+    */
     log_info("Online initialization completed for user: {}", user_ID);
 }
 
@@ -857,10 +1216,20 @@ void CommandHandler::handle_post_offline_messages(
     }
 }
 
-void CommandHandler::handle_post_unordered_noti_and_req(
-    const std::string& user_ID, const json& relation_data) {
-
-}
+// void CommandHandler::handle_post_unordered_noti_and_req(
+//     const std::string& user_ID, const json& relation_data) {
+//     auto commands = disp->mysql_con->get_pending_commands(user_ID);
+//     // auto conn = disp->conn_manager->get_connection(user_ID, 1);
+//     // for (auto& cmd : commands) {
+//     //     auto str = get_command_string(cmd);
+//     //     try_send(
+//     //         disp->conn_manager,
+//     //         conn,
+//     //         str
+//     //     );
+//     // }
+//     // 不能这么处理，客户端处理方式不一样
+// }
 
 void CommandHandler::get_friends(const std::string& user_ID, json& friends) {
     auto friends_with_status = disp->mysql_con->get_friends_with_block_status(user_ID);
@@ -902,6 +1271,32 @@ void CommandHandler::get_relation_net(const std::string& user_ID, json& relation
     relation_net = json::object();
     relation_net["friends"] = friends;
     relation_net["groups"] = groups;
+}
+
+void CommandHandler::update_group_info(const std::string& user_ID, const std::string& group_ID) {
+    // 其实用来发送群成员列表的
+    json group_members;
+    auto members_with_admin = disp->mysql_con->get_group_members_with_admin_status(group_ID);
+    for (const auto& [member_id, is_admin] : members_with_admin) {
+        json member_info;
+        member_info["id"] = member_id;
+        member_info["is_admin"] = is_admin;
+        group_members.push_back(member_info);
+    }
+    // 发送群成员列表
+    auto str = create_sync_string(
+        SyncItem::GROUP_MEMBERS,
+        group_members.dump()
+    );
+    auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
+    if (data_conn) {
+        try_send(
+            disp->conn_manager,
+            data_conn,
+            str,
+            DataType::SyncItem
+        );
+    }
 }
 
 void CommandHandler::get_blocked_info(const std::string& user_ID, const json& friends, json& blocked_info) {

@@ -15,6 +15,7 @@ message SyncItem {
     // 批量同步（用于用户上线时的全量同步）
     RELATION_NET_FULL = 0;  // 完整关系网
     ALL_FRIEND_STATUS = 1;  // 好友在线状态（瞬时）
+    GROUP_MEMBERS = 2; // 更新的群组成员列表
   }
 
   SyncType type = 1;
