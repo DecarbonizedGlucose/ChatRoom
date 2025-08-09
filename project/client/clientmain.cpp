@@ -29,7 +29,6 @@ int main(int argc, char* argv[]) {
 
         log_info("ChatRoom client starting...");
 
-        set_addr_c::fetch_addr_from_config();
         TopClient client;
         client.launch();
     } catch (const std::exception& e) {

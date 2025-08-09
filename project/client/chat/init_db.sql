@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS group_members (
     FOREIGN KEY(group_id) REFERENCES chat_groups(group_id)
 );
 
-CREATE TABLE chat_messages (
+CREATE TABLE IF NOT EXISTS chat_messages (
     message_id INTEGER PRIMARY KEY AUTOINCREMENT,
     sender_id VARCHAR(30) NOT NULL,
     receiver_id VARCHAR(30) NOT NULL,

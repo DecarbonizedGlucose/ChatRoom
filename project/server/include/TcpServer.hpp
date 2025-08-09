@@ -12,8 +12,6 @@ class ListenSocket;
 namespace set_addr_s {
     using Addr = std::pair<std::string, uint16_t>;
     extern Addr server_addr[3];
-
-    bool fetch_addr_from_config();
 }
 
 class TcpServer {

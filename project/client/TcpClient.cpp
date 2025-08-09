@@ -2,11 +2,16 @@
 
 namespace set_addr_c {
     Addr client_addr[3];
-    bool fetch_addr_from_config() {
-        // 模拟配置, 以后再改
-        client_addr[0] = {"127.0.0.1", 9527};
-        client_addr[1] = {"127.0.0.1", 9528};
-        client_addr[2] = {"127.0.0.1", 9529};
-        return true;
-    }
+}
+
+TcpClient::TcpClient(std::string server_ip, uint16_t server_port) {
+    socket = std::make_shared<ConnectSocket>(server_ip, server_port);
+}
+
+void TcpClient::start() {
+    socket->connect();
+}
+
+void TcpClient::stop() {
+    socket->disconnect();
 }

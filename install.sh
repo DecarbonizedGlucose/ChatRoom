@@ -75,7 +75,7 @@ cd ~/.local/share/ChatRoom
 mkdir -p log
 
 echo "正在初始化本地数据库..."
-sqlite3 ./chat.db < "$ORIGINAL_DIR/init_db.sql"
+sqlite3 ./chat.db < "$ORIGINAL_DIR/project/client/chat/init_db.sql"
 
 echo "客户端所有文件已安装到 ~/.local/share/ChatRoom"
 

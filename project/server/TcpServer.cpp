@@ -7,16 +7,6 @@
 
 namespace set_addr_s {
     Addr server_addr[3];
-    bool fetch_addr_from_config() {
-        set_addr_s::server_addr[0] = {"127.0.0.1", 9527};
-        set_addr_s::server_addr[1] = {"127.0.0.1", 9528};
-        set_addr_s::server_addr[2] = {"127.0.0.1", 9529};
-        log_info("Set all addr: {}:{}, {}:{}, {}:{}",
-                 set_addr_s::server_addr[0].first, set_addr_s::server_addr[0].second,
-                 set_addr_s::server_addr[1].first, set_addr_s::server_addr[1].second,
-                 set_addr_s::server_addr[2].first, set_addr_s::server_addr[2].second);
-        return true;
-    }
 }
 
 TcpServer::TcpServer(int idx) : idx(idx) {

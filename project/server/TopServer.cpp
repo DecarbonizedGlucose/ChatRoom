@@ -5,15 +5,44 @@
 #include "../global/include/logging.hpp"
 #include "include/connection_manager.hpp"
 #include "include/sfile_manager.hpp"
+#include <nlohmann/json.hpp>
+#include <fstream>
+
+namespace mysql_config {
+    std::string host;
+    std::string user;
+    std::string password;
+    std::string dbname;
+    unsigned port = 3306U;
+    void config(std::string file) {
+        std::ifstream ifs(file);
+        if (!ifs.is_open()) {
+            throw std::runtime_error("Failed to open config file");
+        }
+
+        std::string content;
+        content.assign((std::istreambuf_iterator<char>(ifs)),
+                       (std::istreambuf_iterator<char>()));
+        ifs.close();
+
+        auto j = nlohmann::json::parse(content);
+        host = j["host"].get<std::string>();
+        user = j["user"].get<std::string>();
+        password = j["password"].get<std::string>();
+        dbname = j["dbname"].get<std::string>();
+        port = j["port"].get<unsigned int>();
+    }
+}
 
 TopServer::TopServer() {
     pool = new thread_pool(20);
     redis = new RedisController();
     mysql = new MySQLController(
-        "127.0.0.1",
-        "decglu",
-        "dGlucose77",
-        "chat_db"
+        mysql_config::host,
+        mysql_config::user,
+        mysql_config::password,
+        mysql_config::dbname,
+        mysql_config::port
     );
     disp = new Dispatcher(redis, mysql);
     message_server = new TcpServer(0);
@@ -34,11 +63,11 @@ TopServer::~TopServer() {
     delete pool;
 }
 
-void TopServer::launch() {
+bool TopServer::launch() {
     pool->init();
     if (!mysql->connect()) {
         log_error("Failed to connect to MySQL");
-        return;
+        return false;
     }
 
     // 设置 SFileManager 的线程池
@@ -59,6 +88,7 @@ void TopServer::launch() {
         data_server->start();
     });
     log_info("Data server submited to thread pool");
+    return true;
 }
 
 void TopServer::stop() {

@@ -1,10 +1,21 @@
 #pragma once
 
+#include <string>
+
 class Dispatcher;
 class RedisController;
 class MySQLController;
 class TcpServer;
 class thread_pool;
+
+namespace mysql_config {
+    extern std::string host;
+    extern std::string user;
+    extern std::string password;
+    extern std::string dbname;
+    extern unsigned int port;
+    void config(std::string file);
+}
 
 class TopServer {
 public:
@@ -19,6 +30,6 @@ public:
     TopServer();
     ~TopServer();
 
-    void launch();
+    bool launch();
     void stop();
 };
