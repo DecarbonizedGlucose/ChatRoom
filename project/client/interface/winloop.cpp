@@ -626,9 +626,9 @@ void WinLoop::chat_loop() {
             if (!got) {
                 // 定期检查当前会话是否仍然有效
                 if (comm->cache.conversations.find(conv_id) == comm->cache.conversations.end()) {
-                    std::lock_guard<std::mutex> lock(output_mutex);
-                    std::cout << '\r' << std::string(50, ' ') << '\r'; // 清除当前行
-                    std::cout << "\n[系统消息] 会话已不存在，即将返回消息列表。\n" << std::endl;
+                    // std::lock_guard<std::mutex> lock(output_mutex);
+                    // std::cout << '\r' << std::string(50, ' ') << '\r'; // 清除当前行
+                    // std::cout << "\n[系统消息] 会话已不存在，即将返回消息列表。\n" << std::endl;
                     chatting = false; // 设置标志以退出聊天循环
                 }
                 continue; // 这样能及时跳出，避免线程池被占用

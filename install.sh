@@ -65,8 +65,8 @@ cd "$ORIGINAL_DIR"
 echo "依赖安装完成，正在构建项目..."
 
 mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . --target client -j$(nproc)
+cmake .. -DBUILD_CLIENT_ONLY=true
+make -j$(nproc)
 
 echo "构建完成，正在初始化环境..."
 
