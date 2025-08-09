@@ -11,7 +11,7 @@ namespace set_addr_s {
         set_addr_s::server_addr[0] = {"127.0.0.1", 9527};
         set_addr_s::server_addr[1] = {"127.0.0.1", 9528};
         set_addr_s::server_addr[2] = {"127.0.0.1", 9529};
-        log_info("模拟读取了所有socket地址{}:{}, {}:{}, {}:{}",
+        log_info("Set all addr: {}:{}, {}:{}, {}:{}",
                  set_addr_s::server_addr[0].first, set_addr_s::server_addr[0].second,
                  set_addr_s::server_addr[1].first, set_addr_s::server_addr[1].second,
                  set_addr_s::server_addr[2].first, set_addr_s::server_addr[2].second);
@@ -47,7 +47,7 @@ int TcpServer::get_efd() const {
     return pr ? pr->get_epoll_fd() : -1;
 }
 
-void TcpServer::init(thread_pool* pool, RedisController* re, Dispatcher* disp) {
+void TcpServer::init(thread_pool* pool, Dispatcher* disp) {
     this->pool = pool;
     this->disp = disp;
     disp->add_server(this, idx);

@@ -156,11 +156,6 @@ public:
         bool is_group,
         const ClientFilePtr& file,
         const std::string& file_id);
-    void send_text_with_file(
-        const std::string& receiver_id,
-        bool is_group,
-        const std::string& text,
-        const std::string& file_path);
     // 进入聊天时瞬间打印充数的记录
     std::vector<ChatMessage> get_conversation_messages(
         const std::string& conversation_id, int limit = 200);

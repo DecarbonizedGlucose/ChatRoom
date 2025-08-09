@@ -142,7 +142,7 @@ void CommandHandler::handle_recv(
         }
         case Action::Refuse_FReq: {
             handle_refuse_friend_request(
-                subj, args[1], ostr);
+                args[1], ostr);
             break;
         }
         case Action::Refuse_GReq: {
@@ -161,7 +161,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Remove_Friend: {
-            handle_remove_friend(subj, args[1], command, ostr);
+            handle_remove_friend(subj, args[1], ostr);
             break;
         }
         case Action::Search_Person: {
@@ -169,8 +169,7 @@ void CommandHandler::handle_recv(
             break;
         }
         case Action::Create_Group: {
-            handle_create_group(
-                args[1], subj, args[0]);
+            handle_create_group(args[1], subj);
             break;
         }
         case Action::Block_Friend: {
@@ -427,7 +426,6 @@ void CommandHandler::handle_authentication(
 }
 
 void CommandHandler::handle_refuse_friend_request(
-    const std::string& sender,
     const std::string& ori_user_ID,
     const std::string& ostr) {
     log_debug("handle_refuse_friend_request called");
@@ -637,7 +635,6 @@ void CommandHandler::handle_add_friend_req(
 void CommandHandler::handle_remove_friend(
     const std::string& user_ID,
     const std::string& friend_ID,
-    const CommandRequest& cmd,
     const std::string& ostr
 ) {
     log_debug("handle_remove_friend called for user_ID: {}, friend_ID: {}", user_ID, friend_ID);
@@ -701,8 +698,8 @@ void CommandHandler::handle_unblock_friend(
 
 void CommandHandler::handle_create_group(
     const std::string& group_name,
-    const std::string& user_ID,
-    const std::string& time) {
+    const std::string& user_ID
+) {
     log_debug("handle_create_group called");
     // 创建群组
     std::string group_ID = disp->mysql_con->create_group(group_name, user_ID);
@@ -1118,7 +1115,7 @@ void CommandHandler::handle_online_init(const std::string& user_ID) {
     // 发送所有在线好友的状态
     handle_post_friends_status(user_ID, relation_data["friends"]);
     // 发送用户离线消息（消息记录）
-    handle_post_offline_messages(user_ID, relation_data);
+    handle_post_offline_messages(user_ID);
     // 发送未接收的通知和未处理的好友请求/群聊邀请等
     //handle_post_unordered_noti_and_req(user_ID, relation_data);
     /**
@@ -1155,9 +1152,7 @@ void CommandHandler::handle_post_friends_status(
     }
 }
 
-void CommandHandler::handle_post_offline_messages(
-    const std::string& user_ID,
-    const json& relation_data) {
+void CommandHandler::handle_post_offline_messages(const std::string& user_ID) {
     log_debug("handle_post_offline_messages called for user: {}", user_ID);
 
     try {

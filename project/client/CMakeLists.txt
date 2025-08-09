@@ -21,15 +21,6 @@ target_link_libraries(client
     nlohmann_json::nlohmann_json
     ${CURL_LIBRARIES}
     spdlog::spdlog_header_only
-    absl_base
-    absl_strings
-    absl_throw_delegate
-    absl_log_internal_check_op
-    absl_log_internal_message
-    absl_log_severity
-    absl_log_globals
-    absl_raw_logging_internal
-    absl_log_internal_nullguard
     SQLiteCpp
     sqlite3
 )

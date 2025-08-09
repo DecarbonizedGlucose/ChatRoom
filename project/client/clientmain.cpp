@@ -4,7 +4,16 @@
 #include <filesystem>
 #include <spdlog/sinks/rotating_file_sink.h>
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc == 5) {
+        std::string addr = argv[1];
+        uint16_t port1 = std::stoi(argv[2]);
+        uint16_t port2 = std::stoi(argv[3]);
+        uint16_t port3 = std::stoi(argv[4]);
+        set_addr_c::client_addr[0] = {addr, port1};
+        set_addr_c::client_addr[1] = {addr, port2};
+        set_addr_c::client_addr[2] = {addr, port3};
+    }
     // 创建日志目录
     std::filesystem::create_directories(std::getenv("HOME") + std::string("/.local/share/ChatRoom/log/"));
 

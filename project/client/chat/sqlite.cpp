@@ -9,11 +9,6 @@
 #include <sqlite3.h>
 
 namespace {
-    /**
-     * @brief 展开路径中的波浪号（~）为用户主目录
-     * @param path 可能包含~的路径
-     * @return 展开后的绝对路径
-     */
     std::string expand_path(const std::string& path) {
         if (path.empty() || path[0] != '~') {
             return path;
@@ -58,7 +53,6 @@ bool SQLiteController::connect() {
     try {
         // 使用 SQLiteCpp 创建数据库连接
         db = std::make_unique<SQLite::Database>(db_path, SQLite::OPEN_READWRITE|SQLite::OPEN_CREATE);
-        log_info("SQLite database connected: {}", db_path);
 
         // 启用外键约束
         db->exec("PRAGMA foreign_keys = ON;");
@@ -83,7 +77,6 @@ void SQLiteController::disconnect() {
     std::lock_guard<std::mutex> lock(db_mutex);
     if (db) {
         db.reset();
-        log_info("SQLite database disconnected");
     }
 }
 
@@ -93,11 +86,6 @@ bool SQLiteController::is_connected() const {
 
 bool SQLiteController::execute(const std::string& query) {
     std::lock_guard<std::mutex> lock(db_mutex);
-    if (!db) {
-        log_error("Database not connected");
-        return false;
-    }
-
     try {
         db->exec(query);
         return true;
@@ -110,12 +98,6 @@ bool SQLiteController::execute(const std::string& query) {
 std::vector<std::vector<std::string>> SQLiteController::query(const std::string& sql) {
     std::lock_guard<std::mutex> lock(db_mutex);
     std::vector<std::vector<std::string>> results;
-
-    if (!db) {
-        log_error("Database not connected");
-        return results;
-    }
-
     try {
         SQLite::Statement query_stmt(*db, sql);
 
@@ -145,11 +127,6 @@ std::vector<std::vector<std::string>> SQLiteController::query(const std::string&
 template<typename... Args>
 bool SQLiteController::execute_stmt(const std::string& sql, const std::string& operation, Args&&... args) {
     std::lock_guard<std::mutex> lock(db_mutex);
-    if (!db) {
-        log_error("Database not connected");
-        return false;
-    }
-
     // 重试机制处理数据库锁定
     const int max_retries = 3;
     for (int retry = 0; retry < max_retries; ++retry) {
@@ -184,10 +161,6 @@ std::vector<T> SQLiteController::query_list(const std::string& sql, const std::s
                                            std::function<T(SQLite::Statement&)> mapper) {
     std::vector<T> results;
     std::lock_guard<std::mutex> lock(db_mutex);
-    if (!db) {
-        log_error("Database not connected");
-        return results;
-    }
     try {
         SQLite::Statement stmt(*db, sql);
         while (stmt.executeStep()) {
@@ -204,10 +177,6 @@ std::vector<T> SQLiteController::query_list_with_params(const std::string& sql, 
                                                        std::function<T(SQLite::Statement&)> mapper, Args&&... args) {
     std::vector<T> results;
     std::lock_guard<std::mutex> lock(db_mutex);
-    if (!db) {
-        log_error("Database not connected");
-        return results;
-    }
     try {
         SQLite::Statement stmt(*db, sql);
         bind_params(stmt, 1, std::forward<Args>(args)...);
@@ -224,10 +193,6 @@ template<typename T, typename... Args>
 T SQLiteController::query_single(const std::string& sql, const std::string& operation, T default_value,
                                 std::function<T(SQLite::Statement&)> mapper, Args&&... args) {
     std::lock_guard<std::mutex> lock(db_mutex);
-    if (!db) {
-        log_error("Database not connected");
-        return default_value;
-    }
     try {
         SQLite::Statement stmt(*db, sql);
         bind_params(stmt, 1, std::forward<Args>(args)...);
@@ -259,10 +224,6 @@ bool SQLiteController::store_user_info(const std::string& user_ID, const std::st
 
 bool SQLiteController::get_stored_user_info(std::string& user_ID, std::string& email) {
     std::lock_guard<std::mutex> lock(db_mutex);
-    if (!db) {
-        log_error("Database not connected");
-        return false;
-    }
     try {
         SQLite::Statement stmt(*db, "SELECT user_id, user_email FROM users LIMIT 1");
         if (stmt.executeStep()) {
@@ -430,13 +391,7 @@ bool SQLiteController::cache_chat_message(
     const std::string& file_name,
     std::size_t file_size,
     const std::string& file_hash) {
-
     std::lock_guard<std::mutex> lock(db_mutex);
-    if (!db) {
-        log_error("Database not connected");
-        return false;
-    }
-
     try {
         SQLite::Statement stmt(*db,
             "INSERT INTO chat_messages (sender_id, receiver_id, is_group, timestamp, text, pin, file_name, file_size, file_hash) "
@@ -499,36 +454,4 @@ std::vector<std::vector<std::string>> SQLiteController::get_group_chat_history(
         << "LIMIT " << limit << ";";
 
     return query(sql.str());
-}
-
-bool SQLiteController::clear_old_messages(int days_to_keep) {
-    std::time_t cutoff_time = std::time(nullptr) - (days_to_keep * 24 * 60 * 60);
-    std::string sql = "DELETE FROM chat_messages WHERE timestamp < " + std::to_string(cutoff_time) + ";";
-    return execute(sql);
-}
-
-/* ---------- 离线消息管理 ---------- */
-
-bool SQLiteController::mark_message_as_synced(long long message_id) {
-    return execute_stmt("UPDATE chat_messages SET synced = 1 WHERE message_id = ?",
-                       "Mark message as synced", (int64_t)message_id);
-}
-
-std::vector<std::vector<std::string>> SQLiteController::get_unsynced_messages() {
-    return query_list<std::vector<std::string>>(
-        "SELECT message_id, sender_id, receiver_id, is_group, timestamp, text, pin, file_name, file_size, file_hash "
-        "FROM chat_messages WHERE synced = 0 ORDER BY timestamp ASC",
-        "Get unsynced messages",
-        [](SQLite::Statement& stmt) {
-            std::vector<std::string> row;
-            for (int i = 0; i < stmt.getColumnCount(); i++) {
-                if (stmt.isColumnNull(i)) {
-                    row.push_back("");
-                } else {
-                    row.push_back(stmt.getColumn(i).getText());
-                }
-            }
-            return row;
-        }
-    );
 }

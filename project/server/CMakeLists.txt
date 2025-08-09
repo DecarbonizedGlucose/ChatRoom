@@ -24,15 +24,6 @@ target_link_libraries(server
     OpenSSL::Crypto
     protobuf::libprotobuf
     nlohmann_json::nlohmann_json
-    absl_base
-    absl_strings
-    absl_throw_delegate
-    absl_log_internal_check_op
-    absl_log_internal_message
-    absl_log_severity
-    absl_log_globals
-    absl_raw_logging_internal
-    absl_log_internal_nullguard
     spdlog::spdlog_header_only
 )
 

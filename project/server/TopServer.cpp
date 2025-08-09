@@ -44,9 +44,9 @@ void TopServer::launch() {
     // 设置 SFileManager 的线程池
     disp->file_manager->set_thread_pool(pool);
 
-    message_server->init(pool, redis, disp);
-    command_server->init(pool, redis, disp);
-    data_server->init(pool, redis, disp);
+    message_server->init(pool, disp);
+    command_server->init(pool, disp);
+    data_server->init(pool, disp);
     pool->submit([this]() {
         message_server->start();
     });

@@ -4,7 +4,15 @@
 #include <string>
 #include <istream>
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc == 4) {
+        uint16_t port1 = std::stoi(argv[1]);
+        uint16_t port2 = std::stoi(argv[2]);
+        uint16_t port3 = std::stoi(argv[3]);
+        set_addr_s::server_addr[0] = {"0.0.0.0", port1};
+        set_addr_s::server_addr[1] = {"0.0.0.0", port2};
+        set_addr_s::server_addr[2] = {"0.0.0.0", port3};
+    }
     spdlog::set_level(spdlog::level::debug);
     std::srand(std::time(nullptr));
     set_addr_s::fetch_addr_from_config();

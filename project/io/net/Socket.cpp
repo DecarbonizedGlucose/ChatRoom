@@ -119,7 +119,7 @@ ssize_t DataSocket::send_with_size() {
     if (size == 0) {
         return 0; // No data to send
     }
-    ssize_t sent = ::write_size_to(fd, &size);
+    ::write_size_to(fd, &size);
     // debug
     // std::cout << "Debug发送大小: " << std::dec << size << std::endl;
     // for (unsigned char c : write_buf) {
@@ -203,11 +203,6 @@ DataSocket::RecvState DataSocket::receive_protocol_with_state(std::string& proto
     }
     proto = packet_buf.substr(4, expected_size);
     packet_buf.erase(0, 4 + expected_size);
-    // debug
-    // std::cout << "Debug收到大小: " << std::dec << proto.size() << std::endl;
-    // for (unsigned char c : proto) {
-    //     std::cout << std::hex << (int)c << " ";
-    // } std::cout << std::endl;
     return RecvState::Success;
 }
 

@@ -155,7 +155,7 @@ bool RedisController::load_user_relations(const std::string& user_ID, json& rela
     }
 }
 
-bool RedisController::unload_user_relations(const std::string& user_ID, const json& relation_data) {
+bool RedisController::unload_user_relations(const std::string& user_ID) {
     try {
         auto key = "chat:user:" + user_ID + ":friends";
         redis_conn.del(key);

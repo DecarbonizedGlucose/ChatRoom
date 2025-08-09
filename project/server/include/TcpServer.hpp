@@ -7,7 +7,6 @@
 
 class Dispatcher;
 class reactor;
-class RedisController;
 class ListenSocket;
 
 namespace set_addr_s {
@@ -38,7 +37,7 @@ public:
     int get_efd() const;
 
     // 配置和初始化
-    void init(thread_pool* pool, RedisController* re, Dispatcher* disp);
+    void init(thread_pool* pool, Dispatcher* disp);
     void start();
     void stop();
     void auto_accept();

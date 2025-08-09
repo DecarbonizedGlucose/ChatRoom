@@ -967,14 +967,6 @@ void CommManager::send_file_message(
     }
 }
 
-void CommManager::send_text_with_file(
-        const std::string& receiver_id,
-        bool is_group,
-        const std::string& text,
-        const std::string& file_path) {
-
-}
-
 std::vector<ChatMessage> CommManager::get_conversation_messages(const std::string& conversation_id, int limit) {
     auto messages = cache.messages[conversation_id].copy_max_num(limit);
     std::sort(messages.begin(), messages.end(), [](const ChatMessage& a, const ChatMessage& b) {

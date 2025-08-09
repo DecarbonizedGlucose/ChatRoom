@@ -74,7 +74,6 @@ private:
         const std::string& ori_user_ID,
         const std::string& ostr);
     void handle_refuse_friend_request(
-        const std::string& sender,
         const std::string& ori_user_ID,
         const std::string& ostr);
     void handle_accept_group_request(
@@ -91,7 +90,6 @@ private:
     void handle_remove_friend(
         const std::string& user_ID,
         const std::string& friend_ID,
-        const CommandRequest& cmd,
         const std::string& ostr);
     void handle_search_person(
         TcpServerConnection* conn,
@@ -104,7 +102,6 @@ private:
         const std::string& friend_ID);
     void handle_create_group(
         const std::string& user_ID,
-        const std::string& time,
         const std::string& group_name);
     void handle_join_group_req(
         const std::string& group_ID,
@@ -155,8 +152,7 @@ private:
     // 非直接指令驱动的业务逻辑
     void handle_post_relation_net(const std::string& user_ID, const json& relation_data);
     void handle_post_friends_status(const std::string& user_ID, const json& friends);
-    void handle_post_offline_messages(const std::string& user_ID, const json& relation_data);
-    // void handle_post_unordered_noti_and_req(const std::string& user_ID, const json& relation_data);
+    void handle_post_offline_messages(const std::string& user_ID);
 
     // 封装起来的函数
     void get_friends(const std::string& user_ID, json& friends);

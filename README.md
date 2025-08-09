@@ -14,8 +14,6 @@ sudo apt install -y \
   libmysqlclient-dev \
   nlohmann-json3-dev \
   libspdlog-dev \
-  libabsl-dev \
-  libncurses-dev \
   libhiredis-dev \
   build-essential \
   libsqlite3-dev
