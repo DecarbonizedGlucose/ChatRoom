@@ -1,4 +1,4 @@
-# One ChatRoom 聊天室项目
+# ChatRoom 聊天室项目
 这是一段话不知道写什么
 有好几行
 ### 功能
@@ -18,11 +18,6 @@ sudo apt install -y \
   build-essential \
   libsqlite3-dev
 
-# SQLiteCpp 需要手动编译安装
-cd /tmp
-git clone https://github.com/SRombauts/SQLiteCpp.git
-cd SQLiteCpp && mkdir build && cd build
-cmake .. && make && sudo make install
 # redis++ 需要手动编译安装
 cd /tmp
 git clone https://github.com/sewenew/redis-plus-plus.git
