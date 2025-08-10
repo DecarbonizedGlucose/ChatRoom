@@ -11,8 +11,95 @@
 
 部署时请使用ubuntu。如有其他需求，请按照脚本，根据系统特性自行配置。
 
+~~~mysql
+CREATE TABLE users (
+    user_id VARCHAR(30) PRIMARY KEY,
+    user_email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash CHAR(60) NOT NULL,
+    last_active TIMESTAMP NULL,
+    status ENUM('active', 'offline') DEFAULT 'offline'
+);
+
+CREATE TABLE friends (
+    user_id VARCHAR(30) NOT NULL,
+    friend_id VARCHAR(30) NOT NULL,
+    is_blocked BOOLEAN DEFAULT FALSE,
+    PRIMARY KEY(user_id, friend_id),
+    FOREIGN KEY(user_id) REFERENCES users(user_id),
+    FOREIGN KEY(friend_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE chat_groups (
+    group_id VARCHAR(30) PRIMARY KEY NOT NULL,
+    group_name VARCHAR(255) NOT NULL,
+    owner_id VARCHAR(30) NOT NULL,
+    FOREIGN KEY(owner_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE group_members (
+    group_id VARCHAR(30) NOT NULL,
+    user_id VARCHAR(30) NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE,
+    PRIMARY KEY(group_id, user_id),
+    FOREIGN KEY(group_id) REFERENCES chat_groups(group_id),
+    FOREIGN KEY(user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE chat_messages (
+    message_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sender_id VARCHAR(30) NOT NULL,
+    receiver_id VARCHAR(30) NOT NULL,
+    is_group BOOLEAN NOT NULL,
+    timestamp BIGINT NOT NULL,
+    text TEXT,
+    pin BOOLEAN DEFAULT FALSE,
+    file_name VARCHAR(255),
+    file_size BIGINT,
+    file_hash VARCHAR(128),
+    FOREIGN KEY (sender_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE chat_files (
+    file_hash CHAR(64) PRIMARY KEY,
+    file_id VARCHAR(36) NOT NULL UNIQUE,
+    file_size BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE chat_commands (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    action TINYINT NOT NULL,
+    sender VARCHAR(255) NOT NULL,
+    para1 VARCHAR(255),
+    para2 VARCHAR(255),
+    para3 VARCHAR(255),
+    para4 VARCHAR(255),
+    para5 VARCHAR(255),
+    para6 VARCHAR(255),
+    managed BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY(sender) REFERENCES users(user_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
+CREATE TABLE user_pending_commands ( # 保留
+    user_id VARCHAR(30) NOT NULL,
+    command_id INT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(user_id, command_id),
+    FOREIGN KEY(user_id) REFERENCES users(user_id),
+    FOREIGN KEY(command_id) REFERENCES chat_commands(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+~~~
+
+
+
+
 
 ## 功能和使用
+
+
 
 
 ## 项目架构
@@ -20,6 +107,8 @@
 
 
 ## 设计细节
+
+
 
 ### Server
 
@@ -66,4 +155,117 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 传输完成再次求hash，以验证文件完整性。
 
 
+
+## 关于项目
+
+目录结构：
+
+~~~
+.
+├── CMakeLists.txt
+├── install.sh
+├── project
+│   ├── client
+│   │   ├── chat
+│   │   │   ├── cfile_manager.cpp
+│   │   │   ├── CommManager.cpp
+│   │   │   ├── init_db.sql
+│   │   │   └── sqlite.cpp
+│   │   ├── clientmain.cpp
+│   │   ├── CMakeLists.txt
+│   │   ├── include
+│   │   │   ├── cfile_manager.hpp
+│   │   │   ├── CommManager.hpp
+│   │   │   ├── output.hpp
+│   │   │   ├── sqlite.hpp
+│   │   │   ├── TcpClient.hpp
+│   │   │   ├── TopClient.hpp
+│   │   │   └── winloop.hpp
+│   │   ├── interface
+│   │   │   ├── output.cpp
+│   │   │   └── winloop.cpp
+│   │   ├── TcpClient.cpp
+│   │   └── TopClient.cpp
+│   ├── global
+│   │   ├── abstract
+│   │   │   ├── command.pb.cc
+│   │   │   ├── command.pb.h
+│   │   │   ├── data.pb.cc
+│   │   │   ├── data.pb.h
+│   │   │   ├── datatypes.cpp
+│   │   │   ├── datatypes.hpp
+│   │   │   ├── envelope.pb.cc
+│   │   │   ├── envelope.pb.h
+│   │   │   ├── message.pb.cc
+│   │   │   ├── message.pb.h
+│   │   │   └── proto
+│   │   │       ├── command.proto
+│   │   │       ├── data.proto
+│   │   │       ├── envelope.proto
+│   │   │       └── message.proto
+│   │   ├── CMakeLists.txt
+│   │   ├── entity
+│   │   │   └── file.cpp
+│   │   └── include
+│   │       ├── action.hpp
+│   │       ├── command.hpp
+│   │       ├── file.hpp
+│   │       ├── group.hpp
+│   │       ├── logging.hpp
+│   │       ├── safe_deque.hpp
+│   │       ├── safe_queue.hpp
+│   │       ├── threadpool.hpp
+│   │       ├── time_utils.hpp
+│   │       └── user.hpp
+│   ├── io
+│   │   ├── CMakeLists.txt
+│   │   ├── include
+│   │   │   ├── ioaction.hpp
+│   │   │   ├── reactor.hpp
+│   │   │   └── Socket.hpp
+│   │   └── net
+│   │       ├── ioaction.cpp
+│   │       ├── reactor.cpp
+│   │       └── Socket.cpp
+│   └── server
+│       ├── chat
+│       │   ├── dispatcher.cpp
+│       │   ├── email.cpp
+│       │   ├── handler.cpp
+│       │   └── sfile_manager.cpp
+│       ├── CMakeLists.txt
+│       ├── connection_manager.cpp
+│       ├── database
+│       │   ├── mysql.cpp
+│       │   └── redis.cpp
+│       ├── include
+│       │   ├── connection_manager.hpp
+│       │   ├── dispatcher.hpp
+│       │   ├── email.hpp
+│       │   ├── handler.hpp
+│       │   ├── mysql.hpp
+│       │   ├── redis.hpp
+│       │   ├── sfile_manager.hpp
+│       │   ├── TcpServerConnection.hpp
+│       │   ├── TcpServer.hpp
+│       │   └── TopServer.hpp
+│       ├── servermain.cpp
+│       ├── TcpServerConnection.cpp
+│       ├── TcpServer.cpp
+│       └── TopServer.cpp
+└── README.md
+
+18 directories, 75 files
+~~~
+项目C++代码近9000行。`protobuf`文件也编译为`.cc``.h`，这些已排除在外。
+~~~
+-------------------------------------------------------------------------------
+Language                     files          blank        comment           code
+-------------------------------------------------------------------------------
+C++                             24            854            589           7100
+C/C++ Header                    31            449            239           1842
+-------------------------------------------------------------------------------
+SUM:                            55           1303            828           8942
+-------------------------------------------------------------------------------
+~~~
 
