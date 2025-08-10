@@ -176,9 +176,7 @@ void CommManager::handle_manage_message(const ChatMessage& msg) {
 
     if (msg.timestamp() > conv.last_time) {
         conv.last_time = msg.timestamp();
-        if (msg.is_group()) {
-            conv.last_message = msg.sender() + ": ";
-        }
+        conv.last_message = msg.is_group() ? msg.sender() + ": " : "";
         if (msg.text().empty() && !msg.payload().file_name().empty()) {
             conv.last_message += "[文件] " + msg.payload().file_name();
         }

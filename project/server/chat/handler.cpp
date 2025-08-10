@@ -84,12 +84,8 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
             }
         }
     }
-    // 存起来
-    disp->mysql_con->add_chat_message(
-        sender, receiver, message.is_group(), message.timestamp(),
-        message.text(), message.pin(), message.payload().file_name(),
-        message.payload().file_size(), message.payload().file_hash()
-    );
+    // 缓存到redis
+    disp->redis_con->cache_chat_message(ostr);
 }
 
 void MessageHandler::handle_send(TcpServerConnection* conn) {

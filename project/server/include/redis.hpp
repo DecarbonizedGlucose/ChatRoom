@@ -37,13 +37,31 @@ chat:group:<group_id>:info -> Hash {
     "owner" : "群主ID",
     "member_count" : "成员数量"
 }
+
+消息批量缓存（用于异步落盘 MySQL）：
+Key: chat:messages
+Type: List
+Value: envelope(chatmessage)的string
 */
+
 
 class RedisController {
 public:
     using Redis = sw::redis::Redis;
 
     RedisController();
+
+/* ==================== 消息批量缓存 ==================== */
+
+    // 将序列化后的消息加入缓存队列
+    bool cache_chat_message(const std::string& serialized_msg);
+
+    // 批量取出消息（最多 count 条），并从 Redis 删除
+    // 返回的 vector 中每个元素是 protobuf ChatMessage 的二进制
+    std::vector<std::string> pop_chat_messages_batch(size_t count);
+
+    // 获取当前缓存队列的长度
+    size_t get_chat_message_queue_size();
 
 /* ==================== 用户状态 ==================== */
 

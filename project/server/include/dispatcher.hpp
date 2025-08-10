@@ -6,6 +6,7 @@
 #include "../../global/abstract/datatypes.hpp"
 #include "../include/redis.hpp"
 #include "../include/mysql.hpp"
+#include <chrono>
 
 class TcpServer;
 class TcpServerConnection;
@@ -25,8 +26,13 @@ public:
     ConnectionManager* conn_manager = nullptr;
     SFileManager* file_manager = nullptr;
 
+    std::chrono::steady_clock::time_point last_flush_time; // 消息存储时间
+    std::chrono::seconds flush_interval{5};
+
     Dispatcher(RedisController* re, MySQLController* my);
     ~Dispatcher();
+
+    void flush_cached_messages();
 
     void add_server(TcpServer* server, int idx);
     void dispatch_recv(TcpServerConnection* conn);

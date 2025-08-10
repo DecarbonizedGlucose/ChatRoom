@@ -22,6 +22,7 @@ private:
     bool running = false;
 
 public:
+    friend class Dispatcher;
 
     Dispatcher* disp = nullptr; // 分发器, 事件分发到这里
     int idx;
