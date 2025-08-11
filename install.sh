@@ -32,7 +32,7 @@ else
 fi
 
 PROTOBUF_VERSION=3.21.12
-INSTALL_PREFIX=/opt/protobuf-${PROTOBUF_VERSION}
+PROTOBUF_PREFIX="$HOME/.local/protobuf-${PROTOBUF_VERSION}"
 
 if [ -f "${PROTOBUF_PREFIX}/bin/protoc" ]; then
     echo "Protobuf ${PROTOBUF_VERSION} 已安装，跳过编译。"
@@ -49,16 +49,18 @@ else
         -Dprotobuf_BUILD_TESTS=OFF \
         -DCMAKE_INSTALL_PREFIX=${PROTOBUF_PREFIX}
     make -j$(nproc)
-    sudo make install
-    sudo ldconfig
+    make install
     echo "Protobuf ${PROTOBUF_VERSION} 安装完成。"
     cd /tmp
     rm -rf protobuf-${PROTOBUF_VERSION} protobuf-all-${PROTOBUF_VERSION}.tar.gz
 fi
 
 # 确保 CMake 用到正确的版本
-export CMAKE_PREFIX_PATH=${PROTOBUF_PREFIX}:$CMAKE_PREFIX_PATH
-export LD_LIBRARY_PATH=${PROTOBUF_PREFIX}/lib:$LD_LIBRARY_PATH
+export CMAKE_PREFIX_PATH="${PROTOBUF_PREFIX}:$CMAKE_PREFIX_PATH"
+export PATH="${PROTOBUF_PREFIX}/bin:$PATH"
+export LD_LIBRARY_PATH="${PROTOBUF_PREFIX}/lib:$LD_LIBRARY_PATH"
+
+echo "已将 Protobuf ${PROTOBUF_VERSION} 安装至 ${PROTOBUF_PREFIX}。"
 
 cd "$ORIGINAL_DIR"
 
@@ -75,7 +77,7 @@ cd ~/.local/share/ChatRoom
 mkdir -p log
 
 echo "正在初始化本地数据库..."
-sqlite3 ./chat.db < "$ORIGINAL_DIR/project/client/chat/init_db.sql"
+sqlite3 ./chat.db < "$ORIGINAL_DIR/sql/client_init.sql"
 
 echo "客户端所有文件已安装到 ~/.local/share/ChatRoom"
 

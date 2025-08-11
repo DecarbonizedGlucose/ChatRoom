@@ -7,97 +7,25 @@
 
 
 
-## 部署（Ubuntu）
+## 部署客户端
 
-部署时请使用ubuntu。如有其他需求，请按照脚本，根据系统特性自行配置。
-
-~~~mysql
-CREATE TABLE users (
-    user_id VARCHAR(30) PRIMARY KEY,
-    user_email VARCHAR(255) NOT NULL UNIQUE,
-    password_hash CHAR(60) NOT NULL,
-    last_active TIMESTAMP NULL,
-    status ENUM('active', 'offline') DEFAULT 'offline'
-);
-
-CREATE TABLE friends (
-    user_id VARCHAR(30) NOT NULL,
-    friend_id VARCHAR(30) NOT NULL,
-    is_blocked BOOLEAN DEFAULT FALSE,
-    PRIMARY KEY(user_id, friend_id),
-    FOREIGN KEY(user_id) REFERENCES users(user_id),
-    FOREIGN KEY(friend_id) REFERENCES users(user_id)
-);
-
-CREATE TABLE chat_groups (
-    group_id VARCHAR(30) PRIMARY KEY NOT NULL,
-    group_name VARCHAR(255) NOT NULL,
-    owner_id VARCHAR(30) NOT NULL,
-    FOREIGN KEY(owner_id) REFERENCES users(user_id)
-);
-
-CREATE TABLE group_members (
-    group_id VARCHAR(30) NOT NULL,
-    user_id VARCHAR(30) NOT NULL,
-    is_admin BOOLEAN DEFAULT FALSE,
-    PRIMARY KEY(group_id, user_id),
-    FOREIGN KEY(group_id) REFERENCES chat_groups(group_id),
-    FOREIGN KEY(user_id) REFERENCES users(user_id)
-);
-
-CREATE TABLE chat_messages (
-    message_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    sender_id VARCHAR(30) NOT NULL,
-    receiver_id VARCHAR(30) NOT NULL,
-    is_group BOOLEAN NOT NULL,
-    timestamp BIGINT NOT NULL,
-    text TEXT,
-    pin BOOLEAN DEFAULT FALSE,
-    file_name VARCHAR(255),
-    file_size BIGINT,
-    file_hash VARCHAR(128),
-    FOREIGN KEY (sender_id) REFERENCES users(user_id)
-);
-
-CREATE TABLE chat_files (
-    file_hash CHAR(64) PRIMARY KEY,
-    file_id VARCHAR(36) NOT NULL UNIQUE,
-    file_size BIGINT NOT NULL DEFAULT 0
-);
-
-CREATE TABLE chat_commands (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    action TINYINT NOT NULL,
-    sender VARCHAR(255) NOT NULL,
-    para1 VARCHAR(255),
-    para2 VARCHAR(255),
-    para3 VARCHAR(255),
-    para4 VARCHAR(255),
-    para5 VARCHAR(255),
-    para6 VARCHAR(255),
-    managed BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY(sender) REFERENCES users(user_id)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
-);
-
-CREATE TABLE user_pending_commands ( # 保留
-    user_id VARCHAR(30) NOT NULL,
-    command_id INT NOT NULL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY(user_id, command_id),
-    FOREIGN KEY(user_id) REFERENCES users(user_id),
-    FOREIGN KEY(command_id) REFERENCES chat_commands(id)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
-);
-~~~
-
-
+执行`install.sh`即可。
 
 
 
 ## 功能和使用
+
+业务逻辑参考QQ、微信、telegram等热门即时通讯软件。
+
+在聊天界面使用`/up file_path`发送文件，用`/down File_ID local_path/file.name`下载文件。
+
+在关系列表中可使用一系列命令
+`/delete [friend ID]` `/block [friend ID]` `/unblock [friend ID]`
+`/quit [group ID]` `/disband [group ID]` `/remove_admin [group ID] [member ID]`
+`/add_admin [group ID] [member ID]` `/create_group [group_name]`
+`/show_members [group ID]` `/show_admins [group ID]`
+`/invite [group ID] [friend ID]` `/remove_member [group_ID] [member_ID]`
+其他操作按照导航提示即可。
 
 
 
@@ -106,13 +34,13 @@ CREATE TABLE user_pending_commands ( # 保留
 
 
 
+
+
 ## 设计细节
-
-
 
 ### Server
 
-分为三个逻辑服务器，分别是MessageSever，CommandServer和DataServer，监听三个端口（可指定），由`TcpServer实现`。每个逻辑服务器有自己的Epoll Reactor（`Reactor`），在一定程度上相通。
+分为三个逻辑服务器，分别是MessageSever，CommandServer和DataServer，监听三个端口（可指定），由`TcpServer`实现。每个逻辑服务器有自己的Epoll Reactor（`Reactor`），在一定程度上相通。
 
 `Reactor`只负责读写事件触发，业务逻辑由`Dispacther`分发。三个逻辑服务器共用一个`Dispatcher`，用来区分数据类型，以便确定业务逻辑，也有统筹管理三个逻辑服务器的功能。
 
@@ -170,7 +98,9 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 │   │   │   ├── cfile_manager.cpp
 │   │   │   ├── CommManager.cpp
 │   │   │   ├── init_db.sql
-│   │   │   └── sqlite.cpp
+│   │   │   ├── output.cpp
+│   │   │   ├── sqlite.cpp
+│   │   │   └── winloop.cpp
 │   │   ├── clientmain.cpp
 │   │   ├── CMakeLists.txt
 │   │   ├── include
@@ -181,9 +111,6 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 │   │   │   ├── TcpClient.hpp
 │   │   │   ├── TopClient.hpp
 │   │   │   └── winloop.hpp
-│   │   ├── interface
-│   │   │   ├── output.cpp
-│   │   │   └── winloop.cpp
 │   │   ├── TcpClient.cpp
 │   │   └── TopClient.cpp
 │   ├── global
@@ -215,8 +142,7 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 │   │       ├── safe_deque.hpp
 │   │       ├── safe_queue.hpp
 │   │       ├── threadpool.hpp
-│   │       ├── time_utils.hpp
-│   │       └── user.hpp
+│   │       └── time_utils.hpp
 │   ├── io
 │   │   ├── CMakeLists.txt
 │   │   ├── include
@@ -255,17 +181,17 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 │       └── TopServer.cpp
 └── README.md
 
-18 directories, 75 files
+17 directories, 74 files
 ~~~
-项目C++代码近9000行。`protobuf`文件也编译为`.cc``.h`，这些已排除在外。
+项目C++代码近9000行。`protobuf`文件也编译为`.cc` `.h`，这些已排除在外。
 ~~~
--------------------------------------------------------------------------------
-Language                     files          blank        comment           code
--------------------------------------------------------------------------------
-C++                             24            854            589           7100
-C/C++ Header                    31            449            239           1842
--------------------------------------------------------------------------------
-SUM:                            55           1303            828           8942
--------------------------------------------------------------------------------
+---------------------------------------------------------------------
+Language           files          blank        comment           code
+---------------------------------------------------------------------
+C++                   24            854            589           7100
+C/C++ Header          30            440            239           1811
+---------------------------------------------------------------------
+SUM:                  54           1294            828           8911
+---------------------------------------------------------------------
 ~~~
 

@@ -1087,13 +1087,7 @@ void WinLoop::my_lists_loop() {
     // /exit /delete /block /unblock /quit /disband
     // /remove_admin /add_admin /create_group
     // /show_members /show_admins
-    std::cout << "可用命令：\n"
-                 "/delete [friend ID]  /block [friend ID]  /unblock [friend ID]\n"
-                 "/quit [group ID]  /disband [group ID]  /remove_admin [group ID] [member ID]\n"
-                 "/add_admin [group ID] [member ID]  /create_group [group_name]\n"
-                 "/show_members [group ID]  /show_admins [group ID]\n"
-                 "/invite [group ID] [friend ID]  /remove_member [group_ID] [member_ID]\n"
-                 "/exit 返回上一级菜单。\n";
+    std::cout << "/exit 返回上一级菜单。\n";
     std::string input, command;
     std::string user_ID, group_ID;
     std::stringstream ss;

@@ -4,8 +4,8 @@ add_executable(client
     clientmain.cpp
     TcpClient.cpp
     TopClient.cpp
-    interface/winloop.cpp
-    interface/output.cpp
+    chat/winloop.cpp
+    chat/output.cpp
     chat/CommManager.cpp
     chat/sqlite.cpp
     chat/cfile_manager.cpp
