@@ -1094,7 +1094,6 @@ void WinLoop::my_lists_loop() {
     while (1) {
         sclear();
         draw_my_lists(output_mutex, comm);
-        print_input_sign();
         std::getline(std::cin, input);
         if (input == "1") {
             // 查看好友列表
@@ -1471,8 +1470,8 @@ void WinLoop::my_lists_loop() {
                 }
             }
         } else if (input == "0") {
-            break;
             switch_to(UIPage::Contacts);
+            return;
         } else {
             std::cout << "无效的选项，请重新输入。" << std::endl;
         }
@@ -1643,9 +1642,7 @@ void draw_contacts(std::mutex& mtx, CommManager* comm) {
     std::cout << "-$- 联系人列表 -$-" << std::endl;
     std::cout << selnum(1) + " 查看通知(" << comm->cache.notices.size() << ")" << std::endl;
     std::cout << selnum(2) + " 管理请求(" << comm->cache.requests.size() << ")" << std::endl;
-    std::cout << selnum(3) + " 添加好友" << std::endl;
-    std::cout << selnum(4) + " 加入群聊" << std::endl;
-    std::cout << selnum(5) + " 查看我的列表" << std::endl;
+    std::cout << selnum(3) + " 查看我的列表" << std::endl;
     std::cout << selnum(0) + " 返回主菜单" << std::endl;
     print_input_sign();
 }

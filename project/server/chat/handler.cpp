@@ -685,7 +685,7 @@ void CommandHandler::handle_unblock_friend(
     const std::string& friend_ID) {
     if (disp->redis_con->get_user_status(friend_ID).first) {
         // 好友在线, 存redis
-        disp->redis_con->set_blocked_by_friend(user_ID, friend_ID, false);
+        disp->redis_con->set_blocked_by_friend(friend_ID, user_ID, false);
     }
     // 数据存到mysql
     disp->mysql_con->unblock_friend(user_ID, friend_ID);

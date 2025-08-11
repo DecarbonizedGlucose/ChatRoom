@@ -741,7 +741,7 @@ void CommManager::print_groups() {
 }
 
 void CommManager::print_message_notice(const std::string& conv_id) {
-    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Start) {
+    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Login) {
         return;
     }
     std::cout << "\r会话" << conv_id << "有1条新消息.\n";
@@ -750,7 +750,7 @@ void CommManager::print_message_notice(const std::string& conv_id) {
 }
 
 void CommManager::print_request_notice() {
-    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Start) {
+    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Login) {
         return;
     }
     std::cout << "\r你有1条新请求.\n";
@@ -759,7 +759,7 @@ void CommManager::print_request_notice() {
 }
 
 void CommManager::print_notice_notice() {
-    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Start) {
+    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Login) {
         return;
     }
     std::cout << "\r你有1条新通知.\n";
