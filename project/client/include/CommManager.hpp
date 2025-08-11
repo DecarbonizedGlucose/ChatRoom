@@ -74,11 +74,15 @@ public:
     std::vector<std::pair<std::string, ConversationInfo*>> get_sorted_conversations();
 };
 
+class WinLoop;
+
 class CommManager {
 public:
     bool* cont = nullptr;
     SQLiteController* sqlite_con = nullptr;
     CFileManager* file_manager = nullptr;
+    friend class WinLoop;
+    WinLoop* win = nullptr;
 
     CommManager(TopClient* client);
 
@@ -163,6 +167,10 @@ public:
 /* ---------- Print ---------- */
     void print_friends();
     void print_groups();
+
+    void print_message_notice(const std::string& conv_id);
+    void print_request_notice();
+    void print_notice_notice();
 
 private:
     // 扔进去全存

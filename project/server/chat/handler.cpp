@@ -549,6 +549,12 @@ void CommandHandler::handle_accept_group_request(
         auto group_ID = ori_cmd.args(1);
         log_debug("群组ID: {}", group_ID);
 
+        // mysql中添加群成员
+        disp->mysql_con->add_user_to_group(group_ID, user_ID);
+        // redis中添加群成员
+        disp->redis_con->add_user_to_group(user_ID, group_ID);
+        disp->redis_con->add_group_member(group_ID, user_ID);
+        // add_group_member 已经自动更新了 member_count，需要重新获取最新的group_info
         auto group_info = disp->redis_con->get_group_info(group_ID);
         if (group_info.empty()) {
             log_error("群组 {} 信息获取失败", group_ID);
@@ -579,13 +585,6 @@ void CommandHandler::handle_accept_group_request(
                 try_send(disp->conn_manager, member_conn, acc_str);
             }
         }
-        // mysql中添加群成员
-        disp->mysql_con->add_user_to_group(group_ID, user_ID);
-        // redis中添加群成员
-        disp->redis_con->add_user_to_group(user_ID, group_ID);
-        disp->redis_con->add_group_member(group_ID, user_ID);
-        group_info["member_count"] = group_info["member_count"].get<int>() + 1;
-        disp->redis_con->cache_group_info(group_ID, group_info);
         // 通知申请人进群
         if (disp->redis_con->get_user_status(user_ID).first) {
             // 申请人在线
@@ -673,7 +672,8 @@ void CommandHandler::handle_block_friend(
     const std::string& friend_ID) {
     if (disp->redis_con->get_user_status(friend_ID).first) {
         // 好友在线, 存redis
-        disp->redis_con->set_blocked_by_friend(user_ID, friend_ID, true);
+        disp->redis_con->set_blocked_by_friend(friend_ID, user_ID, true);
+        log_debug("BLOCKED (Redis) friend relationship between {} and {}", user_ID, friend_ID);
     }
     // 数据存到mysql
     disp->mysql_con->block_friend(user_ID, friend_ID);
@@ -717,12 +717,12 @@ void CommandHandler::handle_create_group(
     json info = {
         {"name", group_name},
         {"owner", user_ID},
-        {"member_count", 1}
+        {"member_count", 0}  // 初始化为0，让add_group_member自动增加
     };
     // 写入redis
     disp->redis_con->cache_group_info(group_ID, info);
     disp->redis_con->add_group_admin(group_ID, user_ID);
-    disp->redis_con->add_group_member(group_ID, user_ID);
+    disp->redis_con->add_group_member(group_ID, user_ID);  // 这里会将0变成1
     disp->redis_con->add_user_to_group(user_ID, group_ID);
     // 创建成功
     // 服务端数据已经处理好
@@ -785,8 +785,8 @@ void CommandHandler::handle_leave_group(
     // 从redis删除
     disp->redis_con->remove_user_from_group(user_ID, group_ID);
     disp->redis_con->remove_group_member(group_ID, user_ID);
+    // remove_group_member 已经自动更新了 member_count，不需要手动再减1
     auto group_info = disp->redis_con->get_group_info(group_ID);
-    group_info["member_count"] = group_info["member_count"].get<int>() - 1;
     disp->redis_con->cache_group_info(group_ID, group_info);
     // 从mysql删除
     disp->mysql_con->remove_user_from_group(group_ID, user_ID);
@@ -873,8 +873,8 @@ void CommandHandler::handle_remove_from_group(
     }
     disp->redis_con->remove_user_from_group(member_ID, group_ID);
     disp->redis_con->remove_group_member(group_ID, member_ID);
+    // remove_group_member 已经自动更新了 member_count，不需要手动再减1
     auto group_info = disp->redis_con->get_group_info(group_ID);
-    group_info["member_count"] = group_info["member_count"].get<int>() - 1;
     disp->redis_con->cache_group_info(group_ID, group_info);
     disp->mysql_con->remove_user_from_group(group_ID, member_ID);
     // 通知所有人

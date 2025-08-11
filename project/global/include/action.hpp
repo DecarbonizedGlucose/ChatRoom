@@ -15,6 +15,7 @@ enum class Action {
     Sign_In,               // 登录 --password
     Sign_Out,              // 登出
     Register,              // 注册 --user_ID --password
+    Unregister,            // 销毁账号 --user_ID
     Get_Veri_Code,         // 获取验证码
     Find_Password,         // 找回密码* --veri_code
     Change_Password,       // 修改密码 --old-password --new-password

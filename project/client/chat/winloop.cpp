@@ -98,14 +98,17 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
     auto args = cmd.args();
     switch (action) {
         case Action::Add_Friend_Req: {        // 处理好友请求
+            comm->print_request_notice();
             comm->cache.requests.push(cmd);
             return;
         }
         case Action::Join_Group_Req: {        // 处理加入群组请求
+            comm->print_request_notice();
             comm->cache.requests.push(cmd);
             return;
         }
         case Action::Invite_To_Group_Req: {   // 处理邀请加入群组请求
+            comm->print_request_notice();
             comm->cache.requests.push(cmd);
             return;
         }
@@ -138,6 +141,7 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
             return;
         }
         case Action::Accept_FReq: {           // 同意好友请求
+            comm->print_notice_notice();
             auto friend_ID = cmd.sender();
             comm->cache.notices.push(cmd);
             if (comm->cache.friend_list.find(friend_ID) == comm->cache.friend_list.end()) {
@@ -151,10 +155,12 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
             return;
         }
         case Action::Refuse_FReq: {           // 拒绝好友请求
+            comm->print_notice_notice();
             comm->cache.notices.push(cmd);
             return;
         }
         case Action::Remove_Friend: {         // 被删除了
+            comm->print_notice_notice();
             comm->cache.notices.push(cmd);
             comm->handle_remove_friend(sender);
             return;
@@ -164,6 +170,7 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
             auto& group_ID = cmd.args(1);
             if (cmd.args(2) == comm->cache.user_ID
                 || comm->cache.group_list[group_ID].is_user_admin) {
+                comm->print_notice_notice();
                 comm->cache.notices.push(cmd); // 管理员、被同意的自己
             }
             // 这里面要拉取群成员名单
@@ -178,6 +185,7 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
             return;
         }
         case Action::Refuse_GReq: {           // 拒绝加群申请
+            comm->print_notice_notice();
             // 拒绝加入群组的请求
             comm->cache.notices.push(cmd);
             return;
@@ -186,12 +194,14 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
             // 在本地删掉这个人。如果是管理员，还要通知
             comm->handle_remove_person(cmd.args(1), cmd.sender());
             if (comm->cache.group_list[cmd.args(1)].is_user_admin) {
+                comm->print_notice_notice();
                 comm->cache.notices.push(cmd);
             }
             comm->handle_remove_person(cmd.args(1), cmd.sender());
             return;
         }
         case Action::Disband_Group: {         // 解散群组
+            comm->print_notice_notice();
             comm->cache.notices.push(cmd);
             comm->handle_disband_group(cmd.args(1));
             return;
@@ -199,9 +209,11 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
         case Action::Remove_From_Group: {     // 被踢
             // 可能是自己，也可能是别人
             if (cmd.args(2) == comm->cache.user_ID) {
+                comm->print_notice_notice();
                 comm->cache.notices.push(cmd);
                 comm->handle_leave_group(cmd.args(1));
             } else if (comm->cache.group_list[cmd.args(1)].is_user_admin) {
+                comm->print_notice_notice();
                 comm->cache.notices.push(cmd);
                 comm->handle_remove_person(cmd.args(1), cmd.args(2));
             } else {
@@ -211,6 +223,7 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
         }
         case Action::Add_Admin: {             // 新增管理员
             if (comm->cache.group_list[cmd.args(1)].is_user_admin || cmd.args(2) == comm->cache.user_ID) {
+                comm->print_notice_notice();
                 comm->cache.notices.push(cmd);
             }
             comm->handle_add_admin(cmd.args(1), cmd.args(2));
@@ -218,6 +231,7 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
         }
         case Action::Remove_Admin: {          // 移除管理员
             if (comm->cache.group_list[cmd.args(1)].is_user_admin) {
+                comm->print_notice_notice();
                 comm->cache.notices.push(cmd);
             }
             comm->handle_remove_admin(cmd.args(1), cmd.args(2));
@@ -288,12 +302,6 @@ void WinLoop::run() {
                 break;
             case UIPage::Manage_Requests:
                 request_loop();
-                break;
-            case UIPage::Add_Person:
-                add_person_loop();
-                break;
-            case UIPage::Join_Group:
-                join_group_loop();
                 break;
             case UIPage::My_Lists:
                 my_lists_loop();
@@ -982,9 +990,8 @@ void WinLoop::add_person_loop() {
         std::string user_ID;
         std::getline(std::cin, user_ID);
         if (user_ID.empty()) { // 返回
-            std::cout << "输入为空, 返回联系人菜单。" << std::endl;
+            std::cout << "输入为空, 返回。" << std::endl;
             pause();
-            switch_to(UIPage::Contacts);
             return;
         }
         // 清空实时通知队列, 确保没有旧的通知干扰
@@ -1035,9 +1042,8 @@ void WinLoop::join_group_loop() {
         std::string group_ID;
         std::getline(std::cin, group_ID);
         if (group_ID.empty()) { // 返回
-            std::cout << "输入为空, 返回联系人菜单。" << std::endl;
+            std::cout << "输入为空, 返回。" << std::endl;
             pause();
-            switch_to(UIPage::Contacts);
             return;
         }
         // 清空实时通知队列, 确保没有旧的通知干扰
@@ -1083,39 +1089,36 @@ void WinLoop::join_group_loop() {
 }
 
 void WinLoop::my_lists_loop() {
-    // 暂时仅展示列表
-    sclear();
-    comm->print_friends();
-    std::cout << std::endl << "======================"
-              << std::endl << std::endl;
-    comm->print_groups();
-    std::cout << std::endl;
-    // /exit /delete /block /unblock /quit /disband
-    // /remove_admin /add_admin /create_group
-    // /show_members /show_admins
-    std::cout << "/exit 返回上一级菜单。\n";
-    std::string input, command;
-    std::string user_ID, group_ID;
-    std::stringstream ss;
+    std::string input;
+    std::string user_ID, group_ID, group_name;
     while (1) {
+        sclear();
+        draw_my_lists(output_mutex, comm);
         print_input_sign();
-        getline(std::cin, input);
-        ss.str(input);
-        ss.clear(); // 清除stringstream的状态标志
-        command.clear();
-        user_ID.clear();
-        group_ID.clear();
-        if (input == "/exit") {
-            break; // 返回上一级菜单
-        } else if (input.find("/delete") == 0) {
+        std::getline(std::cin, input);
+        if (input == "1") {
+            // 查看好友列表
+            comm->print_friends();
+        } else if (input == "2") {
+            // 查看群组列表
+            comm->print_groups();
+        } else if (input == "3") {
+            // 添加好友
+            add_person_loop();
+            continue;
+        } else if (input == "4") {
+            // 加入群聊
+            join_group_loop();
+            continue;
+        } else if (input == "5") {
             // 删除好友
-            ss >> command >> user_ID;
+            std::cout << "请输入要删除的好友ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, user_ID);
             if (user_ID.empty()) {
-                std::cout << "好友ID不能为空" << std::endl;
-                continue;
+                std::cout << "输入为空." << std::endl;
             } else if (comm->cache.friend_list.find(user_ID) == comm->cache.friend_list.end()) {
                 std::cout << "好友不存在, 请检查ID是否正确。" << std::endl;
-                continue;
             } else {
                 comm->handle_send_command(Action::Remove_Friend,
                     comm->cache.user_ID,
@@ -1124,21 +1127,19 @@ void WinLoop::my_lists_loop() {
                 // 从本地缓存中删除
                 comm->handle_remove_friend(user_ID);
             }
-        } else if (input.find("/block") == 0) {
+        } else if (input == "6") {
             // 屏蔽好友
-            ss >> command >> user_ID;
+            std::cout << "请输入要屏蔽的好友ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, user_ID);
             if (user_ID.empty()) {
-                std::cout << "好友ID不能为空" << std::endl;
-                continue;
+                std::cout << "输入为空." << std::endl;
             } else if (user_ID == comm->cache.user_ID) {
                 std::cout << "你不能屏蔽自己。" << std::endl;
-                continue;
             } else if (comm->cache.friend_list.find(user_ID) == comm->cache.friend_list.end()) {
                 std::cout << "好友不存在, 请检查ID是否正确。" << std::endl;
-                continue;
             } else if (comm->cache.friend_list[user_ID].blocked) {
                 std::cout << "好友已被屏蔽。" << std::endl;
-                continue;
             } else {
                 std::cout << "正在屏蔽好友 " << user_ID << "..." << std::endl;
                 // 发送屏蔽好友请求
@@ -1148,20 +1149,19 @@ void WinLoop::my_lists_loop() {
                 std::cout << "已发送屏蔽好友请求。" << std::endl;
                 comm->handle_block_friend(user_ID);
             }
-        } else if (input.find("/unblock") == 0) {
-            ss >> command >> user_ID;
+        } else if (input == "7") {
+            // 取消屏蔽好友
+            std::cout << "请输入要取消屏蔽的好友ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, user_ID);
             if (user_ID.empty()) {
-                std::cout << "好友ID不能为空" << std::endl;
-                continue;
+                std::cout << "输入为空." << std::endl;
             } else if (user_ID == comm->cache.user_ID) {
                 std::cout << "你不能取消屏蔽自己。" << std::endl;
-                continue;
             } else if (comm->cache.friend_list.find(user_ID) == comm->cache.friend_list.end()) {
                 std::cout << "好友不存在, 请检查ID是否正确。" << std::endl;
-                continue;
             } else if (!comm->cache.friend_list[user_ID].blocked) {
                 std::cout << "好友未被屏蔽。" << std::endl;
-                continue;
             } else {
                 std::cout << "正在取消屏蔽好友 " << user_ID << "..." << std::endl;
                 // 发送取消屏蔽好友请求
@@ -1171,17 +1171,17 @@ void WinLoop::my_lists_loop() {
                 std::cout << "已发送取消屏蔽好友请求。" << std::endl;
                 comm->handle_unblock_friend(user_ID);
             }
-        } else if (input.find("/quit") == 0) {
-            ss >> command >> group_ID;
+        } else if (input == "8") {
+            // 退出群聊
+            std::cout << "请输入要退出的群组ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, group_ID);
             if (group_ID.empty()) {
-                std::cout << "群组ID不能为空" << std::endl;
-                continue;
+                std::cout << "输入为空." << std::endl;
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
-                continue;
             } else if (comm->cache.group_list[group_ID].owner_ID == comm->cache.user_ID) {
                 std::cout << "群主请使用/disband。" << std::endl;
-                continue;
             } else {
                 std::cout << "正在退出群组 " << group_ID << "..." << std::endl;
                 // 发送退出群组请求
@@ -1189,17 +1189,17 @@ void WinLoop::my_lists_loop() {
                     comm->cache.user_ID,
                     {TimeUtils::current_time_string(), group_ID}, false);
                 std::cout << "已发送退出群组请求。" << std::endl;
-                // 从本地缓存中删除
                 comm->handle_leave_group(group_ID);
             }
-        } else if (input.find("/disband") == 0) {
-            ss >> command >> group_ID;
+        } else if (input == "9") {
+            // 解散群聊
+            std::cout << "请输入要解散的群组ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, group_ID);
             if (group_ID.empty()) {
-                std::cout << "群组ID不能为空" << std::endl;
-                continue;
+                std::cout << "输入为空." << std::endl;
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
-                continue;
             } else {
                 std::cout << "正在解散群组 " << group_ID << "..." << std::endl;
                 // 发送解散群组请求
@@ -1207,122 +1207,129 @@ void WinLoop::my_lists_loop() {
                     comm->cache.user_ID,
                     {TimeUtils::current_time_string(), group_ID}, false);
                 std::cout << "已发送解散群组请求。" << std::endl;
-                // 从本地缓存中删除
-                comm->handle_leave_group(group_ID);
+                comm->handle_disband_group(group_ID);
             }
-        } else if (input.find("/remove_admin") == 0) {
-            ss >> command >> group_ID >> user_ID;
+        } else if (input == "10") {
+            // 取消管理员
+            std::cout << "请输入要取消管理员的群组ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, group_ID);
             if (group_ID.empty()) {
                 std::cout << "群组ID不能为空" << std::endl;
-                continue;
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
-                continue;
-            } else if (user_ID.empty()) {
-                std::cout << "管理员ID不能为空" << std::endl;
-                continue;
-            }  else if (comm->cache.group_members[group_ID].find(user_ID) == comm->cache.group_members[group_ID].end()) {
-                std::cout << "该用户不是群组成员。" << std::endl;
-                continue;
-            } else if (user_ID == comm->cache.user_ID) {
-                std::cout << "你不能移除自己的管理员身份。" << std::endl;
-                continue;
-            } else if (!comm->sqlite_con->is_group_admin(group_ID, user_ID)) {
-                std::cout << "该用户不是群组管理员。" << std::endl;
-                continue;
+            } else if (comm->cache.group_members.find(group_ID) == comm->cache.group_members.end()
+                        || comm->cache.group_members[group_ID].empty()) {
+                std::cout << "群组成员列表未正确加载, 请稍后再试。" << std::endl;
             } else if (comm->cache.group_list[group_ID].owner_ID != comm->cache.user_ID) {
                 std::cout << "你不是这个群的群主。" << std::endl;
-                continue;
-            } else if (user_ID == comm->cache.group_list[group_ID].owner_ID) {
-                std::cout << "你不能解除自己的的管理员身份。" << std::endl;
-                continue;
             } else {
-                std::cout << "正在移除群组 " << group_ID << " 的管理员 " << user_ID << "..." << std::endl;
-                // 发送移除管理员请求
-                comm->handle_send_command(Action::Remove_Admin,
-                    comm->cache.user_ID,
-                    {TimeUtils::current_time_string(), group_ID, user_ID}, false);
-                std::cout << "已发送移除管理员请求。" << std::endl;
-                // 从本地缓存中删除
-                comm->handle_remove_admin(group_ID, user_ID);
+                std::cout << "请输入要取消管理员的用户ID：" << std::endl;
+                print_input_sign();
+                std::getline(std::cin, user_ID);
+                if (user_ID.empty()) {
+                    std::cout << "管理员ID不能为空" << std::endl;
+                } else if (user_ID == comm->cache.user_ID) {
+                    std::cout << "你不能移除自己的管理员身份。" << std::endl;
+                } else if (comm->cache.group_members[group_ID].find(user_ID) == comm->cache.group_members[group_ID].end()) {
+                    std::cout << "该用户不是群组成员。" << std::endl;
+                } else if (!comm->cache.group_members[group_ID][user_ID]) {
+                    std::cout << "该用户不是群组管理员。" << std::endl;
+                } else {
+                    std::cout << "正在移除群组 " << group_ID << " 的管理员 " << user_ID << "..." << std::endl;
+                    // 发送移除管理员请求
+                    comm->handle_send_command(Action::Remove_Admin,
+                        comm->cache.user_ID,
+                        {TimeUtils::current_time_string(), group_ID, user_ID}, false);
+                    std::cout << "已发送移除管理员请求。" << std::endl;
+                    comm->handle_remove_admin(group_ID, user_ID);
+                }
             }
-        } else if (input.find("/add_admin") == 0) {
-            ss >> command >> group_ID >> user_ID;
+        } else if (input == "11") {
+            // 添加管理员
+            std::cout << "请输入要添加管理员的群组ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, group_ID);
             if (group_ID.empty()) {
                 std::cout << "群组ID不能为空" << std::endl;
-                continue;
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
-                continue;
-            } else if (user_ID.empty()) {
-                std::cout << "管理员ID不能为空" << std::endl;
-                continue;
-            } else if (comm->cache.group_members[group_ID].find(user_ID) == comm->cache.group_members[group_ID].end()) {
-                std::cout << "该用户不是群组成员, 请先添加为群组成员。" << std::endl;
-                continue;
-            } else if (comm->sqlite_con->is_group_admin(group_ID, user_ID)) {
-                std::cout << "该用户已经是群组管理员。" << std::endl;
-                continue;
+            } else if (comm->cache.group_members.find(group_ID) == comm->cache.group_members.end()
+                        || comm->cache.group_members[group_ID].empty()) {
+                std::cout << "群组成员列表未正确加载, 请稍后再试。" << std::endl;
             } else if (comm->cache.group_list[group_ID].owner_ID != comm->cache.user_ID) {
                 std::cout << "你不是这个群的群主。" << std::endl;
-                continue;
-            } else if (user_ID == comm->cache.user_ID) {
-                std::cout << "你本来就是管理员。" << std::endl;
-                continue;
             } else {
-                std::cout << "正在添加群组 " << group_ID << " 的管理员 " << user_ID << "..." << std::endl;
-                // 发送添加管理员请求
-                comm->handle_send_command(Action::Add_Admin,
-                    comm->cache.user_ID,
-                    {TimeUtils::current_time_string(), group_ID, user_ID}, false);
-                std::cout << "已发送添加管理员请求。" << std::endl;
-                // 从本地缓存中删除
-                comm->handle_add_admin(group_ID, user_ID);
+                std::cout << "请输入要添加为管理员的用户ID：" << std::endl;
+                print_input_sign();
+                std::getline(std::cin, user_ID);
+                if (user_ID.empty()) {
+                    std::cout << "管理员ID不能为空" << std::endl;
+                } else if (user_ID == comm->cache.user_ID) {
+                    std::cout << "你本来就是管理员。" << std::endl;
+                } else if (comm->cache.group_members[group_ID].find(user_ID) == comm->cache.group_members[group_ID].end()) {
+                    std::cout << "该用户不是群组成员, 请先添加为群组成员。" << std::endl;
+                } else if (comm->cache.group_members[group_ID][user_ID]) {
+                    std::cout << "该用户已经是群组管理员。" << std::endl;
+                } else {
+                    std::cout << "正在添加群组 " << group_ID << " 的管理员 " << user_ID << "..." << std::endl;
+                    // 发送添加管理员请求
+                    comm->handle_send_command(Action::Add_Admin,
+                        comm->cache.user_ID,
+                        {TimeUtils::current_time_string(), group_ID, user_ID}, false);
+                    std::cout << "已发送添加管理员请求。" << std::endl;
+                    comm->handle_add_admin(group_ID, user_ID);
+                }
             }
-        } else if (input.find("/create_group") == 0) {
-            // 发请求
-            std::string group_name;
-            ss >> command >> group_name;
+        } else if (input == "12") {
+            // 创建群聊
+            std::cout << "请输入新群组的名称：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, group_name);
             if (group_name.empty()) {
-                std::cout << "群组名称不能为空" << std::endl;
-                continue;
-            }
-            comm->handle_send_command(Action::Create_Group,
-                comm->cache.user_ID,
-                {TimeUtils::current_time_string(), group_name}, false);
-            std::cout << "已发送创建群组请求。" << std::endl;
-            std::cout << "请等待服务器响应..." << std::endl;
-            // 等待服务器响应（最多等待5秒）
-            CommandRequest response;
-            bool received = comm->cache.real_time_notices.wait_for_and_pop(
-                response, std::chrono::seconds(5)
-            );
-            if (!received) {
-                std::cout << "创建群组超时, 请检查网络连接后重试。" << std::endl;
-                pause();
-                continue;
-            }
-            // 接受服务器发来的群组ID
-            Action action = static_cast<Action>(response.action());
-            if (action == Action::Give_Group_ID && !response.args(0).empty()) {
-                group_ID = response.args(0);
-                std::cout << "群组创建成功, 群组ID为: " << group_ID << std::endl;
-                // 将群组信息写入本地缓存
-                comm->handle_create_group(group_ID, group_name);
+                std::cout << "输入为空。" << std::endl;
+            } else if (group_name.find("Group_") == 0) {
+                std::cout << "群组名称不能以 'Group_' 开头。" << std::endl;
             } else {
-                // 失败时返回的group ID 是空的
-                std::cout << "创建群组失败, 请重试。" << std::endl;
+                std::cout << "正在创建群组 " << group_name << "..." << std::endl;
+                // 发送创建群组请求
+                comm->handle_send_command(Action::Create_Group,
+                    comm->cache.user_ID,
+                    {TimeUtils::current_time_string(), group_name}, false);
+                std::cout << "已发送创建群组请求。" << std::endl;
+                // 等待服务器响应（最多等待5秒）
+                CommandRequest response;
+                bool received = comm->cache.real_time_notices.wait_for_and_pop(
+                    response, std::chrono::seconds(5)
+                );
+                if (!received) {
+                    std::cout << "创建群组请求超时, 请检查网络连接后重试。" << std::endl;
+                }
+                // 处理响应
+                Action action = static_cast<Action>(response.action());
+                if (action == Action::Give_Group_ID && !response.args(0).empty()) {
+                    group_ID = response.args(0);
+                    std::cout << "群组创建成功, 群组ID为: " << group_ID << std::endl;
+                    // 将群组信息写入本地缓存
+                    comm->handle_create_group(group_ID, group_name);
+                } else {
+                    // 失败时返回的group ID 是空的
+                    std::cout << "创建群组失败, 请重试。" << std::endl;
+                }
             }
-        } else if (input.find("/show_members") == 0) {
-            ss >> command >> group_ID;
+        } else if (input == "13") {
+            // 查看群组成员
+            std::cout << "请输入要查看成员的群组ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, group_ID);
             if (group_ID.empty()) {
-                std::cout << "群组ID不能为空" << std::endl;
-                continue;
+                std::cout << "输入为空." << std::endl;
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
-                continue;
+            } else if (comm->cache.group_members.find(group_ID) == comm->cache.group_members.end()
+                        || comm->cache.group_members[group_ID].empty()) {
+                std::cout << "群组成员列表未正确加载, 请稍后再试。" << std::endl;
             } else {
-                // 显示群组成员
                 std::vector<std::pair<std::string, bool>> members;
                 if (comm->cache.group_members.find(group_ID) != comm->cache.group_members.end()) {
                     members.assign(
@@ -1359,19 +1366,21 @@ void WinLoop::my_lists_loop() {
                         (member == comm->cache.user_ID ? style(member, {ansi::BOLD, ansi::FG_YELLOW}) : member)
                         << (is_admin ? " (管理员)" : "") << std::endl;
                 }
-                std::cout <<  "====================================" << std::endl;
             }
-        } else if (input.find("/show_admins") == 0) {
-            ss >> command >> group_ID;
+        } else if (input == "14") {
+            // 查看群组管理员
+            std::cout << "请输入要查看管理员的群组ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, group_ID);
             if (group_ID.empty()) {
-                std::cout << "群组ID不能为空" << std::endl;
-                continue;
+                std::cout << "输入为空." << std::endl;
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
-                continue;
+            } else if (comm->cache.group_members.find(group_ID) == comm->cache.group_members.end()
+                        || comm->cache.group_members[group_ID].empty()) {
+                std::cout << "群组成员列表未正确加载, 请稍后再试。" << std::endl;
             } else {
-                // 显示群组管理员
-               std::vector<std::pair<std::string, bool>> members;
+                std::vector<std::pair<std::string, bool>> members;
                 if (comm->cache.group_members.find(group_ID) != comm->cache.group_members.end()) {
                     members.assign(
                         comm->cache.group_members[group_ID].begin(),
@@ -1399,67 +1408,77 @@ void WinLoop::my_lists_loop() {
                             (member == comm->cache.user_ID ? style(member, {ansi::BOLD, ansi::FG_YELLOW}) : member)
                             << (is_admin ? " (管理员)" : " (成员)") << std::endl;
                 }
-                std::cout <<  "====================================" << std::endl;
             }
-        } else if (input.find("/invite") == 0) {
-            ss >> command >> group_ID >> user_ID;
-            if (group_ID.empty()) {
-                std::cout << "群组ID不能为空" << std::endl;
-                continue;
-            } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
-                std::cout << "你不在这个群，或这个群不存在。" << std::endl;
-                continue;
-            } else if (user_ID.empty()) {
-                std::cout << "好友ID不能为空" << std::endl;
-                continue;
+        } else if (input == "15") {
+            // 邀请好友加入群聊
+            std::cout << "请输入要邀请的好友ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, user_ID);
+            if (user_ID.empty()) {
+                std::cout << "输入为空." << std::endl;
             } else if (user_ID == comm->cache.user_ID) {
                 std::cout << "你不能邀请自己。" << std::endl;
-                continue;
             } else if (comm->cache.friend_list.find(user_ID) == comm->cache.friend_list.end()) {
                 std::cout << "好友不存在, 请检查ID是否正确。" << std::endl;
-                continue;
             } else {
-                // 发送邀请好友加入群组请求
-                auto& group_name = comm->cache.group_list[group_ID].group_name;
-                comm->handle_send_command(Action::Invite_To_Group_Req,
-                    comm->cache.user_ID,
-                    {TimeUtils::current_time_string(), group_ID, group_name, user_ID}, false);
-                std::cout << "已发送邀请好友加入群组请求。" << std::endl;
+                std::cout << "请输入要邀请的群组ID：" << std::endl;
+                print_input_sign();
+                std::getline(std::cin, group_ID);
+                if (group_ID.empty()) {
+                    std::cout << "输入为空." << std::endl;
+                } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
+                    std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
+                } else {
+                    auto& group_name = comm->cache.group_list[group_ID].group_name;
+                    comm->handle_send_command(Action::Invite_To_Group_Req,
+                        comm->cache.user_ID,
+                        {TimeUtils::current_time_string(), group_ID, group_name, user_ID}, false);
+                    std::cout << "已发送邀请好友加入群组请求。" << std::endl;
+                }
             }
-        } else if (input.find("/remove_member") == 0) {
-            ss >> command >> group_ID >> user_ID;
+        } else if (input == "16") {
+            // 踢人
+            std::cout << "请输入群组ID：" << std::endl;
+            print_input_sign();
+            std::getline(std::cin, group_ID);
             if (group_ID.empty()) {
                 std::cout << "群组ID不能为空" << std::endl;
-                continue;
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
-                continue;
-            } else if (user_ID.empty()) {
-                std::cout << "成员ID不能为空" << std::endl;
-                continue;
-            } else if (comm->cache.group_members[group_ID].find(user_ID) == comm->cache.group_members[group_ID].end()) {
-                std::cout << "这个账号不是群组成员。" << std::endl;
-                continue;
+            } else if (comm->cache.group_members.find(group_ID) == comm->cache.group_members.end()
+                        || comm->cache.group_members[group_ID].empty()) {
+                std::cout << "群组成员列表未正确加载, 请稍后再试。" << std::endl;
             } else if (!comm->cache.group_list[group_ID].is_user_admin) {
                 std::cout << "你不是管理员。" << std::endl;
                 continue;
-            } else if (user_ID == comm->cache.user_ID) {
-                std::cout << "你不能移除自己, 请使用/quit退出群组。" << std::endl;
-                continue;
             } else {
-                // 发送移除成员请求
-                comm->handle_send_command(Action::Remove_From_Group,
+                std::cout << "请输入要踢出的用户ID：" << std::endl;
+                print_input_sign();
+                std::getline(std::cin, user_ID);
+                if (user_ID.empty()) {
+                    std::cout << "成员ID不能为空" << std::endl;
+                } else if (user_ID == comm->cache.user_ID) {
+                    std::cout << "你不能移除自己, 请使用/quit退出群组。" << std::endl;
+                } else if (comm->cache.group_members[group_ID].find(user_ID) == comm->cache.group_members[group_ID].end()) {
+                    std::cout << "这个账号不是群组成员。" << std::endl;
+                } else {
+                    comm->handle_send_command(Action::Remove_From_Group,
                     comm->cache.user_ID,
-                    {TimeUtils::current_time_string(), group_ID, user_ID}, false);
-                std::cout << "已发送移除成员请求。" << std::endl;
-                // 从本地缓存中删除
-                comm->handle_remove_person(group_ID, user_ID);
+                        {TimeUtils::current_time_string(), group_ID, user_ID}, false);
+                    std::cout << "已发送移除成员请求。" << std::endl;
+                    // 从本地缓存中删除
+                    comm->handle_remove_person(group_ID, user_ID);
+                }
             }
+        } else if (input == "0") {
+            break;
+            switch_to(UIPage::Contacts);
         } else {
-            std::cout << "无效的命令, 请重新输入。" << std::endl;
+            std::cout << "无效的选项，请重新输入。" << std::endl;
         }
+        pause();
+        continue;
     }
-    switch_to(UIPage::Main);
 }
 
 void WinLoop::my_loop() {
@@ -1522,10 +1541,6 @@ void WinLoop::handle_contacts_input() {
     } else if (input == "2") {
         switch_to(UIPage::Manage_Requests);
     } else if (input == "3") {
-        switch_to(UIPage::Add_Person);
-    } else if (input == "4") {
-        switch_to(UIPage::Join_Group);
-    } else if (input == "5") {
         switch_to(UIPage::My_Lists);
     } else if (input == "0") {
         switch_to(UIPage::Main);
@@ -1632,6 +1647,28 @@ void draw_contacts(std::mutex& mtx, CommManager* comm) {
     std::cout << selnum(4) + " 加入群聊" << std::endl;
     std::cout << selnum(5) + " 查看我的列表" << std::endl;
     std::cout << selnum(0) + " 返回主菜单" << std::endl;
+    print_input_sign();
+}
+
+void draw_my_lists(std::mutex& mtx, CommManager* comm) {
+    std::cout << "-$- 我的列表 -$-" << std::endl;
+    std::cout << selnum(1) + " 好友列表(" << comm->cache.friend_list.size() << ")" << std::endl;
+    std::cout << selnum(2) + " 群组列表(" << comm->cache.group_list.size() << ")" << std::endl;
+    std::cout << selnum(3) + " 添加好友" << std::endl;
+    std::cout << selnum(4) + " 加入群聊" << std::endl;
+    std::cout << selnum(5) + " 删除好友" << std::endl;
+    std::cout << selnum(6) + " 屏蔽好友" << std::endl;
+    std::cout << selnum(7) + " 取消屏蔽好友" << std::endl;
+    std::cout << selnum(8) + " 退出群组" << std::endl;
+    std::cout << selnum(9) + " 解散群组" << std::endl;
+    std::cout << selnum(10) + " 移除管理员" << std::endl;
+    std::cout << selnum(11) + " 添加管理员" << std::endl;
+    std::cout << selnum(12) + " 创建群组" << std::endl;
+    std::cout << selnum(13) + " 显示群组成员" << std::endl;
+    std::cout << selnum(14) + " 显示群组管理员" << std::endl;
+    std::cout << selnum(15) + " 邀请好友加入群组" << std::endl;
+    std::cout << selnum(16) + " 移除群组成员" << std::endl;
+    std::cout << selnum(0) + " 返回联系人菜单" << std::endl;
     print_input_sign();
 }
 

@@ -29,8 +29,6 @@ enum class UIPage {
     Contacts,
     Show_Notices,
     Manage_Requests,
-    Add_Person,
-    Join_Group,
     My_Lists,
     My,
     Exit
@@ -38,6 +36,7 @@ enum class UIPage {
 
 class WinLoop {
 public:
+    friend class CommManager;
     WinLoop(CommManager* comm, thread_pool* pool);
     ~WinLoop(); // 需要实现以正确释放unique_ptr
 
@@ -85,7 +84,7 @@ private:
     void sclear();
     void pause();
 
-    UIPage current_page;
+    UIPage current_page; // 当前页面状态
 
     CommManager* comm = nullptr; // 通信管理器
     thread_pool* pool = nullptr; // 线程池
@@ -99,3 +98,4 @@ void draw_login(std::mutex& mtx, int idx);
 void draw_register(std::mutex& mtx, int idx);
 void draw_main(std::mutex& mtx, const std::string& user_ID);
 void draw_contacts(std::mutex& mtx, CommManager* comm);
+void draw_my_lists(std::mutex& mtx, CommManager* comm);

@@ -6,6 +6,7 @@
 #include "../../global/include/logging.hpp"
 #include "../include/sqlite.hpp"
 #include "../include/cfile_manager.hpp"
+#include "../include/winloop.hpp"
 #include <ctime>
 #include <fstream>
 #include <algorithm>
@@ -146,6 +147,8 @@ void CommManager::handle_manage_message(const ChatMessage& msg) {
     std::string conv_id = msg.is_group() ? msg.receiver() : msg.sender();
     cache.messages[conv_id].push_back(msg);
     cache.new_messages.push(msg);
+
+    print_message_notice(conv_id);
 
     // 跳过空的会话ID
     if (conv_id.empty()) {
@@ -429,14 +432,6 @@ void CommManager::handle_remove_friend(const std::string& friend_ID) {
         cache.current_conversation_id = "";
     }
 
-    // 从会话排序列表中删除该好友ID
-    // auto it = std::find(cache.sorted_conversation_list.begin(),
-    //                    cache.sorted_conversation_list.end(), friend_ID);
-    // if (it != cache.sorted_conversation_list.end()) {
-    //     cache.sorted_conversation_list.erase(it);
-    //     log_debug("Removed friend {} from sorted conversation list", friend_ID);
-    // }
-
     // 从数据库中删除好友记录
     sqlite_con->remove_friend_cache(cache.user_ID, friend_ID);
     log_info("Removed friend: {}", friend_ID);
@@ -582,14 +577,6 @@ void CommManager::handle_leave_group(const std::string& group_ID) {
     if (cache.current_conversation_id == group_ID) {
         cache.current_conversation_id = "";
     }
-
-    // 从会话排序列表中删除该群组ID
-    // auto it = std::find(cache.sorted_conversation_list.begin(),
-    //                    cache.sorted_conversation_list.end(), group_ID);
-    // if (it != cache.sorted_conversation_list.end()) {
-    //     cache.sorted_conversation_list.erase(it);
-    //     log_debug("Removed group {} from sorted conversation list", group_ID);
-    // }
 
     // 从数据库中删除群组记录
     sqlite_con->remove_group_cache(group_ID);
@@ -751,6 +738,33 @@ void CommManager::print_groups() {
                   << info.member_count << ')'
                   << " | " << id << std::endl;
     }
+}
+
+void CommManager::print_message_notice(const std::string& conv_id) {
+    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Start) {
+        return;
+    }
+    std::cout << "\r会话" << conv_id << "有1条新消息.\n";
+    print_input_sign();
+    std::cout.flush();
+}
+
+void CommManager::print_request_notice() {
+    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Start) {
+        return;
+    }
+    std::cout << "\r你有1条新请求.\n";
+    print_input_sign();
+    std::cout.flush();
+}
+
+void CommManager::print_notice_notice() {
+    if (win->current_page == UIPage::Chat || win->current_page == UIPage::Start) {
+        return;
+    }
+    std::cout << "\r你有1条新通知.\n";
+    print_input_sign();
+    std::cout.flush();
 }
 
 /* ---------- 会话管理 ---------- */
