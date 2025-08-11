@@ -335,7 +335,10 @@ void WinLoop::login_loop() { // 改进用email/ID均可登录, 并返回另一�
         }
         draw_login(output_mutex, 2);
         while (1) {
+            system("stty -echo");
             std::getline(std::cin, password);
+            system("stty echo");
+            std::cout << std::endl;
             if (user.empty() || password.empty()) {
                 std::cout << "不能输入空字符串" << std::endl;
                 print_input_sign();
@@ -457,7 +460,10 @@ void WinLoop::register_loop() {
         }
         draw_register(output_mutex, 4);
         while (1) {
+            system("stty -echo");
             std::getline(std::cin, password);
+            system("stty echo");
+            std::cout << std::endl;
             if (!is_password_valid(password)) {
                 std::cout << "密码不合法。" << std::endl;
                 print_input_sign();
