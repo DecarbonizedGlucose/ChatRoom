@@ -218,9 +218,7 @@ void CommandHandler::handle_recv(
         }
         case Action::Remember_Connection: {
             // 注册连接行为
-            conn->user_ID = subj; // 这里的subj是user_ID
-            int server_index = std::stoi(args[0]);
-            disp->conn_manager->add_conn(conn, server_index);
+            handle_remember_connection(conn, subj, std::stoi(args[0]));
             break;
         }
         case Action::Online_Init: {
@@ -321,6 +319,38 @@ void CommandHandler::handle_sign_out(const std::string& user_ID) {
 
     // 最后删除用户连接（这会删除所有相关的连接对象）
     disp->conn_manager->remove_user(user_ID);
+    log_info("User {} signed out successfully", user_ID);
+}
+
+void CommandHandler::handle_uncommon_disconnect(const std::string& user_ID) {
+    log_debug("handle_uncommon_disconnect called for user_ID: {}", user_ID);
+
+    // 先通知所有在线好友, 再删除用户连接
+    // 这样避免在通知过程中访问已删除的连接
+    try {
+        auto friends = disp->mysql_con->get_friends_list(user_ID);
+        for (const auto& friend_ID : friends) {
+            try {
+                if (!disp->redis_con->get_user_status(friend_ID).first)
+                    continue; // 好友不在线, 跳过
+                auto env_out = create_command_string(Action::Friend_Offline, "", {user_ID});
+                auto friend_conn = disp->conn_manager->get_connection(friend_ID, 1);
+                if (friend_conn) { // 好友在线, 发送离线通知
+                    try_send(disp->conn_manager, friend_conn, env_out);
+                    log_debug("Notified friend {} about user {} going offline", friend_ID, user_ID);
+                } else {
+                    log_debug("Friend {} not connected, skipping offline notification", friend_ID);
+                }
+            } catch (const std::exception& e) {
+                log_error("Error notifying friend {} about user {} logout: {}", friend_ID, user_ID, e.what());
+            }
+        }
+    } catch (const std::exception& e) {
+        log_error("Error getting friends list for user {} during logout: {}", user_ID, e.what());
+    }
+
+    // 最后删除用户连接（这会删除所有相关的连接对象）
+    disp->conn_manager->destroy_connection(user_ID);
     log_info("User {} signed out successfully", user_ID);
 }
 
@@ -1091,7 +1121,7 @@ void CommandHandler::handle_download_file(
 
 void CommandHandler::handle_remember_connection(
     TcpServerConnection* conn, const std::string& user_ID, int server_index) {
-    log_debug("handle_remember_connection {} called for user: {}", server_index, user_ID);
+    log_info("handle_remember_connection {} called for user: {}, fd: {}", server_index, user_ID, conn->socket->get_fd());
     // 将连接添加到连接管理器
     // 每次登录, 这个会调用三次
     conn->user_ID = user_ID; // 更新连接的user_ID

@@ -5,6 +5,8 @@
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
+#include <sys/stat.h>
+#include <filesystem>
 #include <cmath>
 
 // ============ File 基类实现 ============
@@ -75,8 +77,8 @@ size_t File::get_total_chunks() const {
 // ============ ClientFile 实现 ============
 
 ClientFile::ClientFile(const std::string& path) : local_path(path) {
-    if (!std::filesystem::exists(path)) {
-        log_error("File does not exist: {}", path);
+    if (!std::filesystem::exists(path) || std::filesystem::is_directory(path)) {
+        log_error("File does not exist or is a directory: {}", path);
         status = FileStatus::FAILED;
         return;
     }
@@ -112,21 +114,50 @@ ClientFile::~ClientFile() {
     }
 }
 
-bool ClientFile::open_for_read() {
+FileOpenStatus ClientFile::open_for_read() {
     if (input_stream.is_open()) {
         input_stream.close();
     }
 
+    // 检查路径是否存在
+    if (!std::filesystem::exists(local_path)) {
+        log_error("File not found: {}", local_path);
+        status = FileStatus::FAILED;
+        return FileOpenStatus::NOT_FOUND;
+    }
+
+    // 检查是否是目录
+    if (std::filesystem::is_directory(local_path)) {
+        log_error("Path is a directory, not a file: {}", local_path);
+        status = FileStatus::FAILED;
+        return FileOpenStatus::IS_DIR;
+    }
+
+    // 检查文件权限
+    struct stat file_stat;
+    if (stat(local_path.c_str(), &file_stat) != 0) {
+        log_error("Failed to get file stats: {}", local_path);
+        status = FileStatus::FAILED;
+        return FileOpenStatus::UNKNOWN_ERROR;
+    }
+
+    if (!(file_stat.st_mode & S_IRUSR)) {
+        log_error("No read permission for file: {}", local_path);
+        status = FileStatus::FAILED;
+        return FileOpenStatus::PERMISSION_DENIED;
+    }
+
+    // 尝试打开文件
     input_stream.open(local_path, std::ios::binary);
     if (!input_stream.is_open()) {
         log_error("Failed to open file for reading: {}", local_path);
         status = FileStatus::FAILED;
-        return false;
+        return FileOpenStatus::UNKNOWN_ERROR;
     }
 
     status = FileStatus::UPLOADING;
     current_chunk = 0;
-    return true;
+    return FileOpenStatus::SUCCESS;
 }
 
 std::vector<char> ClientFile::read_next_chunk() {
@@ -154,10 +185,34 @@ bool ClientFile::has_more_chunks() const {
     return current_chunk < get_total_chunks();
 }
 
-bool ClientFile::open_for_write() {
+FileOpenStatus ClientFile::open_for_write() {
     // 确保目录存在
     std::filesystem::path file_path(local_path);
     std::filesystem::create_directories(file_path.parent_path());
+
+    // 检查目标路径是否已经是一个目录
+    if (std::filesystem::exists(local_path) && std::filesystem::is_directory(local_path)) {
+        log_error("Target path is a directory, not a file: {}", local_path);
+        status = FileStatus::FAILED;
+        return FileOpenStatus::IS_DIR;
+    }
+
+    // 检查父目录的写权限
+    std::filesystem::path parent_dir = file_path.parent_path();
+    if (std::filesystem::exists(parent_dir)) {
+        struct stat dir_stat;
+        if (stat(parent_dir.c_str(), &dir_stat) != 0) {
+            log_error("Failed to get directory stats: {}", parent_dir.string());
+            status = FileStatus::FAILED;
+            return FileOpenStatus::UNKNOWN_ERROR;
+        }
+
+        if (!(dir_stat.st_mode & S_IWUSR)) {
+            log_error("No write permission for directory: {}", parent_dir.string());
+            status = FileStatus::FAILED;
+            return FileOpenStatus::PERMISSION_DENIED;
+        }
+    }
 
     if (output_stream.is_open()) {
         output_stream.close();
@@ -167,11 +222,11 @@ bool ClientFile::open_for_write() {
     if (!output_stream.is_open()) {
         log_error("Failed to open file for writing: {}", local_path);
         status = FileStatus::FAILED;
-        return false;
+        return FileOpenStatus::UNKNOWN_ERROR;
     }
 
     status = FileStatus::DOWNLOADING;
-    return true;
+    return FileOpenStatus::SUCCESS;
 }
 
 bool ClientFile::write_chunk(const std::vector<char>& data, size_t chunk_index) {

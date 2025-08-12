@@ -14,7 +14,11 @@ void CFileManager::upload_file(const std::string& file_path) {
         return w_status == OperationType::Free;
     });
     auto file = std::make_shared<ClientFile>(file_path);
-    file->open_for_read();
+    FileOpenStatus status = file->open_for_read();
+    if (status != FileOpenStatus::SUCCESS) {
+        log_error("Failed to open file for upload: {}, reason: {}", file_path, static_cast<int>(status));
+        return;
+    }
     pool->submit([this, file]() {
         w_status = OperationType::Uploading;
         process_upload_task(file);
@@ -28,7 +32,11 @@ void CFileManager::upload_file(const ClientFilePtr& file) {
     upload_cv.wait(lock, [this]() {
         return w_status == OperationType::Free;
     });
-    file->open_for_read();
+    FileOpenStatus status = file->open_for_read();
+    if (status != FileOpenStatus::SUCCESS) {
+        log_error("Failed to open file for upload: {}, reason: {}", file->get_local_path(), static_cast<int>(status));
+        return;
+    }
     pool->submit([this, file]() {
         w_status = OperationType::Uploading;
         process_upload_task(file);
@@ -48,7 +56,11 @@ void CFileManager::download_file(
         return r_status == OperationType::Free;
     });
     auto file = std::make_shared<ClientFile>(file_name, save_path, file_hash, file_size);
-    file->open_for_read();
+    FileOpenStatus status = file->open_for_write();
+    if (status != FileOpenStatus::SUCCESS) {
+        log_error("Failed to open file for download: {}, reason: {}", save_path, static_cast<int>(status));
+        return;
+    }
     pool->submit([this, file]() {
         r_status = OperationType::Downloading;
         process_download_task(file);

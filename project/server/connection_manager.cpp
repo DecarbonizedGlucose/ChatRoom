@@ -43,12 +43,10 @@ void ConnectionManager::remove_user(std::string user_ID) {
         return; // 用户已经被移除或不存在
     }
 
-    // 安全删除连接对象
+    // 删除标记
     for (int i = 0; i < 3; ++i) {
         if (it->second[i] != nullptr) {
-            log_debug("Deleting connection {} for user: {}", i, user_ID);
-            delete it->second[i];
-            it->second[i] = nullptr; // 防止重复删除
+            it->second[i]->user_ID.clear();
         }
     }
 
@@ -62,6 +60,24 @@ void ConnectionManager::remove_user(std::string user_ID) {
         log_info("Successfully removed user: {}", user_ID);
     } catch (const std::exception& e) {
         log_error("Error updating user {} status during removal: {}", user_ID, e.what());
+    }
+}
+
+void ConnectionManager::destroy_connection(std::string user_ID) {
+    std::lock_guard<std::mutex> lock(user_mutex);
+    auto it = user_connections.find(user_ID);
+    if (it != user_connections.end()) {
+        for (int i = 0; i < 3; ++i) {
+            if (it->second[i] != nullptr) {
+                log_debug("Destroying connection {} for user: {}", i, user_ID);
+                delete it->second[i];
+                it->second[i] = nullptr; // 防止重复删除
+            }
+        }
+        user_connections.erase(it);
+        log_info("Destroyed all connections for user: {}", user_ID);
+    } else {
+        log_debug("No connections found for user: {}", user_ID);
     }
 }
 

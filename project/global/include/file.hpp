@@ -11,6 +11,14 @@
 // 文件分片大小 (64KB)
 constexpr size_t CHUNK_SIZE = 4 * 1024 * 1024;  // 4MB
 
+enum class FileOpenStatus {
+    SUCCESS,
+    NOT_FOUND,
+    IS_DIR,
+    PERMISSION_DENIED,
+    UNKNOWN_ERROR
+};
+
 // 文件状态枚举
 enum class FileStatus {
     PENDING,        // 等待处理
@@ -56,12 +64,12 @@ public:
     ~ClientFile();
 
     // 上传相关
-    bool open_for_read();
+    FileOpenStatus open_for_read();
     std::vector<char> read_next_chunk();
     bool has_more_chunks() const;
 
     // 下载相关
-    bool open_for_write();
+    FileOpenStatus open_for_write();
     bool write_chunk(const std::vector<char>& data, size_t chunk_index);
     bool finalize_download();
 

@@ -9,9 +9,7 @@
 
 ## 部署客户端
 
-直接下载`Release`并运行。
-
-如果要在本地编译，运行`install.sh`。
+运行`install.sh`。
 
 
 

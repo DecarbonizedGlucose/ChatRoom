@@ -428,7 +428,7 @@ MySQLController::get_offline_messages(const std::string& user_ID, std::time_t la
         "WHERE gm.user_id = '" + user_ID + "' AND cm.is_group = TRUE "
         "AND cm.sender_id != '" + user_ID + "' "
         "AND cm.timestamp > " + std::to_string(last_active_time) + " "
-        ") ORDER BY timestamp ASC LIMIT " + std::to_string(limit) + ";";
+        ") ORDER BY timestamp DESC LIMIT " + std::to_string(limit) + ";";
 
     auto rows = query(sql);
     for (const auto& row : rows) {

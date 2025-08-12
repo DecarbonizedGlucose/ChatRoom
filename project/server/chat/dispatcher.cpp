@@ -75,9 +75,7 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
 
                 // 注意：handle_sign_out 内部会调用 remove_user, 这会删除所有该用户的连接
                 // 包括当前的 conn 对象, 所以之后不能再使用 conn
-                command_handler->handle_sign_out(user_id);
-
-                // conn 已经被 remove_user 删除, 设置为 nullptr 防止重复使用
+                command_handler->handle_uncommon_disconnect(user_id); // 非正常断开处理
                 conn = nullptr;
             }
             return; // 连接断开, 退出处理循环

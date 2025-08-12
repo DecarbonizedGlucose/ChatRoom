@@ -78,7 +78,8 @@ class WinLoop;
 
 class CommManager {
 public:
-    bool* cont = nullptr;
+    //bool* cont = nullptr;
+    std::atomic<bool> online = false;
     SQLiteController* sqlite_con = nullptr;
     CFileManager* file_manager = nullptr;
     friend class WinLoop;

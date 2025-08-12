@@ -59,7 +59,7 @@ auto CommManager::send_async(int idx, const std::string& proto) {
 std::string CommManager::read_nb(int idx) {
     std::string proto;
     DataSocket::RecvState state;
-    while (*cont) {
+    while (online) {
         state = clients[idx]->socket->receive_protocol_with_state(proto);
         switch (state) {
             case DataSocket::RecvState::Success: return proto;
@@ -78,7 +78,7 @@ std::string CommManager::read_nb(int idx) {
 }
 
 void CommManager::send_nb(int idx, const std::string& proto) {
-    while (*cont) {
+    while (online) {
         if (clients[idx]->socket->send_protocol(proto)) {
             return;
         }
@@ -203,20 +203,7 @@ CommandRequest CommManager::handle_receive_command(bool nb) {
     } else {
         proto = this->read_nb(1);
     }
-
-    try {
-        auto cmd = get_command_request(proto);
-        log_debug("Successfully parsed command: action={}", cmd.action());
-        return cmd;
-    } catch (const std::exception& e) {
-        log_error("Failed to parse command: {}", e.what());
-        // 打印原始数据的前几个字节用于调试
-        if (proto.size() > 0) {
-            log_error("Proto data (first 20 bytes): {}",
-                     proto.substr(0, std::min((size_t)20, proto.size())));
-        }
-        throw;
-    }
+    return get_command_request(proto);
 }
 
 void CommManager::handle_send_command(Action action, const std::string& sender,

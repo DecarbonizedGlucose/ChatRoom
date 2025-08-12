@@ -310,7 +310,6 @@ void WinLoop::run() {
                 my_loop();
                 break;
             case UIPage::Exit:
-                log_out();
                 running = false;
                 break;
             default:
@@ -379,6 +378,7 @@ void WinLoop::login_loop() { // 改进用email/ID均可登录, 并返回另一�
                     comm->cache.user_email = resp.args(0);
                 }
                 comm->cache.user_password_hash = password_hash;
+                comm->online = true;
                 main_init();
                 switch_to(UIPage::Main);
                 return;
@@ -503,8 +503,8 @@ void WinLoop::register_loop() {
 
 void WinLoop::main_init() {
     std::cout << "正在初始化数据..." << std::endl;
-    std::cout << "用户ID : " << comm->cache.user_ID << std::endl;
-    std::cout << "用户邮箱 : " << comm->cache.user_email << std::endl;
+    // std::cout << "用户ID : " << comm->cache.user_ID << std::endl;
+    // std::cout << "用户邮箱 : " << comm->cache.user_email << std::endl;
     // 用户email和ID写入SQLite
     comm->sqlite_con->store_user_info(comm->cache.user_ID, comm->cache.user_email, comm->cache.user_password_hash);
     // tcp连接认证, server端：handle_remember_connection
@@ -515,7 +515,7 @@ void WinLoop::main_init() {
     // Message, Command循环读, Data适时读, 所有通道适时写
     pool->submit([&]{
         comm->clients[0]->socket->set_nonblocking();
-        while (this->running) {
+        while (comm->online) {
             auto msg = comm->handle_receive_message();
             pool->submit([this, msg](){
                 comm->handle_manage_message(msg); // 直接调用处理
@@ -524,7 +524,7 @@ void WinLoop::main_init() {
     });
     pool->submit([&]{
         comm->clients[1]->socket->set_nonblocking();
-        while (this->running) {
+        while (comm->online) {
             auto cmd = comm->handle_receive_command();
             pool->submit([this, cmd](){
                 log_debug("Received command: action={}, sender={}",
@@ -673,7 +673,7 @@ void WinLoop::chat_loop() {
             iss >> cmd >> path;
             auto file = std::make_shared<ClientFile>(path);
             if (file->status == FileStatus::FAILED) {
-                std::cout << "[系统消息] 文件不存在。" << std::endl << std::endl;
+                std::cout << "[系统消息] 文件不存在或者是个目录。" << std::endl << std::endl;
                 continue;
             }
             // 发送上传请求
@@ -1524,8 +1524,25 @@ void WinLoop::handle_main_input() {
     } else if (input == "0") {
         // 退出登录
         comm->handle_send_command(Action::Sign_Out, comm->cache.user_ID, {});
+        comm->cache.user_ID.clear();
+        comm->cache.user_email.clear();
+        comm->cache.user_password_hash.clear();
+        comm->cache.friend_list.clear();
+        comm->cache.group_list.clear();
+        comm->cache.group_members.clear();
+        comm->cache.notices.clear();
+        comm->cache.requests.clear();
+        comm->cache.real_time_notices.clear();
+        comm->cache.conversations.clear();
+        comm->cache.current_conversation_id.clear();
+        comm->cache.messages.clear();
+        comm->cache.new_messages.clear();
+        comm->cache.sorted_conversation_list.clear();
         std::cout << "正在退出登录..." << std::endl;
-        switch_to(UIPage::Exit);
+        comm->online = false;
+        comm->clients[0]->socket->set_nonblocking(0);
+        comm->clients[1]->socket->set_nonblocking(0);
+        switch_to(UIPage::Start);
     } else {
         std::cout << "无效的输入, 请重新选择。" << std::endl;
         pause();
@@ -1633,7 +1650,7 @@ void draw_main(std::mutex& mtx, const std::string& user_ID) {
     std::cout << selnum(1) + " 消息列表" << std::endl;
     std::cout << selnum(2) + " 联系人" << std::endl;
     std::cout << selnum(3) + " 我的" << std::endl;
-    std::cout << selnum(0) + " 退出登录 && 退出程序" << std::endl;
+    std::cout << selnum(0) + " 退出登录" << std::endl;
     print_input_sign();
 }
 
