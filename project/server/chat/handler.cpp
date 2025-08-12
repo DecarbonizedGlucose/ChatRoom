@@ -607,28 +607,13 @@ void CommandHandler::handle_accept_group_request(
             group_info["owner"]}
         );
         // 通知所有人，除了上面那个
-        auto member_list = disp->redis_con->get_group_members(group_ID);
+        auto member_list = disp->redis_con->get_group_members(group_ID); // 已经包含了申请人
         for (const auto& member_ID : member_list) {
             if (member_ID == conn->user_ID) continue; // 不通知自己
             auto member_conn = disp->conn_manager->get_connection(member_ID, 1);
             if (member_conn) {
                 try_send(disp->conn_manager, member_conn, acc_str);
             }
-        }
-        // 通知申请人进群
-        if (disp->redis_con->get_user_status(user_ID).first) {
-            // 申请人在线
-            auto new_person_conn = disp->conn_manager->get_connection(user_ID, 1);
-            if (new_person_conn) {
-                try_send(disp->conn_manager, new_person_conn, acc_str);
-                log_debug("通知申请人 {} 进群成功", user_ID);
-                // 发送群成员列表
-                update_group_info(user_ID, group_ID);
-            } else {
-                log_error("申请人 {} 在线但无法找到连接", user_ID);
-            }
-        } else {
-            log_info("申请人 {} 离线，无法立即通知", user_ID);
         }
         log_info(conn->user_ID + "同意了让" + user_ID + "加入群组" + group_ID);
 

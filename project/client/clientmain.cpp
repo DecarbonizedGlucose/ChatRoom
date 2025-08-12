@@ -3,8 +3,12 @@
 #include "../global/include/logging.hpp"
 #include <filesystem>
 #include <spdlog/sinks/rotating_file_sink.h>
+#include <csignal>
 
 int main(int argc, char* argv[]) {
+    std::signal(SIGINT, SIG_IGN);
+    std::signal(SIGQUIT, SIG_IGN);
+    std::signal(SIGTSTP, SIG_IGN);
     if (argc == 5) {
         std::string addr = argv[1];
         uint16_t port1 = std::stoi(argv[2]);

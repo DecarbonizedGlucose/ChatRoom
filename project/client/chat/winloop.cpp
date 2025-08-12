@@ -971,7 +971,7 @@ void WinLoop::request_loop() {
                         comm->cache.user_ID,
                         {TimeUtils::current_time_string(),
                         cmd.args(1)}, false);
-                    std::cout << "已发送加入群聊请求。" << std::endl;
+                    std::cout << "已发送加入群聊请求，等待管理员同意。" << std::endl;
                 } else {
                     std::cout << "已取消加入群聊。" << std::endl;
                 }
@@ -1116,13 +1116,15 @@ void WinLoop::my_lists_loop() {
             std::getline(std::cin, user_ID);
             if (user_ID.empty()) {
                 std::cout << "输入为空." << std::endl;
+            } else if (user_ID == comm->cache.user_ID) {
+                std::cout << "你不能删除自己。" << std::endl;
             } else if (comm->cache.friend_list.find(user_ID) == comm->cache.friend_list.end()) {
                 std::cout << "好友不存在, 请检查ID是否正确。" << std::endl;
             } else {
                 comm->handle_send_command(Action::Remove_Friend,
                     comm->cache.user_ID,
                     {TimeUtils::current_time_string(), user_ID}, false);
-                std::cout << "已发送删除好友请求。" << std::endl;
+                std::cout << "已删除好友。" << std::endl;
                 // 从本地缓存中删除
                 comm->handle_remove_friend(user_ID);
             }
@@ -1145,7 +1147,7 @@ void WinLoop::my_lists_loop() {
                 comm->handle_send_command(Action::Block_Friend,
                     comm->cache.user_ID,
                     {user_ID}, false);
-                std::cout << "已发送屏蔽好友请求。" << std::endl;
+                std::cout << "已屏蔽好友。" << std::endl;
                 comm->handle_block_friend(user_ID);
             }
         } else if (input == "7") {
@@ -1167,7 +1169,7 @@ void WinLoop::my_lists_loop() {
                 comm->handle_send_command(Action::Unblock_Friend,
                     comm->cache.user_ID,
                     {user_ID}, false);
-                std::cout << "已发送取消屏蔽好友请求。" << std::endl;
+                std::cout << "已取消屏蔽好友。" << std::endl;
                 comm->handle_unblock_friend(user_ID);
             }
         } else if (input == "8") {
@@ -1180,14 +1182,14 @@ void WinLoop::my_lists_loop() {
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
             } else if (comm->cache.group_list[group_ID].owner_ID == comm->cache.user_ID) {
-                std::cout << "群主请使用/disband。" << std::endl;
+                std::cout << "群主请使用disband。" << std::endl;
             } else {
                 std::cout << "正在退出群组 " << group_ID << "..." << std::endl;
                 // 发送退出群组请求
                 comm->handle_send_command(Action::Leave_Group,
                     comm->cache.user_ID,
                     {TimeUtils::current_time_string(), group_ID}, false);
-                std::cout << "已发送退出群组请求。" << std::endl;
+                std::cout << "已退出群组。" << std::endl;
                 comm->handle_leave_group(group_ID);
             }
         } else if (input == "9") {
@@ -1199,6 +1201,8 @@ void WinLoop::my_lists_loop() {
                 std::cout << "输入为空." << std::endl;
             } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                 std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
+            } else if (comm->cache.group_list[group_ID].owner_ID != comm->cache.user_ID) {
+                std::cout << "你不是这个群的群主。" << std::endl;
             } else {
                 std::cout << "正在解散群组 " << group_ID << "..." << std::endl;
                 // 发送解散群组请求
@@ -1282,11 +1286,15 @@ void WinLoop::my_lists_loop() {
             }
         } else if (input == "12") {
             // 创建群聊
-            std::cout << "请输入新群组的名称：" << std::endl;
+            std::cout << "请输入新群组的名称(不能含空格、制表符,不超过25个字符,不能以'Group_'开头):" << std::endl;
             print_input_sign();
             std::getline(std::cin, group_name);
             if (group_name.empty()) {
                 std::cout << "输入为空。" << std::endl;
+            } else if (group_name.length() > 25) {
+                std::cout << "群组名称过长, 请限制在25个字符以内。" << std::endl;
+            } else if (group_name.find_first_of(" \t") != std::string::npos) {
+                std::cout << "群组名称不能包含空格或制表符。" << std::endl;
             } else if (group_name.find("Group_") == 0) {
                 std::cout << "群组名称不能以 'Group_' 开头。" << std::endl;
             } else {
@@ -1427,12 +1435,17 @@ void WinLoop::my_lists_loop() {
                     std::cout << "输入为空." << std::endl;
                 } else if (comm->cache.group_list.find(group_ID) == comm->cache.group_list.end()) {
                     std::cout << "群组不存在, 请检查ID是否正确。" << std::endl;
+                } else if (comm->cache.group_members.find(group_ID) == comm->cache.group_members.end()
+                            || comm->cache.group_members[group_ID].empty()) {
+                    std::cout << "群组成员列表未正确加载, 请稍后再试。" << std::endl;
+                } else if (comm->cache.group_members[group_ID].find(user_ID) != comm->cache.group_members[group_ID].end()) {
+                    std::cout << "该用户已经是群组成员。" << std::endl;
                 } else {
                     auto& group_name = comm->cache.group_list[group_ID].group_name;
                     comm->handle_send_command(Action::Invite_To_Group_Req,
                         comm->cache.user_ID,
                         {TimeUtils::current_time_string(), group_ID, group_name, user_ID}, false);
-                    std::cout << "已发送邀请好友加入群组请求。" << std::endl;
+                    std::cout << "已发送邀请好友加入群聊，等待对方接受并申请入群。" << std::endl;
                 }
             }
         } else if (input == "16") {
@@ -1449,17 +1462,23 @@ void WinLoop::my_lists_loop() {
                 std::cout << "群组成员列表未正确加载, 请稍后再试。" << std::endl;
             } else if (!comm->cache.group_list[group_ID].is_user_admin) {
                 std::cout << "你不是管理员。" << std::endl;
-                continue;
             } else {
                 std::cout << "请输入要踢出的用户ID：" << std::endl;
                 print_input_sign();
                 std::getline(std::cin, user_ID);
                 if (user_ID.empty()) {
                     std::cout << "成员ID不能为空" << std::endl;
+                } else if (comm->cache.user_ID == comm->cache.group_list[group_ID].owner_ID
+                            && user_ID == comm->cache.user_ID) {
+                    std::cout << "群主不能踢自己，请使用解散群聊。" << std::endl;
                 } else if (user_ID == comm->cache.user_ID) {
-                    std::cout << "你不能移除自己, 请使用/quit退出群组。" << std::endl;
+                    std::cout << "你不能移除自己, 请使用退出群组。" << std::endl;
                 } else if (comm->cache.group_members[group_ID].find(user_ID) == comm->cache.group_members[group_ID].end()) {
                     std::cout << "这个账号不是群组成员。" << std::endl;
+                } else if (comm->cache.group_list[group_ID].owner_ID == user_ID) {
+                    std::cout << "你不能踢群主。" << std::endl;
+                } else if (comm->cache.group_members[group_ID][user_ID]) {
+                    std::cout << "你不能移除其他管理员。" << std::endl;
                 } else {
                     comm->handle_send_command(Action::Remove_From_Group,
                     comm->cache.user_ID,
