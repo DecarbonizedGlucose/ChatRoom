@@ -63,6 +63,7 @@ private:
         const std::string& email,
         std::string& user_ID,
         std::string& user_password);
+    void handle_unregister(const std::string& user_ID, CommandRequest& cmd);
     void handle_send_veri_code(
         TcpServerConnection* conn,
         std::string subj);

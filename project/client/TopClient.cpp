@@ -17,8 +17,7 @@ TopClient::TopClient() {
     pool = new thread_pool(8);
     comm = new CommManager(this);
     winloop = new WinLoop(comm, pool);
-    //comm->cont = &winloop->running; // 传递运行状态指针
-    comm->win = winloop; // 传递WinLoop指针
+    comm->win = winloop;
 }
 
 TopClient::~TopClient() {

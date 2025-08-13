@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <atomic>
 #include "../../global/abstract/datatypes.hpp"
 #include "../../global/include/safe_deque.hpp"
 #include "../../global/include/safe_queue.hpp"
@@ -80,6 +81,9 @@ class CommManager {
 public:
     //bool* cont = nullptr;
     std::atomic<bool> online = false;
+    // 后台接收线程运行标志（仅用于等待退出，防止再次登录时与阻塞读竞争）
+    std::atomic<bool> rx_running_msg{false};
+    std::atomic<bool> rx_running_cmd{false};
     SQLiteController* sqlite_con = nullptr;
     CFileManager* file_manager = nullptr;
     friend class WinLoop;
@@ -172,8 +176,14 @@ public:
     void print_message_notice(const std::string& conv_id);
     void print_request_notice();
     void print_notice_notice();
+    void print_rfile_notice();
+    void print_wfile_notice();
 
 private:
     // 扔进去全存
     void store_relation_network_data(const json& relation_data);
+
+public:
+    // 安全停止后台接收线程，并在需要时恢复阻塞模式（用于再次登录前）
+    void stop_receivers();
 };

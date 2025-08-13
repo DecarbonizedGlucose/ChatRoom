@@ -168,6 +168,12 @@ bool MySQLController::update_user_status(const std::string& user_ID, bool online
     return execute(sql);
 }
 
+bool MySQLController::delete_user(const std::string& user_ID) {
+    // 删用户表
+    std::string sql = "DELETE FROM users WHERE user_id = '" + user_ID + "';";
+    return execute(sql);
+}
+
 /* ---------- 好友 ---------- */
 
 bool MySQLController::add_friend(const std::string& user_ID, const std::string& friend_ID) {

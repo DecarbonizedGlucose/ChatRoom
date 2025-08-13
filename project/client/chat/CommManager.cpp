@@ -313,7 +313,7 @@ void CommManager::store_relation_network_data(const json& relation_data) {
                 user_is_admin
             };
 
-            // 解析群成员数据
+        // 解析群成员数据
             if (group_info.contains("members") && group_info["members"].is_array()) {
                 for (const auto& member_info : group_info["members"]) {
                     std::string member_id = member_info["id"];
@@ -323,6 +323,9 @@ void CommManager::store_relation_network_data(const json& relation_data) {
                     sqlite_con->cache_group_member(group_id, member_id, is_admin);
                     log_debug("Cached group member: {} in {} (admin: {})",
                              member_id, group_id, is_admin);
+
+            // 同步填充到内存缓存，便于菜单直接显示
+            cache.group_members[group_id][member_id] = is_admin;
                 }
             }
         }
@@ -510,7 +513,7 @@ void CommManager::handle_join_group(
     cache.group_list[group_ID] = {
         group_name,
         owner_ID,
-        member_count + 1, // 加上当前用户
+        member_count,
         (cache.user_ID == owner_ID)
     };
 
@@ -681,6 +684,19 @@ void CommManager::handle_reply_heartbeat() {
     handle_send_command(Action::HEARTBEAT, cache.user_ID, {});
 }
 
+void CommManager::stop_receivers() {
+    // 通知后台接收循环退出
+    online = false;
+    // 等待循环实际退出（最多等待短时间，避免死等）
+    for (int i = 0; i < 50; ++i) { // ~500ms
+        if (!rx_running_msg.load() && !rx_running_cmd.load()) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    // 恢复阻塞模式，避免下次登录时阻塞读被非阻塞设置影响
+    if (clients[0] && clients[0]->socket) clients[0]->socket->set_nonblocking(0);
+    if (clients[1] && clients[1]->socket) clients[1]->socket->set_nonblocking(0);
+}
+
 /* ---------- Print ---------- */
 
 void CommManager::print_friends() {
@@ -750,6 +766,24 @@ void CommManager::print_notice_notice() {
         return;
     }
     std::cout << "\r你有1条新通知.\n";
+    print_input_sign();
+    std::cout.flush();
+}
+
+void CommManager::print_rfile_notice() {
+    if (win->current_page == UIPage::Login) {
+        return;
+    }
+    std::cout << "\r[系统消息] 1个文件下载完成." << std::endl << std::endl;
+    print_input_sign();
+    std::cout.flush();
+}
+
+void CommManager::print_wfile_notice() {
+    if (win->current_page == UIPage::Login) {
+        return;
+    }
+    std::cout << "\r[系统消息] 1个文件上传完成." << std::endl << std::endl;
     print_input_sign();
     std::cout.flush();
 }

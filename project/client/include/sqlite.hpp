@@ -118,5 +118,9 @@ public:
     std::vector<std::vector<std::string>> get_group_chat_history(
         const std::string& group_ID,
         int limit = 100);
+
+/* ---------- 自毁 ---------- */
+
+    bool delete_user_data(const std::string& user_ID);
 };
 

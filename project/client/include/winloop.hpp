@@ -61,8 +61,6 @@ private:
     void contacts_loop();
     void notice_loop();
     void request_loop();
-    void add_person_loop();
-    void join_group_loop();
     void my_lists_loop();
     void my_loop();
     void chat_loop();

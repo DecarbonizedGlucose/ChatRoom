@@ -455,3 +455,47 @@ std::vector<std::vector<std::string>> SQLiteController::get_group_chat_history(
 
     return query(sql.str());
 }
+
+bool SQLiteController::delete_user_data(const std::string& user_ID) {
+    // 用户表，群组表，好友表，成员表，消息记录表
+    std::lock_guard<std::mutex> lock(db_mutex);
+    try {
+        // 删除用户表中的数据
+        SQLite::Statement stmt1(*db,
+            "DELETE FROM users WHERE user_id = ?");
+        stmt1.bind(1, user_ID);
+        stmt1.exec();
+
+        // 删除群组表中的数据
+        SQLite::Statement stmt2(*db,
+            "DELETE FROM groups WHERE owner_id = ? OR group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)");
+        stmt2.bind(1, user_ID);
+        stmt2.bind(2, user_ID);
+        stmt2.exec();
+
+        // 删除好友表中的数据
+        SQLite::Statement stmt3(*db,
+            "DELETE FROM friends WHERE user_id = ? OR friend_id = ?");
+        stmt3.bind(1, user_ID);
+        stmt3.bind(2, user_ID);
+        stmt3.exec();
+
+        // 删除成员表中的数据
+        SQLite::Statement stmt4(*db,
+            "DELETE FROM group_members WHERE user_id = ?");
+        stmt4.bind(1, user_ID);
+        stmt4.exec();
+
+        // 删除消息记录表中的数据
+        SQLite::Statement stmt5(*db,
+            "DELETE FROM chat_messages WHERE sender_id = ? OR receiver_id = ?");
+        stmt5.bind(1, user_ID);
+        stmt5.bind(2, user_ID);
+        stmt5.exec();
+
+        return true;
+    } catch (const std::exception& e) {
+        log_error("Failed to delete user data: {}", e.what());
+        return false;
+    }
+}

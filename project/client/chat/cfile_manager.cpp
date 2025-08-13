@@ -86,6 +86,7 @@ void CFileManager::process_upload_task(const ClientFilePtr& file) {
             !file->has_more_chunks()
         );
     }
+    comm->print_wfile_notice();
     log_info("File upload completed: {}", file->get_local_path());
 }
 
@@ -98,5 +99,6 @@ void CFileManager::process_download_task(const ClientFilePtr& file) {
         log_debug("Receive file chunk: {}, index: {}", file->file_id, chunk.chunk_index());
     }
     file->finalize_download();
+    comm->print_rfile_notice();
     log_info("File download completed: {}", file->get_local_path());
 }

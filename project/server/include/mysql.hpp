@@ -47,6 +47,7 @@ public:
     std::string get_user_id_from_email(const std::string& email);
     std::string get_user_email_from_id(const std::string& user_ID);
     bool update_user_status(const std::string& user_ID, bool online);
+    bool delete_user(const std::string& user_ID);
 
 /* ---------- 好友 ---------- */
 

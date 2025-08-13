@@ -193,9 +193,13 @@ bool RedisController::load_user_relations(const std::string& user_ID, json& rela
     }
 }
 
-bool RedisController::unload_user_relations(const std::string& user_ID) {
+bool RedisController::unload_user(const std::string& user_ID) {
     try {
         auto key = "chat:user:" + user_ID + ":friends";
+        redis_conn.del(key);
+        key = "chat:user:" + user_ID + ":groups";
+        redis_conn.del(key);
+        key = "chat:user:" + user_ID + ":status";
         redis_conn.del(key);
 
         log_info("Unloaded user relations for {} from Redis cache", user_ID);

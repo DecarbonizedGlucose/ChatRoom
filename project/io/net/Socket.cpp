@@ -227,9 +227,9 @@ bool AcceptedSocket::disconnect() {
         log_error("AcceptedSocket: Failed to close socket: {}", strerror(errno));
         throw std::runtime_error("Failed to close socket: " + std::string(strerror(errno)));
     }
+    log_info("AcceptedSocket disconnected (fd:{})", fd);
     fd = -1;
     connected = false;
-    log_info("AcceptedSocket disconnected (fd:{})", fd);
     return true;
 }
 
@@ -289,9 +289,9 @@ bool CSocket::disconnect() {
         log_error("CSocket: Failed to close socket: {}", strerror(errno));
         throw std::runtime_error("Failed to close socket: " + std::string(strerror(errno)));
     }
+    log_info("CSocket (fd:{}) disconnected from {}:{}", fd, ip, port);
     fd = -1;
     connected = false;
-    log_info("CSocket (fd:{}) disconnected from {}:{}", fd, ip, port);
     return true;
 }
 

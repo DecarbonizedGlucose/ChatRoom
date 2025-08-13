@@ -8,12 +8,17 @@
 #include <iostream>
 #include <regex>
 #include "../include/sfile_manager.hpp"
+#include "../../global/include/time_utils.hpp"
 
 void try_send(ConnectionManager* conn_manager,
     TcpServerConnection* conn,
     const std::string& proto,
     DataType type
 ) {
+    if (conn == nullptr) {
+        log_info("try_send called with null connection, skip sending");
+        return;
+    }
     // 首先设置要发送的数据
     conn->socket->set_write_buf(proto);
     conn->set_send_type(type);
@@ -380,6 +385,109 @@ void CommandHandler::handle_register(
     try_send(disp->conn_manager, conn, env_out);
 }
 
+void CommandHandler::handle_unregister(const std::string& user_ID, CommandRequest& cmd) {
+    log_debug("handle_unregister called for user_ID: {}", user_ID);
+    // 1. 处理好友关系：通知并双向删除（Redis + MySQL）
+    auto friends = disp->mysql_con->get_friends_list(user_ID);
+    for (const auto& friend_ID : friends) {
+        // 通知对方：你被对方删除（客户端用 Remove_Friend 处理）
+        if (disp->redis_con->get_user_status(friend_ID).first) {
+            auto friend_conn = disp->conn_manager->get_connection(friend_ID, 1);
+            if (friend_conn) {
+                auto env_out = create_command_string(
+                    Action::Remove_Friend,
+                    user_ID,
+                    {TimeUtils::current_time_string(), friend_ID}
+                );
+                try_send(disp->conn_manager, friend_conn, env_out);
+            }
+        }
+        // Redis 缓存清理（双向）
+        disp->redis_con->remove_friend(user_ID, friend_ID);
+        disp->redis_con->remove_friend(friend_ID, user_ID);
+        // MySQL 双向删除
+        disp->mysql_con->delete_friend(user_ID, friend_ID);
+        disp->mysql_con->delete_friend(friend_ID, user_ID);
+    }
+
+    // 2. 处理群组：根据是否为群主执行解散或退群
+    // 使用 MySQL 获取权威的群列表，避免 Redis 未缓存导致遗漏
+    auto groups = disp->mysql_con->get_user_groups(user_ID);
+    for (const auto& group_ID : groups) {
+        std::string owner_id;
+        auto group_info = disp->redis_con->get_group_info(group_ID);
+        if (!group_info.empty() && group_info.contains("owner")) {
+            owner_id = group_info["owner"].get<std::string>();
+        } else {
+            owner_id = disp->mysql_con->get_group_owner(group_ID);
+        }
+
+        if (owner_id == user_ID) {
+            // 解散群组
+            auto members = disp->redis_con->get_group_members(group_ID);
+            if (members.empty()) {
+                // 从 MySQL 回退获取成员
+                auto members_with_admin = disp->mysql_con->get_group_members_with_admin_status(group_ID);
+                for (auto& p : members_with_admin) members.push_back(p.first);
+            }
+            auto disband_msg = create_command_string(
+                Action::Disband_Group,
+                user_ID,
+                {TimeUtils::current_time_string(), group_ID}
+            );
+            for (const auto& member_ID : members) {
+                if (member_ID == user_ID) continue;
+                // 通知
+                if (disp->redis_con->get_user_status(member_ID).first) {
+                    auto conn_m = disp->conn_manager->get_connection(member_ID, 1);
+                    if (conn_m) try_send(disp->conn_manager, conn_m, disband_msg);
+                }
+                // Redis：从成员的群集合移除
+                disp->redis_con->remove_user_from_group(member_ID, group_ID);
+                // Redis：从群成员集合移除（计数随之递减）
+                disp->redis_con->remove_group_member(group_ID, member_ID);
+            }
+            // Redis 删除群缓存 + MySQL 解散群
+            disp->redis_con->remove_group(group_ID);
+            disp->mysql_con->disband_group(group_ID);
+        } else {
+            // 普通成员退群
+            // 获取成员列表用于通知
+            auto members = disp->redis_con->get_group_members(group_ID);
+            if (members.empty()) {
+                auto members_with_admin = disp->mysql_con->get_group_members_with_admin_status(group_ID);
+                for (auto& p : members_with_admin) members.push_back(p.first);
+            }
+            auto leave_msg = create_command_string(
+                Action::Leave_Group,
+                user_ID,
+                {TimeUtils::current_time_string(), group_ID}
+            );
+            for (const auto& member_ID : members) {
+                if (member_ID == user_ID) continue;
+                if (disp->redis_con->get_user_status(member_ID).first) {
+                    auto conn_m = disp->conn_manager->get_connection(member_ID, 1);
+                    if (conn_m) try_send(disp->conn_manager, conn_m, leave_msg);
+                }
+            }
+            // Redis & MySQL 从该群移除该用户
+            // 如果该用户是管理员，先从管理员列表中移除
+            if (disp->redis_con->is_group_admin(group_ID, user_ID)) {
+                disp->redis_con->remove_group_admin(group_ID, user_ID);
+                disp->mysql_con->remove_group_admin(group_ID, user_ID);
+            }
+            disp->redis_con->remove_user_from_group(user_ID, group_ID);
+            disp->redis_con->remove_group_member(group_ID, user_ID);
+            disp->mysql_con->remove_user_from_group(group_ID, user_ID);
+        }
+    }
+
+    // 3. 断开连接并清理用户数据
+    handle_sign_out(user_ID);
+    disp->redis_con->unload_user(user_ID);
+    disp->mysql_con->delete_user(user_ID);
+}
+
 void CommandHandler::handle_send_veri_code(
     TcpServerConnection* conn,
     std::string subj) {
@@ -653,9 +761,10 @@ void CommandHandler::handle_remove_friend(
     if (disp->redis_con->get_user_status(friend_ID).first) {
         // 好友在线
         disp->redis_con->remove_friend(friend_ID, user_ID);
+        auto friend_conn = disp->conn_manager->get_connection(friend_ID, 1);
         try_send(
             disp->conn_manager,
-            disp->conn_manager->get_connection(friend_ID, 1),
+            friend_conn,
             ostr
         );
     }
@@ -798,6 +907,11 @@ void CommandHandler::handle_leave_group(
         }
     }
     // 从redis删除
+    // 如果该用户是管理员，先从管理员列表中移除
+    if (disp->redis_con->is_group_admin(group_ID, user_ID)) {
+        disp->redis_con->remove_group_admin(group_ID, user_ID);
+        disp->mysql_con->remove_group_admin(group_ID, user_ID);
+    }
     disp->redis_con->remove_user_from_group(user_ID, group_ID);
     disp->redis_con->remove_group_member(group_ID, user_ID);
     // remove_group_member 已经自动更新了 member_count，不需要手动再减1
@@ -849,11 +963,12 @@ void CommandHandler::handle_invite_to_group_req(
     const std::string& friend_ID
 ) {
     log_debug("handle_invite_to_group_req called");
-    if (disp->conn_manager->get_connection(friend_ID, 1)) {
+    auto conn = disp->conn_manager->get_connection(friend_ID, 1);
+    if (conn) {
         // 在线
         try_send(
             disp->conn_manager,
-            disp->conn_manager->get_connection(friend_ID, 1),
+            conn,
             ostr
         );
         log_info("{}被邀请加入群组", friend_ID);
@@ -944,9 +1059,10 @@ void CommandHandler::handle_add_admin(
     auto member_list = disp->redis_con->get_group_members(group_ID);
     for (const auto& member_ID : member_list) {
         if (member_ID == owner_ID) continue;
+        auto conn = disp->conn_manager->get_connection(member_ID, 1);
         try_send(
             disp->conn_manager,
-            disp->conn_manager->get_connection(member_ID, 1),
+            conn,
             ostr
         );
     }
@@ -977,9 +1093,10 @@ void CommandHandler::handle_remove_admin(
     auto member_list = disp->redis_con->get_group_members(group_ID);
     for (const auto& member_ID : member_list) {
         if (member_ID == owner_ID) continue;
+        auto conn = disp->conn_manager->get_connection(member_ID, 1);
         try_send(
             disp->conn_manager,
-            disp->conn_manager->get_connection(member_ID, 1),
+            conn,
             ostr
         );
     }

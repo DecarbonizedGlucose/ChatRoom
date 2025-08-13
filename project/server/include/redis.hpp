@@ -87,7 +87,7 @@ public:
     // blocked_by_data: 专门的被屏蔽状态数据, 存储到friends缓存中
     bool load_user_relations(const std::string& user_ID, json& relation_data, const json& blocked_by_data = json{});
 
-    bool unload_user_relations(const std::string& user_ID);
+    bool unload_user(const std::string& user_ID);
 
     bool add_friend(const std::string& user_ID, const std::string& friend_ID, bool blocked);
 
