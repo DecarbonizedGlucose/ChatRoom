@@ -19,16 +19,56 @@ sudo apt install -y        \
     libsqlite3-dev         \
     sqlite3
 
-if pkg-config --exists SQLiteCpp; then
+# 可选：如果系统没有 cmake，则安装（某些环境未预装）
+if ! command -v cmake >/dev/null 2>&1; then
+    sudo apt install -y cmake
+fi
+
+# 封装更健壮的 SQLiteCpp 检测
+has_sqlitecpp() {
+    # 1) pkg-config（常见大小写两种）
+    if pkg-config --exists SQLiteCpp 2>/dev/null || pkg-config --exists sqlitecpp 2>/dev/null; then
+        return 0
+    fi
+    # 2) 头文件路径
+    for inc in \
+        /usr/include/SQLiteCpp/SQLiteCpp.h \
+        /usr/local/include/SQLiteCpp/SQLiteCpp.h \
+        /opt/homebrew/include/SQLiteCpp/SQLiteCpp.h \
+        /opt/local/include/SQLiteCpp/SQLiteCpp.h; do
+        [ -f "$inc" ] && return 0
+    done
+    # 3) CMake config
+    for cfg in \
+        /usr/lib/cmake/SQLiteCpp/SQLiteCppConfig.cmake \
+        /usr/lib64/cmake/SQLiteCpp/SQLiteCppConfig.cmake \
+        /usr/local/lib/cmake/SQLiteCpp/SQLiteCppConfig.cmake \
+        /usr/local/lib64/cmake/SQLiteCpp/SQLiteCppConfig.cmake; do
+        [ -f "$cfg" ] && return 0
+    done
+    # 4) 已安装的 deb 包
+    if dpkg -s libsqlitecpp-dev >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+if has_sqlitecpp; then
     echo "SQLiteCpp 已安装，跳过安装"
 else
-    echo "正在安装 SQLiteCpp..."
-    cd /tmp
-    git clone https://github.com/SRombauts/SQLiteCpp.git
-    cd SQLiteCpp && mkdir build && cd build
-    cmake .. && make && sudo make install
-    cd /tmp
-    rm -rf SQLiteCpp
+    echo "尝试通过 apt 安装 SQLiteCpp (libsqlitecpp-dev)…"
+    if sudo apt install -y libsqlitecpp-dev >/dev/null 2>&1; then
+        echo "已通过 apt 安装 SQLiteCpp"
+    else
+        echo "apt 未提供或安装失败，回退到源码构建 SQLiteCpp…"
+        cd /tmp
+        rm -rf SQLiteCpp
+        git clone --depth=1 https://github.com/SRombauts/SQLiteCpp.git
+        cd SQLiteCpp && mkdir -p build && cd build
+        cmake .. && make -j"$(nproc)" && sudo make install
+        cd /tmp
+        rm -rf SQLiteCpp
+    fi
 fi
 
 PROTOBUF_VERSION=3.21.12
