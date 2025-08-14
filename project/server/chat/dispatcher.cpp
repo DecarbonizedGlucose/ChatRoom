@@ -4,7 +4,7 @@
 #include "../../global/include/logging.hpp"
 #include "../include/connection_manager.hpp"
 #include "sfile_manager.hpp"
-#include "../../global/abstract/datatypes.hpp"
+// #include "../../global/abstract/datatypes.hpp"
 
 using RecvState = DataSocket::RecvState;
 
@@ -35,23 +35,23 @@ void Dispatcher::add_server(TcpServer* server, int idx) {
     this->server[idx] = server;
 }
 
-void Dispatcher::flush_cached_messages() {
-    log_info("Flushing cached messages to MySQL");
-    server[0]->pool->submit([&](){
-        size_t batch_size = 200;
-        auto batch = redis_con->pop_chat_messages_batch(batch_size);
-        if (batch.empty()) return;
-        for (auto &raw : batch) {
-            auto msg = get_chat_message(raw);
-            // 存起来
-            mysql_con->add_chat_message(
-                msg.sender(), msg.receiver(), msg.is_group(), msg.timestamp(),
-                msg.text(), msg.pin(), msg.payload().file_name(),
-                msg.payload().file_size(), msg.payload().file_hash()
-            );
-        }
-    });
-}
+// void Dispatcher::flush_cached_messages() {
+//     log_info("Flushing cached messages to MySQL");
+//     server[0]->pool->submit([&](){
+//         size_t batch_size = 200;
+//         auto batch = redis_con->pop_chat_messages_batch(batch_size);
+//         if (batch.empty()) return;
+//         for (auto &raw : batch) {
+//             auto msg = get_chat_message(raw);
+//             // 存起来
+//             mysql_con->add_chat_message(
+//                 msg.sender(), msg.receiver(), msg.is_group(), msg.timestamp(),
+//                 msg.text(), msg.pin(), msg.payload().file_name(),
+//                 msg.payload().file_size(), msg.payload().file_hash()
+//             );
+//         }
+//     });
+// }
 
 void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
     log_debug("dispatch_recv called for connection fd: {}", conn->socket->get_fd());
@@ -102,14 +102,14 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
             any.UnpackTo(&chat_msg);
             // 消息接收
             message_handler->handle_recv(chat_msg, proto_str);
-            // 定时批量存储
-            auto now = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_flush_time);
+            // // 定时批量存储
+            // auto now = std::chrono::steady_clock::now();
+            // auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_flush_time);
 
-            if (elapsed >= flush_interval) {
-                flush_cached_messages();
-                last_flush_time = now;
-            }
+            // if (elapsed >= flush_interval) {
+            //     flush_cached_messages();
+            //     last_flush_time = now;
+            // }
         } else if (any.Is<CommandRequest>()) {
             CommandRequest cmd_req;
             any.UnpackTo(&cmd_req);

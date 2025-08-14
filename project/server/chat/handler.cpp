@@ -89,8 +89,14 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
             }
         }
     }
-    // 缓存到redis
-    disp->redis_con->cache_chat_message(ostr);
+    // // 缓存到redis
+    // disp->redis_con->cache_chat_message(ostr);
+    // 存起来
+    disp->mysql_con->add_chat_message(
+        sender, receiver, message.is_group(), message.timestamp(),
+        message.text(), message.pin(), message.payload().file_name(),
+        message.payload().file_size(), message.payload().file_hash()
+    );
 }
 
 void MessageHandler::handle_send(TcpServerConnection* conn) {
@@ -390,7 +396,7 @@ void CommandHandler::handle_unregister(const std::string& user_ID, CommandReques
     // 1. 处理好友关系：通知并双向删除（Redis + MySQL）
     auto friends = disp->mysql_con->get_friends_list(user_ID);
     for (const auto& friend_ID : friends) {
-        // 通知对方：你被对方删除（客户端用 Remove_Friend 处理）
+        // 通知对方
         if (disp->redis_con->get_user_status(friend_ID).first) {
             auto friend_conn = disp->conn_manager->get_connection(friend_ID, 1);
             if (friend_conn) {
@@ -402,16 +408,13 @@ void CommandHandler::handle_unregister(const std::string& user_ID, CommandReques
                 try_send(disp->conn_manager, friend_conn, env_out);
             }
         }
-        // Redis 缓存清理（双向）
         disp->redis_con->remove_friend(user_ID, friend_ID);
         disp->redis_con->remove_friend(friend_ID, user_ID);
-        // MySQL 双向删除
         disp->mysql_con->delete_friend(user_ID, friend_ID);
         disp->mysql_con->delete_friend(friend_ID, user_ID);
     }
 
-    // 2. 处理群组：根据是否为群主执行解散或退群
-    // 使用 MySQL 获取权威的群列表，避免 Redis 未缓存导致遗漏
+    // 2. 根据是否为群主执行解散或退群
     auto groups = disp->mysql_con->get_user_groups(user_ID);
     for (const auto& group_ID : groups) {
         std::string owner_id;
@@ -451,8 +454,6 @@ void CommandHandler::handle_unregister(const std::string& user_ID, CommandReques
             disp->redis_con->remove_group(group_ID);
             disp->mysql_con->disband_group(group_ID);
         } else {
-            // 普通成员退群
-            // 获取成员列表用于通知
             auto members = disp->redis_con->get_group_members(group_ID);
             if (members.empty()) {
                 auto members_with_admin = disp->mysql_con->get_group_members_with_admin_status(group_ID);
@@ -470,8 +471,6 @@ void CommandHandler::handle_unregister(const std::string& user_ID, CommandReques
                     if (conn_m) try_send(disp->conn_manager, conn_m, leave_msg);
                 }
             }
-            // Redis & MySQL 从该群移除该用户
-            // 如果该用户是管理员，先从管理员列表中移除
             if (disp->redis_con->is_group_admin(group_ID, user_ID)) {
                 disp->redis_con->remove_group_admin(group_ID, user_ID);
                 disp->mysql_con->remove_group_admin(group_ID, user_ID);
@@ -482,7 +481,7 @@ void CommandHandler::handle_unregister(const std::string& user_ID, CommandReques
         }
     }
 
-    // 3. 断开连接并清理用户数据
+    // 3. 断开连接，清理用户数据
     handle_sign_out(user_ID);
     disp->redis_con->unload_user(user_ID);
     disp->mysql_con->delete_user(user_ID);
@@ -1129,11 +1128,12 @@ void CommandHandler::handle_upload_file(
     if (new_file_id.empty()) {
         // 文件已存在，返回Deny_File命令
         log_info("File with hash {} already exists, denying upload", file_hash);
-
+        // 需要重新获取file_id
+        auto file_id = disp->mysql_con->get_file_id_by_hash(file_hash);
         auto env_str = create_command_string(
             Action::Deny_File,
             "ChatRoom Server",
-            {file_hash, "1", new_file_id}
+            {file_hash, "1", file_id}
         );
         try_send(disp->conn_manager, conn, env_str);
         return;
@@ -1289,6 +1289,7 @@ void CommandHandler::handle_post_offline_messages(const std::string& user_ID) {
         // 获取用户的last_active时间
         std::time_t last_active = disp->mysql_con->get_user_last_active(user_ID);
         if (last_active == 0) {
+            // 理论上是初次登录
             log_debug("No last_active time found for user {}, sending empty offline messages", user_ID);
         } else {
             // 从MySQL获取离线消息（最多200条）
@@ -1330,6 +1331,9 @@ void CommandHandler::handle_post_offline_messages(const std::string& user_ID) {
                 DataType::OfflineMessages
             );
             log_info("Sent {} offline messages to user: {}", chat_messages.size(), user_ID);
+            // 在成功发送离线消息后，更新 MySQL 中的 last_active，
+            // 标记本次发送为新的离线查询起点，避免后续再次登录重复发送。
+            disp->mysql_con->update_user_last_active(user_ID);
         } else {
             log_error("Data connection not found for user: {}", user_ID);
         }

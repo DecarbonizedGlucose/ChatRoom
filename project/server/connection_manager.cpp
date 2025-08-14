@@ -75,6 +75,13 @@ void ConnectionManager::destroy_connection(std::string user_ID) {
             }
         }
         user_connections.erase(it);
+        try {
+            disp->redis_con->set_user_status(user_ID, false);
+            disp->mysql_con->update_user_status(user_ID, false);
+            log_info("Successfully removed user: {}", user_ID);
+        } catch (const std::exception& e) {
+            log_error("Error updating user {} status during removal: {}", user_ID, e.what());
+        }
         log_info("Destroyed all connections for user: {}", user_ID);
     } else {
         log_debug("No connections found for user: {}", user_ID);

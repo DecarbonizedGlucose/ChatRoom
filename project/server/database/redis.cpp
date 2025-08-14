@@ -7,42 +7,42 @@
 RedisController::RedisController()
     : redis_conn("tcp://127.0.0.1:6379") {}
 
-bool RedisController::cache_chat_message(const std::string& serialized_msg) {
-    try {
-        redis_conn.rpush("chat:messages", serialized_msg);
-        return true;
-    } catch (const sw::redis::Error &err) {
-        log_error("Failed to cache chat message: {}", err.what());
-        return false;
-    }
-}
+// bool RedisController::cache_chat_message(const std::string& serialized_msg) {
+//     try {
+//         redis_conn.rpush("chat:messages", serialized_msg);
+//         return true;
+//     } catch (const sw::redis::Error &err) {
+//         log_error("Failed to cache chat message: {}", err.what());
+//         return false;
+//     }
+// }
 
-std::vector<std::string> RedisController::pop_chat_messages_batch(size_t count) {
-    std::vector<std::string> messages;
-    try {
-        // 先取
-        redis_conn.lrange("chat:messages", 0, count - 1, std::back_inserter(messages));
+// std::vector<std::string> RedisController::pop_chat_messages_batch(size_t count) {
+//     std::vector<std::string> messages;
+//     try {
+//         // 先取
+//         redis_conn.lrange("chat:messages", 0, count - 1, std::back_inserter(messages));
 
-        // 再删（相当于 pop 掉前 count 个元素）
-        if (!messages.empty()) {
-            redis_conn.ltrim("chat:messages", messages.size(), -1);
-        }
-    } catch (const sw::redis::Error &err) {
-        // 出错时返回空
-        log_error("Failed to pop chat messages batch: {}", err.what());
-        messages.clear();
-    }
-    return messages;
-}
+//         // 再删（相当于 pop 掉前 count 个元素）
+//         if (!messages.empty()) {
+//             redis_conn.ltrim("chat:messages", messages.size(), -1);
+//         }
+//     } catch (const sw::redis::Error &err) {
+//         // 出错时返回空
+//         log_error("Failed to pop chat messages batch: {}", err.what());
+//         messages.clear();
+//     }
+//     return messages;
+// }
 
-size_t RedisController::get_chat_message_queue_size() {
-    try {
-        return redis_conn.llen("chat:messages");
-    } catch (const sw::redis::Error &err) {
-        log_error("Failed to get chat message queue size: {}", err.what());
-        return 0;
-    }
-}
+// size_t RedisController::get_chat_message_queue_size() {
+//     try {
+//         return redis_conn.llen("chat:messages");
+//     } catch (const sw::redis::Error &err) {
+//         log_error("Failed to get chat message queue size: {}", err.what());
+//         return 0;
+//     }
+// }
 
 
 std::pair<bool, std::time_t> RedisController::get_user_status(const std::string& user_ID) {
