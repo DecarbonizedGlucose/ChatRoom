@@ -18,13 +18,6 @@
 业务逻辑参考QQ、微信、telegram等热门即时通讯软件。
 
 在聊天界面使用`/up file_path`发送文件，用`/down File_ID local_path/file.name`下载文件。
-
-在关系列表中可使用一系列命令
-`/delete [friend ID]` `/block [friend ID]` `/unblock [friend ID]`
-`/quit [group ID]` `/disband [group ID]` `/remove_admin [group ID] [member ID]`
-`/add_admin [group ID] [member ID]` `/create_group [group_name]`
-`/show_members [group ID]` `/show_admins [group ID]`
-`/invite [group ID] [friend ID]` `/remove_member [group_ID] [member_ID]`
 其他操作按照导航提示即可。
 
 
@@ -32,7 +25,7 @@
 
 ## 项目架构
 
-![proj](./source/proj.png)
+![proj](https://github.com/user-attachments/assets/f1eb35b2-65ae-45db-9416-01ed7aa19271)
 
 
 
@@ -97,7 +90,6 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 │   │   ├── chat
 │   │   │   ├── cfile_manager.cpp
 │   │   │   ├── CommManager.cpp
-│   │   │   ├── init_db.sql
 │   │   │   ├── output.cpp
 │   │   │   ├── sqlite.cpp
 │   │   │   └── winloop.cpp
@@ -137,7 +129,6 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 │   │       ├── action.hpp
 │   │       ├── command.hpp
 │   │       ├── file.hpp
-│   │       ├── group.hpp
 │   │       ├── logging.hpp
 │   │       ├── safe_deque.hpp
 │   │       ├── safe_queue.hpp
@@ -179,19 +170,22 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 │       ├── TcpServerConnection.cpp
 │       ├── TcpServer.cpp
 │       └── TopServer.cpp
-└── README.md
+├── README.md
+└── sql
+    ├── client_init.sql
+    └── server_init.sql
 
-17 directories, 74 files
+18 directories, 74 files
 ~~~
-项目C++代码近9000行。`protobuf`文件也编译为`.cc` `.h`，这些已排除在外。
+项目C++代码9400行。`protobuf`文件也编译为`.cc` `.h`，这些已排除在外。
 ~~~
----------------------------------------------------------------------
-Language           files          blank        comment           code
----------------------------------------------------------------------
-C++                   24            854            589           7100
-C/C++ Header          30            440            239           1811
----------------------------------------------------------------------
-SUM:                  54           1294            828           8911
----------------------------------------------------------------------
+--------------------------------------------------------------------
+Language          files          blank        comment           code
+--------------------------------------------------------------------
+C++                  24            884            684           7615
+C/C++ Header         29            441            219           1825
+--------------------------------------------------------------------
+SUM:                 53           1325            903           9440
+--------------------------------------------------------------------
 ~~~
 
