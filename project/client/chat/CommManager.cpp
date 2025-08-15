@@ -697,7 +697,6 @@ void CommManager::handle_reply_heartbeat() {
         handle_send_command(Action::HEARTBEAT, cache.user_ID, {});
     else
         handle_send_command(Action::HEARTBEAT, cache.temp_user_ID, {});
-    std::cout << "发送了心跳包" << std::endl;
 }
 
 void CommManager::stop_receivers() {

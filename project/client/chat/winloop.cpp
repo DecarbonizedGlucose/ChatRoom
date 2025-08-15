@@ -127,7 +127,6 @@ void WinLoop::init() {
                 pool->submit([cmd, this](){
                     log_debug("Received command: action={}, sender={}",
                         static_cast<int>(cmd.action()), cmd.sender());
-                    std::cout << "Action = " << static_cast<int>(cmd.action()) << std::endl;
                     this->dispatch_cmd(cmd); // 分发给不同的处理函数
                 });
             } catch (const std::exception& e) {
@@ -143,8 +142,6 @@ void WinLoop::init() {
         );
         comm->send_nb(i, str);
     }
-    std::cout << "temp id=" << id << std::endl;
-    pause();
 }
 
 WinLoop::~WinLoop() {
@@ -332,7 +329,6 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
             return;
         }
         case Action::HEARTBEAT: {             // 心跳检测
-            std::cout << "收到了心跳包" << std::endl;
             comm->handle_reply_heartbeat();
             return;
         }
