@@ -385,7 +385,7 @@ bool SQLiteController::cache_chat_message(
     const std::string& sender_ID,
     const std::string& receiver_ID,
     bool is_group,
-    std::time_t timestamp,
+    std::int64_t timestamp,
     const std::string& text_content,
     bool pin,
     const std::string& file_name,

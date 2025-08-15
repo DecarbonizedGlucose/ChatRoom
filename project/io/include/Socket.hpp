@@ -111,6 +111,7 @@ public:
     bool connect();
     bool disconnect();
     bool is_connected() const;
+    std::string get_local_ip() const;
 };
 
 class ListenSocket : public Socket {

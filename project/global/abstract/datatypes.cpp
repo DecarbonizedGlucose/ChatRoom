@@ -1,4 +1,4 @@
-
+#include "../include/time_utils.hpp"
 #include "datatypes.hpp"
 #include <iostream>
 #include <ctime>
@@ -9,7 +9,7 @@ ChatMessage create_chat_message(
     const std::string& sender,
     const std::string& receiver,
     const bool is_group_msg,
-    const std::time_t timestamp,
+    const std::int64_t timestamp,
     const std::string& text,
     const bool pin,
     const std::string& file_name,
@@ -47,7 +47,7 @@ std::string create_message_string(
     const std::string& sender,
     const std::string& receiver,
     const bool is_group_msg,
-    const std::time_t timestamp,
+    const std::int64_t timestamp,
     const std::string& text,
     const bool pin,
     const std::string& file_name,
@@ -61,6 +61,9 @@ std::string create_message_string(
 
 ChatMessage get_chat_message(const std::string& proto_str) {
     Envelope env;
+    if (proto_str.empty()) {
+        return ChatMessage();
+    }
     if (!env.ParseFromString(proto_str)) {
         throw std::runtime_error("Failed to parse Envelope from received data");
     }
@@ -133,6 +136,9 @@ std::string create_command_string(
 
 CommandRequest get_command_request(const std::string& proto_str) {
     Envelope env;
+    if (proto_str.empty()) {
+        return CommandRequest();
+    }
     if (!env.ParseFromString(proto_str)) {
         throw std::runtime_error("Failed to parse Envelope from received data");
     }
@@ -201,13 +207,13 @@ FileChunk get_file_chunk(const std::string& proto_str) {
 SyncItem create_sync_item(
     SyncItem::SyncType type,
     const std::string& content,
-    std::time_t timestamp
+    std::int64_t timestamp
 ) {
     SyncItem item;
     item.set_type(type);
     item.set_content(content);
     if (timestamp == 0) {
-        timestamp = std::time(nullptr); // 如果没有提供时间戳, 使用当前时间
+        timestamp = now_us();
     }
     item.set_timestamp(timestamp);
     return item;
@@ -226,7 +232,7 @@ std::string get_sync_string(const SyncItem& item) {
 std::string create_sync_string(
     SyncItem::SyncType type,
     const std::string& content,
-    std::time_t timestamp
+    std::int64_t timestamp
 ) {
     auto item = create_sync_item(type, content, timestamp);
     return get_sync_string(item);

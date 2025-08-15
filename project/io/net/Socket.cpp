@@ -295,6 +295,25 @@ bool CSocket::disconnect() {
     return true;
 }
 
+std::string CSocket::get_local_ip() const {
+    if (fd < 0) {
+        log_error("CSocket: Invalid socket for getting local IP");
+        return "";
+    }
+    struct sockaddr_in local_addr;
+    socklen_t addr_len = sizeof(local_addr);
+    if (getsockname(fd, reinterpret_cast<struct sockaddr*>(&local_addr), &addr_len) < 0) {
+        log_error("CSocket: Failed to get local address: {}", strerror(errno));
+        return "";
+    }
+    char ip_str[INET_ADDRSTRLEN];
+    if (inet_ntop(AF_INET, &local_addr.sin_addr, ip_str, sizeof(ip_str)) == nullptr) {
+        log_error("CSocket: Failed to convert local IP to string: {}", strerror(errno));
+        return "";
+    }
+    return std::string(ip_str);
+}
+
 /* ----- ListenSocket ----- */
 
 LSocket::ListenSocket(bool nonblock) : Socket(socket(AF_INET, SOCK_STREAM, 0), nonblock) {

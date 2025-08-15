@@ -37,6 +37,7 @@ void TopClient::launch() {
     // 初始化线程池
     pool->init();
     // 启动命令行界面
+    winloop->init();
     winloop->run();
     stop();
     return;

@@ -33,6 +33,8 @@ void try_send(ConnectionManager* conn_manager,
         // 数据发送成功
         if (!conn->user_ID.empty())
             conn_manager->update_user_activity(conn->user_ID);
+        else
+            conn_manager->update_user_activity(conn->temp_user_ID);
         log_debug("Sent immediately to fd={}, bytes={}, user_ID={}", conn->socket->get_fd(), sent, conn->user_ID);
     } else {
         // 发送出错 (sent < 0)
@@ -232,8 +234,12 @@ void CommandHandler::handle_recv(
             handle_remember_connection(conn, subj, std::stoi(args[0]));
             break;
         }
+        case Action::Set_Temp_Connection: {
+            handle_set_temp_connection(conn, subj, std::stoi(args[0]));
+            break;
+        }
         case Action::Online_Init: {
-            handle_online_init(subj);
+            handle_online_init(subj, conn);
             break;
         }
         default: {
@@ -327,9 +333,19 @@ void CommandHandler::handle_sign_out(const std::string& user_ID) {
     } catch (const std::exception& e) {
         log_error("Error getting friends list for user {} during logout: {}", user_ID, e.what());
     }
-
+    auto conn_0 = disp->conn_manager->get_connection(user_ID, 0);
+    auto conn_1 = disp->conn_manager->get_connection(user_ID, 1);
+    auto conn_2 = disp->conn_manager->get_connection(user_ID, 2);
+    if (conn_0) conn_0->user_ID.clear();
+    if (conn_1) conn_1->user_ID.clear();
+    if (conn_2) conn_2->user_ID.clear();
     // 最后删除用户连接（这会删除所有相关的连接对象）
     disp->conn_manager->remove_user(user_ID);
+    // 重新进入未登录状态
+    // 临时ID会一直存在，不影响其他部分
+    disp->conn_manager->add_temp_conn(conn_0, 0);
+    disp->conn_manager->add_temp_conn(conn_1, 1);
+    disp->conn_manager->add_temp_conn(conn_2, 2);
     log_info("User {} signed out successfully", user_ID);
 }
 
@@ -403,7 +419,7 @@ void CommandHandler::handle_unregister(const std::string& user_ID, CommandReques
                 auto env_out = create_command_string(
                     Action::Remove_Friend,
                     user_ID,
-                    {TimeUtils::current_time_string(), friend_ID}
+                    {current_time_string(), friend_ID}
                 );
                 try_send(disp->conn_manager, friend_conn, env_out);
             }
@@ -436,7 +452,7 @@ void CommandHandler::handle_unregister(const std::string& user_ID, CommandReques
             auto disband_msg = create_command_string(
                 Action::Disband_Group,
                 user_ID,
-                {TimeUtils::current_time_string(), group_ID}
+                {current_time_string(), group_ID}
             );
             for (const auto& member_ID : members) {
                 if (member_ID == user_ID) continue;
@@ -462,7 +478,7 @@ void CommandHandler::handle_unregister(const std::string& user_ID, CommandReques
             auto leave_msg = create_command_string(
                 Action::Leave_Group,
                 user_ID,
-                {TimeUtils::current_time_string(), group_ID}
+                {current_time_string(), group_ID}
             );
             for (const auto& member_ID : members) {
                 if (member_ID == user_ID) continue;
@@ -1231,8 +1247,17 @@ void CommandHandler::handle_remember_connection(
     log_info("Remembered {}'s conn[{}] fd: {}", user_ID, server_index, conn->socket->get_fd());
 }
 
-void CommandHandler::handle_online_init(const std::string& user_ID) {
+void CommandHandler::handle_set_temp_connection(
+        TcpServerConnection* conn, const std::string& temp_user_ID, int server_index) {
+    log_info("handle_set_temp_connection called for temp_user_ID: {}, server_index: {}", temp_user_ID, server_index);
+    conn->temp_user_ID = temp_user_ID;
+    disp->conn_manager->add_temp_conn(conn, server_index);
+    log_info("Set {}'s conn[{}] fd: {}", temp_user_ID, server_index, conn->socket->get_fd());
+}
+
+void CommandHandler::handle_online_init(const std::string& user_ID, TcpServerConnection* conn) {
     log_debug("handle_online_init called for user: {}", user_ID);
+    disp->conn_manager->remove_user(conn->temp_user_ID);
     json relation_data; // 用于存储关系网数据
     json blocked_info;
     get_relation_net(user_ID, relation_data);
@@ -1287,7 +1312,7 @@ void CommandHandler::handle_post_offline_messages(const std::string& user_ID) {
         std::vector<ChatMessage> chat_messages;
 
         // 获取用户的last_active时间
-        std::time_t last_active = disp->mysql_con->get_user_last_active(user_ID);
+        std::int64_t last_active = disp->mysql_con->get_user_last_active(user_ID);
         if (last_active == 0) {
             // 理论上是初次登录
             log_debug("No last_active time found for user {}, sending empty offline messages", user_ID);

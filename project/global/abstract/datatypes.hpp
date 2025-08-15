@@ -27,7 +27,7 @@ ChatMessage create_chat_message(
     const std::string& sender,
     const std::string& receiver,
     const bool is_group_msg,
-    const std::time_t timestamp,
+    const std::int64_t timestamp,
     const std::string& text,
     const bool pin = false,
     const std::string& file_name = "",
@@ -41,7 +41,7 @@ std::string create_message_string(
     const std::string& sender,
     const std::string& receiver,
     const bool is_group_msg,
-    const std::time_t timestamp,
+    const std::int64_t timestamp,
     const std::string& text,
     const bool pin = false,
     const std::string& file_name = "",
@@ -112,7 +112,7 @@ FileChunk get_file_chunk(const std::string& proto_str);
 SyncItem create_sync_item(
     SyncItem::SyncType type,
     const std::string& content,
-    std::time_t timestamp = 0
+    std::int64_t timestamp = 0
 );
 
 std::string get_sync_string(const SyncItem& item);
@@ -120,7 +120,7 @@ std::string get_sync_string(const SyncItem& item);
 std::string create_sync_string(
     SyncItem::SyncType type,
     const std::string& content,
-    std::time_t timestamp = 0
+    std::int64_t timestamp = 0
 );
 
 SyncItem get_sync_item(const std::string& proto_str);

@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include "TcpServerConnection.hpp"
 
 class Dispatcher;
@@ -38,6 +39,7 @@ public:
         }
     }
 
+    void add_temp_conn(TcpServerConnection* conn, int server_index);
     void add_conn(TcpServerConnection* conn, int server_index);
     void remove_user(std::string user_ID);
     void destroy_connection(std::string user_ID);

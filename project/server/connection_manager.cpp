@@ -35,6 +35,36 @@ void ConnectionManager::add_conn(TcpServerConnection* conn, int server_index) {
     }
 }
 
+void ConnectionManager::add_temp_conn(TcpServerConnection* conn, int server_index) {
+    if (conn == nullptr) {
+        log_error("Attempted to add null connection for server_index: {}", server_index);
+        return;
+    }
+
+    if (server_index < 0 || server_index >= 3) {
+        log_error("Invalid server_index: {} for user: {}", server_index, conn->temp_user_ID);
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(user_mutex);
+
+    // 如果该位置已有连接, 先安全清理
+    if (user_connections[conn->temp_user_ID][server_index] != nullptr) {
+        log_info("Replacing existing connection {} for user: {}", server_index, conn->temp_user_ID);
+        delete user_connections[conn->temp_user_ID][server_index];
+    }
+
+    // 添加新连接
+    user_connections[conn->temp_user_ID][server_index] = conn;
+
+    try {
+        disp->redis_con->set_user_status(conn->temp_user_ID, true);
+        log_info("Added connection {} for user: {}", server_index, conn->temp_user_ID);
+    } catch (const std::exception& e) {
+        log_error("Error updating user {} status during connection add: {}", conn->temp_user_ID, e.what());
+    }
+}
+
 void ConnectionManager::remove_user(std::string user_ID) {
     std::lock_guard<std::mutex> lock(user_mutex);
     auto it = user_connections.find(user_ID);
@@ -43,20 +73,16 @@ void ConnectionManager::remove_user(std::string user_ID) {
         return; // 用户已经被移除或不存在
     }
 
-    // 删除标记
-    for (int i = 0; i < 3; ++i) {
-        if (it->second[i] != nullptr) {
-            it->second[i]->user_ID.clear();
-        }
-    }
-
     // 从映射表中移除用户
     user_connections.erase(it);
 
     // 更新用户状态（在锁内进行, 保证一致性）
     try {
         disp->redis_con->set_user_status(user_ID, false);
-        disp->mysql_con->update_user_status(user_ID, false);
+        if (user_ID[0] != '_') // 不是临时用户名
+            disp->mysql_con->update_user_status(user_ID, false);
+        else
+            disp->redis_con->del_user_status(user_ID);
         log_info("Successfully removed user: {}", user_ID);
     } catch (const std::exception& e) {
         log_error("Error updating user {} status during removal: {}", user_ID, e.what());
@@ -77,7 +103,10 @@ void ConnectionManager::destroy_connection(std::string user_ID) {
         user_connections.erase(it);
         try {
             disp->redis_con->set_user_status(user_ID, false);
-            disp->mysql_con->update_user_status(user_ID, false);
+            if (user_ID[0] != '_')
+                disp->mysql_con->update_user_status(user_ID, false);
+            else
+                disp->redis_con->del_user_status(user_ID);
             log_info("Successfully removed user: {}", user_ID);
         } catch (const std::exception& e) {
             log_error("Error updating user {} status during removal: {}", user_ID, e.what());
@@ -150,8 +179,8 @@ void ConnectionManager::check_user_timeouts() {
         }
     }
 
-    std::vector<std::string> users_to_remove;
-    users_to_remove.reserve(all_users.size()); // 预分配空间
+    std::vector<std::string> users_to_destroy;
+    users_to_destroy.reserve(all_users.size()); // 预分配空间
 
     // 在锁外进行Redis检查, 避免长时间持锁
     for (const auto& user_ID : all_users) {
@@ -159,42 +188,44 @@ void ConnectionManager::check_user_timeouts() {
             // 检查用户状态, 如果last_active时间过长则移除
             auto status = disp->redis_con->get_user_status(user_ID);
             bool is_online = status.first;
-            std::time_t last_active = status.second;
+            std::int64_t last_active = status.second;
 
             if (is_online) {
-                auto now = std::time(nullptr);
+                auto now = now_us();
                 auto inactive_time = now - last_active;
 
-                if (inactive_time > 90) { // 90秒超时
-                    users_to_remove.push_back(user_ID);
-                    log_info("User {} timed out ({}s inactive), marking for removal", user_ID, inactive_time);
-                } else if (inactive_time > 30) { // 30秒发送心跳
+                constexpr std::int64_t TIMEOUT_US = 90LL * 1000000;
+                constexpr std::int64_t HEARTBEAT_US = 30LL * 1000000;
+                if (inactive_time > TIMEOUT_US) { // 90秒超时（微秒）
+                    users_to_destroy.push_back(user_ID);
+                    log_info("User {} timed out ({}us inactive), marking for removal", user_ID, inactive_time);
+                } else if (inactive_time > HEARTBEAT_US) { // 30秒发送心跳（微秒）
                     send_heartbeat_to_user(user_ID);
                 }
             } else {
                 // 用户已离线, 标记移除
-                users_to_remove.push_back(user_ID);
+                users_to_destroy.push_back(user_ID);
                 log_debug("User {} is offline, marking for removal", user_ID);
             }
         } catch (const std::exception& e) {
             log_error("Error checking status for user {}: {}", user_ID, e.what());
             // 发生错误时也标记移除, 避免僵尸连接
-            users_to_remove.push_back(user_ID);
+            users_to_destroy.push_back(user_ID);
         }
     }
 
     // 批量移除超时用户
-    for (const auto& user_ID : users_to_remove) {
+    for (const auto& user_ID : users_to_destroy) {
         try {
             disp->redis_con->set_user_status(user_ID, false);
-            remove_user(user_ID); // remove_user内部已有锁保护
+            destroy_connection(user_ID);
         } catch (const std::exception& e) {
             log_error("Error removing user {}: {}", user_ID, e.what());
         }
     }
 
-    if (!users_to_remove.empty()) {
-        log_info("Heartbeat check completed: removed {} users", users_to_remove.size());
+    if (!users_to_destroy.empty()) {
+        log_info("Heartbeat check completed: removed {} users", users_to_destroy.size());
     }
 }
 
@@ -205,7 +236,7 @@ void ConnectionManager::send_heartbeat_to_user(const std::string& user_ID) {
             std::string heartbeat_cmd = create_command_string(Action::HEARTBEAT, "", {});
             try_send(this, cmd_conn, heartbeat_cmd);
         } else {
-            log_debug("Skipping heartbeat for user {} - command connection not available", user_ID);
+            log_debug("Skipping heartbeat for user {} : connection[1] is nullptr", user_ID);
         }
     } catch (const std::exception& e) {
         log_error("Exception while sending heartbeat to user {}: {}", user_ID, e.what());

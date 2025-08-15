@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <iterator>
+#include "../../global/include/time_utils.hpp"
 
 RedisController::RedisController()
     : redis_conn("tcp://127.0.0.1:6379") {}
@@ -45,7 +46,7 @@ RedisController::RedisController()
 // }
 
 
-std::pair<bool, std::time_t> RedisController::get_user_status(const std::string& user_ID) {
+std::pair<bool, std::int64_t> RedisController::get_user_status(const std::string& user_ID) {
     auto key = "chat:user:" + user_ID + ":status";
     auto val = redis_conn.get(key);
     if (!val) {
@@ -53,7 +54,7 @@ std::pair<bool, std::time_t> RedisController::get_user_status(const std::string&
     }
     auto jval = json::parse(*val);
     bool online = jval["online"];
-    std::time_t last_active = jval["last_active"];
+    std::int64_t last_active = jval["last_active"];
     return {online, last_active};
 }
 
@@ -61,9 +62,14 @@ void RedisController::set_user_status(const std::string& user_ID, bool online) {
     auto key = "chat:user:" + user_ID + ":status";
     json jval = {
         {"online", online},
-        {"last_active", std::time(nullptr)}
+        {"last_active", now_us()}
     };
     redis_conn.set(key, jval.dump());
+}
+
+void RedisController::del_user_status(const std::string& user_ID) {
+    auto key = "chat:user:" + user_ID + ":status";
+    redis_conn.del(key);
 }
 
 void RedisController::set_veri_code(const std::string& user_email, const std::string& veri_code) {

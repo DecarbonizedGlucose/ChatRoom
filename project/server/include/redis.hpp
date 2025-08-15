@@ -65,9 +65,11 @@ public:
 
 /* ==================== 用户状态 ==================== */
 
-    std::pair<bool, std::time_t> get_user_status(const std::string& user_ID);
+    std::pair<bool, std::int64_t> get_user_status(const std::string& user_ID);
 
     void set_user_status(const std::string& user_ID, bool online);
+
+    void del_user_status(const std::string& user_ID);
 
 /* ==================== 验证码 ==================== */
 

@@ -43,7 +43,11 @@ namespace {
     // 用户名合规性
     bool is_username_valid(const std::string& user_ID) {
         // 只能包含字母、数字和下划线, 长度在5-20位之间
+        // 不能以Group_或者下划线开头
         if (user_ID.length() < 5 || user_ID.length() > 20) {
+            return false;
+        }
+        if (user_ID.find("Group_", 0) == 0 || user_ID[0] == '_') {
             return false;
         }
         for (char c : user_ID) {
@@ -88,6 +92,61 @@ namespace {
 WinLoop::WinLoop(CommManager* comm, thread_pool* pool)
     : current_page(UIPage::Start), comm(comm), pool(pool) {}
 
+void WinLoop::init() {
+    running = true;
+    // 生成临时ID
+    auto id = "_" + std::to_string(now_us()) + "_";
+    auto ip = comm->clients[0]->socket->get_local_ip();
+    id += ip + '_';
+    comm->cache.temp_user_ID = id; // 设置临时ID = _time_ip_ 太丑陋了
+    // Message, Command循环读, Data适时读, 所有通道适时写
+    pool->submit([&]{
+        comm->clients[0]->socket->set_nonblocking();
+        while (running) {
+            try {
+                auto msg = comm->handle_receive_message();
+                if (!msg.timestamp()) {
+                    continue;
+                }
+                pool->submit([msg, this](){
+                    this->comm->handle_manage_message(msg); // 直接调用处理
+                });
+            } catch (const std::exception& e) {
+                log_error("Error occurred while processing message: {}", e.what());
+            }
+        }
+    });
+    pool->submit([&]{
+        comm->clients[1]->socket->set_nonblocking();
+        while (running) {
+            try {
+                auto cmd = comm->handle_receive_command();
+                if (cmd.action() == 0) { // 0 是sign in，这里表示空
+                    continue;
+                }
+                pool->submit([cmd, this](){
+                    log_debug("Received command: action={}, sender={}",
+                        static_cast<int>(cmd.action()), cmd.sender());
+                    std::cout << "Action = " << static_cast<int>(cmd.action()) << std::endl;
+                    this->dispatch_cmd(cmd); // 分发给不同的处理函数
+                });
+            } catch (const std::exception& e) {
+                log_error("Error occurred while processing command: {}", e.what());
+            }
+        }
+    });
+    for (int i=0; i<3; ++i) { // 服务器三合一认证
+        auto str = create_command_string(
+            Action::Set_Temp_Connection,
+            comm->cache.temp_user_ID,
+            {std::to_string(i)}
+        );
+        comm->send_nb(i, str);
+    }
+    std::cout << "temp id=" << id << std::endl;
+    pause();
+}
+
 WinLoop::~WinLoop() {
     running = false;
 }
@@ -97,6 +156,17 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
     std::string sender = cmd.sender();
     auto args = cmd.args();
     switch (action) {
+        case Action::Accept_Post_Code:
+        case Action::Refuse_Post_Code:
+        case Action::Success_Auth:
+        case Action::Failed_Auth:
+        case Action::Accept_Regi:
+        case Action::Refuse_Regi:
+        case Action::Accept_Login:
+        case Action::Refuse_Login: {
+            comm->cache.real_time_notices.push(cmd);
+            return;
+        }
         case Action::Add_Friend_Req: {        // 处理好友请求
             comm->print_request_notice();
             comm->cache.requests.push(cmd);
@@ -262,6 +332,7 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
             return;
         }
         case Action::HEARTBEAT: {             // 心跳检测
+            std::cout << "收到了心跳包" << std::endl;
             comm->handle_reply_heartbeat();
             return;
         }
@@ -273,7 +344,6 @@ void WinLoop::dispatch_cmd(const CommandRequest& cmd) {
 }
 
 void WinLoop::run() {
-    running = true;
     while (running) { // 状态机比那循环嵌套好看多了
         switch (current_page) {
             case UIPage::Start:
@@ -359,12 +429,19 @@ void WinLoop::login_loop() { // 改进用email/ID均可登录, 并返回另一�
 
         // 传给服务器
         try {
-            comm->handle_send_command(Action::Sign_In, user, {password_hash}, false);
+            comm->handle_send_command(Action::Sign_In, user, {password_hash});
             log_info("Login command sent successfully");
 
             // 读取服务器响应
             std::cout << "正在登录, 请稍候..." << std::endl;
-            CommandRequest resp = comm->handle_receive_command(false);
+            CommandRequest resp;
+            bool got = comm->cache.real_time_notices.wait_for_and_pop(resp, std::chrono::seconds(5));
+            if (!got) {
+                std::cout << "登录超时，请重试。" << std::endl;
+                log_error("Login timeout for user: {}", user);
+                pause();
+                continue;
+            }
             log_info("Received response from server: action={}", resp.action());
 
             if (resp.action() == static_cast<int>(Action::Accept_Login)) {
@@ -416,10 +493,18 @@ void WinLoop::register_loop() {
             break;
         }
         // 发送验证码请求
-        comm->handle_send_command(Action::Get_Veri_Code, email, {}, false);
+        comm->handle_send_command(Action::Get_Veri_Code, email, {});
         log_info("Sent veri code request");
         // 读取服务器响应
-        CommandRequest resp = comm->handle_receive_command(false);
+        CommandRequest resp;
+        bool got = comm->cache.real_time_notices.wait_for_and_pop(resp, std::chrono::seconds(5));
+        if (!got) {
+            std::cout << "获取验证码超时，请重试。" << std::endl;
+            log_error("Get verification code timeout for email: {}", email);
+            pause();
+            continue;
+        }
+
         log_info("Received veri code response");
         int action_ = resp.action();
         if (action_ != static_cast<int>(Action::Accept_Post_Code)) {
@@ -438,9 +523,16 @@ void WinLoop::register_loop() {
             break;
         }
         // 发送验证码
-        comm->handle_send_command(Action::Authentication, email, {veri_code}, false);
+        comm->handle_send_command(Action::Authentication, email, {veri_code});
         // 读取服务器响应
-        CommandRequest auth_resp = comm->handle_receive_command(false);
+        CommandRequest auth_resp;
+        got = comm->cache.real_time_notices.wait_for_and_pop(auth_resp, std::chrono::seconds(5));
+        if (!got) {
+            std::cout << "身份验证超时，请重试。" << std::endl;
+            log_error("Authentication timeout for email: {}", email);
+            pause();
+            continue;
+        }
         if (auth_resp.action() != static_cast<int>(Action::Success_Auth)) {
             std::cout << "身份验证失败：" << auth_resp.args(0) << std::endl;
             pause();
@@ -456,8 +548,15 @@ void WinLoop::register_loop() {
             }
             // 检验用户名唯一性
             std::cout << "正在检查用户名唯一性..." << std::endl;
-            comm->handle_send_command(Action::Search_Person, "", {username}, false);
-            CommandRequest search_resp = comm->handle_receive_command(false);
+            comm->handle_send_command(Action::Search_Person, "", {username});
+            CommandRequest search_resp;
+            got = comm->cache.real_time_notices.wait_for_and_pop(search_resp, std::chrono::seconds(5));
+            if (!got) {
+                std::cout << "检查用户名唯一性超时，请重试。" << std::endl;
+                print_input_sign();
+                log_error("Check username uniqueness timeout for username: {}", username);
+                continue;
+            }
             if (search_resp.action() == static_cast<int>(Action::Notify_Exist)) {
                 std::cout << "用户名已存在, 请重新输入：" << std::endl;
                 print_input_sign();
@@ -481,10 +580,17 @@ void WinLoop::register_loop() {
         }
         std::string password_hash = hash_password(password);
         // 发送注册请求
-        comm->handle_send_command(Action::Register, email, {username, password_hash}, false);
+        comm->handle_send_command(Action::Register, email, {username, password_hash});
         log_info("Sent registration request");
         // 读取服务器响应
-        CommandRequest reg_resp = comm->handle_receive_command(false);
+        CommandRequest reg_resp;
+        got = comm->cache.real_time_notices.wait_for_and_pop(reg_resp, std::chrono::seconds(5));
+        if (!got) {
+            std::cout << "注册请求超时，请重试。" << std::endl;
+            log_error("Registration request timeout");
+            print_input_sign();
+            continue;
+        }
         log_info("Received registration response");
         if (reg_resp.action() == static_cast<int>(Action::Accept_Regi)) {
             log_info("Successfully registered");
@@ -510,34 +616,7 @@ void WinLoop::main_init() {
     // tcp连接认证, server端：handle_remember_connection
     comm->handle_send_id();
     // 发送初始化请求
-    comm->handle_send_command(Action::Online_Init, comm->cache.user_ID, {}, false);
-
-    // Message, Command循环读, Data适时读, 所有通道适时写
-    pool->submit([&]{
-    comm->clients[0]->socket->set_nonblocking();
-    comm->rx_running_msg = true;
-    while (comm->online) {
-            auto msg = comm->handle_receive_message();
-            pool->submit([this, msg](){
-                comm->handle_manage_message(msg); // 直接调用处理
-            });
-        }
-    comm->rx_running_msg = false;
-    });
-    pool->submit([&]{
-    comm->clients[1]->socket->set_nonblocking();
-    comm->rx_running_cmd = true;
-    while (comm->online) {
-            auto cmd = comm->handle_receive_command();
-            pool->submit([this, cmd](){
-                log_debug("Received command: action={}, sender={}",
-                    static_cast<int>(cmd.action()), cmd.sender());
-                dispatch_cmd(cmd); // 分发给不同的处理函数
-            });
-        }
-    comm->rx_running_cmd = false;
-    });
-
+    comm->handle_send_command(Action::Online_Init, comm->cache.user_ID, {});
     // 拉取关系网
     std::cout << "正在拉取关系网..." << std::endl;
     comm->handle_get_relation_net();
@@ -638,7 +717,7 @@ void WinLoop::chat_loop() {
     std::string input;
     bool chatting = true;
     // 记录该会话已渲染的最新时间戳，用于去重
-    std::time_t last_ts = 0;
+    std::int64_t last_ts = 0;
     if (!history.empty()) {
         last_ts = history.back().timestamp();
     }
@@ -926,7 +1005,7 @@ void WinLoop::request_loop() {
                 if (query()) {
                     comm->handle_send_command(Action::Accept_FReq,
                         comm->cache.user_ID,
-                        {TimeUtils::current_time_string(),
+                        {current_time_string(),
                         cmd.sender()}, false);
                     std::cout << "已同意好友请求。" << std::endl;
                     // 写入本地
@@ -934,7 +1013,7 @@ void WinLoop::request_loop() {
                 } else {
                     comm->handle_send_command(Action::Refuse_FReq,
                         comm->cache.user_ID,
-                        {TimeUtils::current_time_string(),
+                        {current_time_string(),
                         cmd.sender()}, false);
                     std::cout << "已拒绝好友请求。" << std::endl;
                 }
@@ -947,7 +1026,7 @@ void WinLoop::request_loop() {
                 if (query()) {
                     comm->handle_send_command(Action::Accept_GReq,
                         comm->cache.user_ID,
-                        {TimeUtils::current_time_string(),
+                        {current_time_string(),
                         cmd_id}, false);
                     // 接收处理情况
                     CommandRequest resp;
@@ -968,7 +1047,7 @@ void WinLoop::request_loop() {
                 else {
                     comm->handle_send_command(Action::Refuse_GReq,
                         comm->cache.user_ID,
-                        {TimeUtils::current_time_string(),
+                        {current_time_string(),
                         cmd_id}, false);
                     // 接收处理情况
                     CommandRequest resp;
@@ -992,7 +1071,7 @@ void WinLoop::request_loop() {
                 if (query()) {
                     comm->handle_send_command(Action::Join_Group_Req,
                         comm->cache.user_ID,
-                        {TimeUtils::current_time_string(),
+                        {current_time_string(),
                         cmd.args(1)}, false);
                     std::cout << "已发送加入群聊请求，等待管理员同意。" << std::endl;
                 } else {
@@ -1049,7 +1128,7 @@ void WinLoop::my_lists_loop() {
                             // 发送添加好友请求
                             comm->handle_send_command(Action::Add_Friend_Req,
                                 comm->cache.user_ID,
-                                {TimeUtils::current_time_string(), user_ID}, false);
+                                {current_time_string(), user_ID}, false);
                             std::cout << "好友请求已发送！" << std::endl;
                         } else {
                             std::cout << "已取消发送好友请求。" << std::endl;
@@ -1095,7 +1174,7 @@ void WinLoop::my_lists_loop() {
                             // 发送加入群组请求
                             comm->handle_send_command(Action::Join_Group_Req,
                                 comm->cache.user_ID,
-                                { TimeUtils::current_time_string(),
+                                {current_time_string(),
                                 group_ID}, false);
                             std::cout << "已发送加入群组请求！" << std::endl;
                         } else {
@@ -1122,7 +1201,7 @@ void WinLoop::my_lists_loop() {
             } else {
                 comm->handle_send_command(Action::Remove_Friend,
                     comm->cache.user_ID,
-                    {TimeUtils::current_time_string(), user_ID}, false);
+                    {current_time_string(), user_ID}, false);
                 std::cout << "已删除好友。" << std::endl;
                 // 从本地缓存中删除
                 comm->handle_remove_friend(user_ID);
@@ -1187,7 +1266,7 @@ void WinLoop::my_lists_loop() {
                 // 发送退出群组请求
                 comm->handle_send_command(Action::Leave_Group,
                     comm->cache.user_ID,
-                    {TimeUtils::current_time_string(), group_ID}, false);
+                    {current_time_string(), group_ID}, false);
                 std::cout << "已退出群组。" << std::endl;
                 comm->handle_leave_group(group_ID);
             }
@@ -1207,7 +1286,7 @@ void WinLoop::my_lists_loop() {
                 // 发送解散群组请求
                 comm->handle_send_command(Action::Disband_Group,
                     comm->cache.user_ID,
-                    {TimeUtils::current_time_string(), group_ID}, false);
+                    {current_time_string(), group_ID}, false);
                 std::cout << "已发送解散群组请求。" << std::endl;
                 comm->handle_disband_group(group_ID);
             }
@@ -1242,7 +1321,7 @@ void WinLoop::my_lists_loop() {
                     // 发送移除管理员请求
                     comm->handle_send_command(Action::Remove_Admin,
                         comm->cache.user_ID,
-                        {TimeUtils::current_time_string(), group_ID, user_ID}, false);
+                        {current_time_string(), group_ID, user_ID}, false);
                     std::cout << "已发送移除管理员请求。" << std::endl;
                     comm->handle_remove_admin(group_ID, user_ID);
                 }
@@ -1278,7 +1357,7 @@ void WinLoop::my_lists_loop() {
                     // 发送添加管理员请求
                     comm->handle_send_command(Action::Add_Admin,
                         comm->cache.user_ID,
-                        {TimeUtils::current_time_string(), group_ID, user_ID}, false);
+                        {current_time_string(), group_ID, user_ID}, false);
                     std::cout << "已发送添加管理员请求。" << std::endl;
                     comm->handle_add_admin(group_ID, user_ID);
                 }
@@ -1301,7 +1380,7 @@ void WinLoop::my_lists_loop() {
                 // 发送创建群组请求
                 comm->handle_send_command(Action::Create_Group,
                     comm->cache.user_ID,
-                    {TimeUtils::current_time_string(), group_name}, false);
+                    {current_time_string(), group_name}, false);
                 std::cout << "已发送创建群组请求。" << std::endl;
                 // 等待服务器响应（最多等待5秒）
                 CommandRequest response;
@@ -1463,7 +1542,7 @@ void WinLoop::my_lists_loop() {
                     auto& group_name = comm->cache.group_list[group_ID].group_name;
                     comm->handle_send_command(Action::Invite_To_Group_Req,
                         comm->cache.user_ID,
-                        {TimeUtils::current_time_string(), group_ID, group_name, user_ID}, false);
+                        {current_time_string(), group_ID, group_name, user_ID}, false);
                     std::cout << "已发送邀请好友加入群聊，等待对方接受并申请入群。" << std::endl;
                 }
             }
@@ -1501,7 +1580,7 @@ void WinLoop::my_lists_loop() {
                 } else {
                     comm->handle_send_command(Action::Remove_From_Group,
                     comm->cache.user_ID,
-                        {TimeUtils::current_time_string(), group_ID, user_ID}, false);
+                        {current_time_string(), group_ID, user_ID}, false);
                     std::cout << "已发送移除成员请求。" << std::endl;
                     // 从本地缓存中删除
                     comm->handle_remove_person(group_ID, user_ID);
@@ -1553,7 +1632,6 @@ void WinLoop::my_loop() {
                 comm->cache.messages.clear();
                 comm->cache.new_messages.clear();
                 comm->cache.sorted_conversation_list.clear();
-                comm->stop_receivers();
                 switch_to(UIPage::Start);
                 return;
             } else {
@@ -1710,7 +1788,8 @@ void draw_register(std::mutex& mtx, int idx) {
             break;
         }
         case 3: {
-            std::cout << "用户名只能包含字母、数字和下划线, 长度在5-20位之间";
+            std::cout << "用户名只能包含字母、数字和下划线, 长度在5-20位之间" << std::endl;
+            std::cout << "不能以Group_或者下划线开头" << std::endl;
             std::cout << "用户名";
             print_input_sign();
             break;
@@ -1816,7 +1895,7 @@ std::string WinLoop::format_message(const ChatMessage& msg) {
     auto timestamp = msg.timestamp();
 
     // 转换时间戳为可读格式
-    std::time_t time_val = static_cast<std::time_t>(timestamp);
+    std::int64_t time_val = static_cast<std::int64_t>(timestamp);
     std::tm* tm_info = std::localtime(&time_val);
     char time_str[100];
     std::strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
@@ -1864,10 +1943,12 @@ void WinLoop::render_message(const ChatMessage& msg) {
     }
 
     // 时间戳转格式化时间
-    std::time_t t = msg.timestamp();
+    std::int64_t us_timestamp = msg.timestamp();
+    std::time_t sec = us_timestamp / 1000000; // 微秒转秒
     char time_buf[64];
-    std::strftime(time_buf, sizeof(time_buf), "%Y.%m.%d %H:%M:%S", std::localtime(&t));
-    std::string time_part = "<" + std::string(time_buf) + ">";
+    std::strftime(time_buf, sizeof(time_buf), "%Y.%m.%d %H:%M:%S", std::localtime(&sec));
+    int ms = (us_timestamp / 1000) % 1000;
+    std::string time_part = "<" + std::string(time_buf) + "." + std::to_string(ms) + ">";
 
     std::cout << '\r' << header << style(time_part, {ansi::BOLD, ansi::FG_GREEN}) << std::endl;
 

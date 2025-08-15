@@ -19,6 +19,7 @@ class ContactCache {
 public:
     // 用户
     std::string user_ID;
+    std::string temp_user_ID; // 这辈子没写过这么抽象的解法
     std::string user_email;
     std::string user_password_hash; // 存储密码哈希值
 
@@ -52,7 +53,7 @@ public:
         std::string name;            // 显示名称
         bool is_group = false;       // 是否为群聊
         std::string last_message;    // 最后一条消息
-        std::time_t last_time = 0;   // 最后消息时间
+        std::int64_t last_time = 0;   // 最后消息时间
         int unread_count = 0;        // 未读消息数
     };
     std::unordered_map<std::string, ConversationInfo> conversations;
@@ -81,9 +82,9 @@ class CommManager {
 public:
     //bool* cont = nullptr;
     std::atomic<bool> online = false;
-    // 后台接收线程运行标志（仅用于等待退出，防止再次登录时与阻塞读竞争）
-    std::atomic<bool> rx_running_msg{false};
-    std::atomic<bool> rx_running_cmd{false};
+    // // 后台接收线程运行标志（仅用于等待退出，防止再次登录时与阻塞读竞争）
+    // std::atomic<bool> rx_running_msg{false};
+    // std::atomic<bool> rx_running_cmd{false};
     SQLiteController* sqlite_con = nullptr;
     CFileManager* file_manager = nullptr;
     friend class WinLoop;

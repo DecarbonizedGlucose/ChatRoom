@@ -67,13 +67,13 @@ CREATE TABLE chat_commands (
         ON DELETE CASCADE
 );
 
-CREATE TABLE user_pending_commands ( # 保留
-    user_id VARCHAR(30) NOT NULL,
-    command_id INT NOT NULL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY(user_id, command_id),
-    FOREIGN KEY(user_id) REFERENCES users(user_id),
-    FOREIGN KEY(command_id) REFERENCES chat_commands(id)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
-);
+-- CREATE TABLE user_pending_commands ( # 保留
+--     user_id VARCHAR(30) NOT NULL,
+--     command_id INT NOT NULL,
+--     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     PRIMARY KEY(user_id, command_id),
+--     FOREIGN KEY(user_id) REFERENCES users(user_id),
+--     FOREIGN KEY(command_id) REFERENCES chat_commands(id)
+--         ON UPDATE CASCADE
+--         ON DELETE CASCADE
+-- );

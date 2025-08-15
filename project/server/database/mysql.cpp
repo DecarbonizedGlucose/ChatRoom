@@ -138,7 +138,7 @@ bool MySQLController::check_user_pswd(const std::string& email, const std::strin
 }
 
 void MySQLController::update_user_last_active(const std::string& email) {
-    std::string sql = "UPDATE users SET last_active = NOW() WHERE user_email = '"
+    std::string sql = "UPDATE users SET last_active = NOW(6) WHERE user_email = '"
         + normalize_email(email) + "';";
     execute(sql);
 }
@@ -388,7 +388,7 @@ bool MySQLController::add_chat_message(
     const std::string& sender_ID,
     const std::string& receiver_ID,
     bool is_to_group,
-    std::time_t timestamp,
+    std::int64_t timestamp,
     const std::string& text_content,
     bool pin,
     const std::string& file_name,
@@ -410,9 +410,9 @@ bool MySQLController::add_chat_message(
     return execute(sql);
 }
 
-std::vector<std::tuple<std::string, std::string, bool, std::time_t, std::string, bool, std::string, std::size_t, std::string>>
-MySQLController::get_offline_messages(const std::string& user_ID, std::time_t last_active_time, int limit) {
-    std::vector<std::tuple<std::string, std::string, bool, std::time_t, std::string, bool, std::string, std::size_t, std::string>> messages;
+std::vector<std::tuple<std::string, std::string, bool, std::int64_t, std::string, bool, std::string, std::size_t, std::string>>
+MySQLController::get_offline_messages(const std::string& user_ID, std::int64_t last_active_time, int limit) {
+    std::vector<std::tuple<std::string, std::string, bool, std::int64_t, std::string, bool, std::string, std::size_t, std::string>> messages;
 
     // 构建SQL查询 - 获取用户离线期间收到的消息，但只包括当前关系网内的消息
     std::string sql = "("
@@ -456,7 +456,7 @@ MySQLController::get_offline_messages(const std::string& user_ID, std::time_t la
     return messages;
 }
 
-std::time_t MySQLController::get_user_last_active(const std::string& user_ID) {
+std::int64_t MySQLController::get_user_last_active(const std::string& user_ID) {
     std::string sql = "SELECT UNIX_TIMESTAMP(last_active) FROM users WHERE user_id = '" + user_ID + "';";
     auto rows = query(sql);
     if (!rows.empty() && rows[0].size() > 0 && !rows[0][0].empty()) {

@@ -149,7 +149,13 @@ private:
         TcpServerConnection* conn,
         const std::string& user_ID,
         int server_index);
-    void handle_online_init(const std::string& user_ID);
+    void handle_set_temp_connection(
+        TcpServerConnection* conn,
+        const std::string& temp_user_ID,
+        int server_index);
+    void handle_online_init(
+        const std::string& user_ID,
+        TcpServerConnection* conn);
 
     // 非直接指令驱动的业务逻辑
     void handle_post_relation_net(const std::string& user_ID, const json& relation_data);

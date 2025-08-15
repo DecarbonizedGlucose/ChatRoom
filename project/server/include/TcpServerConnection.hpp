@@ -33,6 +33,7 @@ public:
     safe_queue<std::pair<std::string, DataType>> write_queue;
     Dispatcher* dispatcher = nullptr;
     std::string user_ID;
+    std::string temp_user_ID;
     DataType to_send_type = DataType::None;
     std::atomic<ReceiveStatus> receive_status = ReceiveStatus::Free; // 接收状态
     std::atomic<SendStatus> send_status = SendStatus::Free; // 发送状态

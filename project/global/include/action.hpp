@@ -71,6 +71,7 @@ enum class Action {
     Deny_File_Req,         // 拒绝文件下载请求 --file_ID
 
     /*      连接管理      */
+    Set_Temp_Connection,   // 设置临时连接
     Remember_Connection,   // 记住连接 --idx
     Online_Init,           // 在线初始化
     HEARTBEAT,             // 心跳检测

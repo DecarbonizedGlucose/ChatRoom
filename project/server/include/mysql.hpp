@@ -100,7 +100,7 @@ public:
         const std::string& sender_ID,
         const std::string& receiver_ID,
         bool is_to_group,
-        std::time_t timestamp,
+        std::int64_t timestamp,
         const std::string& text_content,
         bool pin = false,
         const std::string& file_name = "",
@@ -108,11 +108,11 @@ public:
         const std::string& file_hash = "");
 
     // 获取用户的离线消息（从last_active时间点之后的消息）
-    std::vector<std::tuple<std::string, std::string, bool, std::time_t, std::string, bool, std::string, std::size_t, std::string>>
-    get_offline_messages(const std::string& user_ID, std::time_t last_active_time, int limit = 200);
+    std::vector<std::tuple<std::string, std::string, bool, std::int64_t, std::string, bool, std::string, std::size_t, std::string>>
+    get_offline_messages(const std::string& user_ID, std::int64_t last_active_time, int limit = 200);
 
     // 获取用户的last_active时间
-    std::time_t get_user_last_active(const std::string& user_ID);
+    std::int64_t get_user_last_active(const std::string& user_ID);
 
 
 /* ---------- 文件 ---------- */

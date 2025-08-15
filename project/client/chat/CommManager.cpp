@@ -7,6 +7,7 @@
 #include "../include/sqlite.hpp"
 #include "../include/cfile_manager.hpp"
 #include "../include/winloop.hpp"
+#include "../../global/include/time_utils.hpp"
 #include <ctime>
 #include <fstream>
 #include <algorithm>
@@ -59,11 +60,22 @@ auto CommManager::send_async(int idx, const std::string& proto) {
 std::string CommManager::read_nb(int idx) {
     std::string proto;
     DataSocket::RecvState state;
-    while (online) {
+    auto start = std::chrono::steady_clock::now();
+    const int timeout_ms = 500; // 超时时间，可根据需要调整
+    while (win->running) {
         state = clients[idx]->socket->receive_protocol_with_state(proto);
         switch (state) {
-            case DataSocket::RecvState::Success: return proto;
-            case DataSocket::RecvState::NoMoreData: continue;
+            case DataSocket::RecvState::Success:
+                return proto;
+            case DataSocket::RecvState::NoMoreData: {
+                auto now = std::chrono::steady_clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
+                if (elapsed > timeout_ms) {
+                    log_debug("read_nb timeout ({} ms) for connection {}", elapsed, idx);
+                    return "";
+                }
+                continue;
+            }
             case DataSocket::RecvState::Disconnected: {
                 log_info("Connection {} disconnected", idx);
                 return "";
@@ -78,7 +90,7 @@ std::string CommManager::read_nb(int idx) {
 }
 
 void CommManager::send_nb(int idx, const std::string& proto) {
-    while (online) {
+    while (win->running) {
         if (clients[idx]->socket->send_protocol(proto)) {
             return;
         }
@@ -102,7 +114,7 @@ void CommManager::handle_send_message(const std::string& sender, const std::stri
                                       bool pin, const std::string& file_name,
                                       std::size_t file_size, const std::string& file_hash,
                                       bool nb) {
-    auto time = std::time(nullptr);
+    auto time = now_us();
     std::string env_out = create_message_string(sender, receiver, is_group_msg, time, text,
                                                 pin, file_name, file_size, file_hash);
     if (!nb) this->send(0, env_out);
@@ -681,20 +693,24 @@ void CommManager::handle_remove_admin(const std::string& group_ID, const std::st
 void CommManager::handle_reply_heartbeat() {
     log_debug("Received heartbeat from server, sending response");
     // 立即回复心跳
-    handle_send_command(Action::HEARTBEAT, cache.user_ID, {});
+    if (!cache.user_ID.empty()) // 已登录用户
+        handle_send_command(Action::HEARTBEAT, cache.user_ID, {});
+    else
+        handle_send_command(Action::HEARTBEAT, cache.temp_user_ID, {});
+    std::cout << "发送了心跳包" << std::endl;
 }
 
 void CommManager::stop_receivers() {
     // 通知后台接收循环退出
     online = false;
-    // 等待循环实际退出（最多等待短时间，避免死等）
-    for (int i = 0; i < 50; ++i) { // ~500ms
-        if (!rx_running_msg.load() && !rx_running_cmd.load()) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    // 恢复阻塞模式，避免下次登录时阻塞读被非阻塞设置影响
-    if (clients[0] && clients[0]->socket) clients[0]->socket->set_nonblocking(0);
-    if (clients[1] && clients[1]->socket) clients[1]->socket->set_nonblocking(0);
+    // // 等待循环实际退出（最多等待短时间，避免死等）
+    // for (int i = 0; i < 50; ++i) { // ~500ms
+    //     if (!rx_running_msg.load() && !rx_running_cmd.load()) break;
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // }
+    // // 恢复阻塞模式，避免下次登录时阻塞读被非阻塞设置影响
+    // if (clients[0] && clients[0]->socket) clients[0]->socket->set_nonblocking(0);
+    // if (clients[1] && clients[1]->socket) clients[1]->socket->set_nonblocking(0);
 }
 
 /* ---------- Print ---------- */
@@ -956,7 +972,7 @@ void CommManager::send_text_message(const std::string& receiver_id, bool is_grou
     // 更新会话信息
     if (cache.conversations.find(receiver_id) != cache.conversations.end()) {
         cache.conversations[receiver_id].last_message = text;
-        cache.conversations[receiver_id].last_time = std::time(nullptr);
+        cache.conversations[receiver_id].last_time = now_us();
         // 更新会话排序
         cache.update_conversation_order(receiver_id);
     }
@@ -994,7 +1010,7 @@ void CommManager::send_file_message(
     // 更新会话信息
     if (cache.conversations.find(receiver_id) != cache.conversations.end()) {
         cache.conversations[receiver_id].last_message = "[文件] " + file->file_name;
-        cache.conversations[receiver_id].last_time = std::time(nullptr);
+        cache.conversations[receiver_id].last_time = now_us();
         // 更新会话排序
         cache.update_conversation_order(receiver_id);
     }

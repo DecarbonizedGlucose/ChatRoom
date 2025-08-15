@@ -64,10 +64,12 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
             break;
         } else if (state == RecvState::Disconnected) {
             log_info("Connection fd {} disconnected", conn->socket->get_fd());
-            if (conn->user_ID.empty()) {
-                // 未登录用户, 直接删除连接
-                delete conn;
-                conn = nullptr;
+            if (conn->user_ID.empty() && conn->temp_user_ID.empty()) {
+                log_error("Connection (t) ID is empty.");
+                // 正常来说，这不会发生
+            } else if (conn->user_ID.empty()) {
+                // 处理未登录用户的断开
+                log_info("unsigned user connection fd {} disconnected", conn->socket->get_fd());
             } else {
                 // 已登录用户, 先保存user_ID, 然后执行登出处理
                 std::string user_id = conn->user_ID;
@@ -88,6 +90,8 @@ void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
         // 收到数据, 更新发送的用户活动时间
         if (!conn->user_ID.empty())
             conn_manager->update_user_activity(conn->user_ID);
+        else
+            conn_manager->update_user_activity(conn->temp_user_ID);
 
         // 转写
         Envelope env;

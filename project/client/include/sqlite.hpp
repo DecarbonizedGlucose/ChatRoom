@@ -103,7 +103,7 @@ public:
         const std::string& sender_ID,
         const std::string& receiver_ID,
         bool is_group,
-        std::time_t timestamp,
+        std::int64_t timestamp,
         const std::string& text_content,
         bool pin = false,
         const std::string& file_name = "",

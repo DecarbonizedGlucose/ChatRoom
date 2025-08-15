@@ -40,6 +40,8 @@ public:
     WinLoop(CommManager* comm, thread_pool* pool);
     ~WinLoop(); // 需要实现以正确释放unique_ptr
 
+    void init();
+
     void run();
     void stop();
     void dispatch_cmd(const CommandRequest& cmd);
