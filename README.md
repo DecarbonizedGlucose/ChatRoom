@@ -17,7 +17,8 @@
 
 业务逻辑参考QQ、微信、telegram等热门即时通讯软件。
 
-在聊天界面使用`/up file_path`发送文件，用`/down File_ID local_path/file.name`下载文件。
+在聊天界面使用`/up file_path`发送文件，用`/down File_ID local_path/file.name`下载文件，
+或使用`/exit`退出聊天。
 其他操作按照导航提示即可。
 
 
