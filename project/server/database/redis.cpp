@@ -8,43 +8,75 @@
 RedisController::RedisController()
     : redis_conn("tcp://127.0.0.1:6379") {}
 
-// bool RedisController::cache_chat_message(const std::string& serialized_msg) {
-//     try {
-//         redis_conn.rpush("chat:messages", serialized_msg);
-//         return true;
-//     } catch (const sw::redis::Error &err) {
-//         log_error("Failed to cache chat message: {}", err.what());
-//         return false;
-//     }
-// }
+bool RedisController::cache_chat_message(
+    const std::string& serialized_msg,
+    const std::string& conv,
+    int64_t timestamp
+) {
+    try {
+        redis_conn.zadd("chat:messages:" + conv,
+                        serialized_msg,
+                        static_cast<double>(timestamp));
+        return true;
+    } catch (const sw::redis::Error &err) {
+        log_error("Failed to cache chat message: {}", err.what());
+        return false;
+    }
+}
 
-// std::vector<std::string> RedisController::pop_chat_messages_batch(size_t count) {
-//     std::vector<std::string> messages;
-//     try {
-//         // 先取
-//         redis_conn.lrange("chat:messages", 0, count - 1, std::back_inserter(messages));
+std::vector<std::string> RedisController::pop_chat_messages_batch(size_t count) {
+    std::vector<std::string> messages;
+    try {
+        // 用 scan 扫描 chat:message:* 键
+        auto cursor = 0UL;
+        std::vector<std::string> keys;
+        do {
+            cursor = redis_conn.scan(cursor, "chat:message:*", 100, std::back_inserter(keys));
+            for (const auto& key : keys) {
+                redis_conn.zpopmax(key, 200, std::back_inserter(messages));
+            }
+            keys.clear();
+        } while (cursor != 0);
+    } catch (const sw::redis::Error &err) {
+        // 出错时返回空
+        log_error("Failed to pop chat messages batch: {}", err.what());
+        messages.clear();
+    }
+    return messages;
+}
 
-//         // 再删（相当于 pop 掉前 count 个元素）
-//         if (!messages.empty()) {
-//             redis_conn.ltrim("chat:messages", messages.size(), -1);
-//         }
-//     } catch (const sw::redis::Error &err) {
-//         // 出错时返回空
-//         log_error("Failed to pop chat messages batch: {}", err.what());
-//         messages.clear();
-//     }
-//     return messages;
-// }
-
-// size_t RedisController::get_chat_message_queue_size() {
-//     try {
-//         return redis_conn.llen("chat:messages");
-//     } catch (const sw::redis::Error &err) {
-//         log_error("Failed to get chat message queue size: {}", err.what());
-//         return 0;
-//     }
-// }
-
+std::vector<std::string> RedisController::get_offline_messages(
+    const std::string& user_ID,
+    int64_t time,
+    size_t count,
+    const json& relation_data
+) {
+    // 私聊300，群聊200
+    std::vector<std::string> offline_messages;
+    try {
+        if (relation_data.contains("friends") && relation_data["friends"].is_array() && !relation_data["friends"].empty()) {
+            int cnt1 = 300 / relation_data["friends"].size();
+            for (auto& friend_info : relation_data["friends"]) {
+                std::string conv = std::min(user_ID, friend_info["id"].get<std::string>()) + "." +
+                                   std::max(user_ID, friend_info["id"].get<std::string>());
+                redis_conn.zrevrange("chat:messages:" + conv, 0, cnt1-1, std::back_inserter(offline_messages));
+            }
+        }
+        if (relation_data.contains("groups") && relation_data["groups"].is_array() && !relation_data["groups"].empty()) {
+            int cnt2 = 200 / relation_data["groups"].size();
+            for (auto& group_info : relation_data["groups"]) {
+                redis_conn.zrevrange("chat:messages:" + group_info["id"].get<std::string>(), 0, cnt2-1, std::back_inserter(offline_messages));
+            }
+        }
+    } catch (const sw::redis::Error &err) {
+        log_error("Failed to get offline messages: {}", err.what());
+        offline_messages.clear();
+    } catch (const std::exception& e) {
+        log_error("Failed to get offline messages: {}", e.what());
+        offline_messages.clear();
+    }
+    return offline_messages;
+}
 
 std::pair<bool, std::int64_t> RedisController::get_user_status(const std::string& user_ID) {
     auto key = "chat:user:" + user_ID + ":status";

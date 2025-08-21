@@ -395,7 +395,7 @@ bool MySQLController::add_chat_message(
     const std::size_t file_size,
     const std::string& file_hash) {
 
-    std::string sql = "INSERT INTO chat_messages (sender_id, receiver_id, is_group, timestamp, text, pin, file_name, file_size, file_hash) VALUES ('"
+    std::string sql = "INSERT IGNORE INTO chat_messages (sender_id, receiver_id, is_group, timestamp, text, pin, file_name, file_size, file_hash) VALUES ('"
         + sender_ID + "', '" + receiver_ID + "', "
         + (is_to_group ? "TRUE" : "FALSE") + ", " + std::to_string(timestamp) + ", '"
         + text_content + "', " + (pin ? "TRUE" : "FALSE");

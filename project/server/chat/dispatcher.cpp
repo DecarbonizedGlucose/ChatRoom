@@ -17,6 +17,14 @@ Dispatcher::Dispatcher(RedisController* re, MySQLController* my)
     offline_message_handler = new OfflineMessageHandler(this);
     conn_manager = new ConnectionManager(this);
     file_manager = new SFileManager(this);
+
+    running = true;
+    flush_message_thread = std::thread([&](){
+        while (running) {
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            flush_cached_messages();
+        }
+    });
 }
 
 Dispatcher::~Dispatcher() {
@@ -35,23 +43,23 @@ void Dispatcher::add_server(TcpServer* server, int idx) {
     this->server[idx] = server;
 }
 
-// void Dispatcher::flush_cached_messages() {
-//     log_info("Flushing cached messages to MySQL");
-//     server[0]->pool->submit([&](){
-//         size_t batch_size = 200;
-//         auto batch = redis_con->pop_chat_messages_batch(batch_size);
-//         if (batch.empty()) return;
-//         for (auto &raw : batch) {
-//             auto msg = get_chat_message(raw);
-//             // 存起来
-//             mysql_con->add_chat_message(
-//                 msg.sender(), msg.receiver(), msg.is_group(), msg.timestamp(),
-//                 msg.text(), msg.pin(), msg.payload().file_name(),
-//                 msg.payload().file_size(), msg.payload().file_hash()
-//             );
-//         }
-//     });
-// }
+void Dispatcher::flush_cached_messages() {
+    server[0]->pool->submit([&](){
+        size_t batch_size = 500;
+        auto batch = redis_con->pop_chat_messages_batch(batch_size);
+        if (batch.empty()) return;
+        log_info("Flushing cached messages to MySQL");
+        for (auto &raw : batch) {
+            auto msg = get_chat_message(raw);
+            // 存起来
+            mysql_con->add_chat_message(
+                msg.sender(), msg.receiver(), msg.is_group(), msg.timestamp(),
+                msg.text(), msg.pin(), msg.payload().file_name(),
+                msg.payload().file_size(), msg.payload().file_hash()
+            );
+        }
+    });
+}
 
 void Dispatcher::dispatch_recv(TcpServerConnection* conn) {
     log_debug("dispatch_recv called for connection fd: {}", conn->socket->get_fd());

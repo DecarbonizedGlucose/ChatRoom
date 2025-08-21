@@ -160,7 +160,7 @@ private:
     // 非直接指令驱动的业务逻辑
     void handle_post_relation_net(const std::string& user_ID, const json& relation_data);
     void handle_post_friends_status(const std::string& user_ID, const json& friends);
-    void handle_post_offline_messages(const std::string& user_ID);
+    void handle_post_offline_messages(const std::string& user_ID, const json& relation_data);
 
     // 封装起来的函数
     void get_friends(const std::string& user_ID, json& friends);

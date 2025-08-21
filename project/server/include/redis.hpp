@@ -42,6 +42,13 @@ chat:group:<group_id>:info -> Hash {
 // Key: chat:messages
 // Type: List
 // Value: envelope(chatmessage)的string
+
+消息缓存
+chat:messages:<conv>
+一个zset，存入的字段是env包裹的未经解析message的string，分数为时间戳。其中，conv：
+如果是群聊消息，为group_ID,否则为两个user_ID的拼接。
+规则：若user_ID_1 < user_ID_2,则为 user_ID_1.user_ID_2
+这样方便存储与提取
 */
 
 
@@ -51,17 +58,24 @@ public:
 
     RedisController();
 
-// /* ==================== 消息批量缓存 ==================== */
+/* ==================== 消息批量缓存 ==================== */
 
-//     // 将序列化后的消息加入缓存队列
-//     bool cache_chat_message(const std::string& serialized_msg);
+    // 将序列化后的消息加入缓存队列
+    bool cache_chat_message(
+        const std::string& serialized_msg,
+        const std::string& conv,
+        int64_t timestamp);
 
-//     // 批量取出消息（最多 count 条），并从 Redis 删除
-//     // 返回的 vector 中每个元素是 protobuf ChatMessage 的二进制
-//     std::vector<std::string> pop_chat_messages_batch(size_t count);
+    // 批量取出消息（最多 count 条），并从 Redis 删除
+    // 返回的 vector 中每个元素是 protobuf ChatMessage 的二进制
+    std::vector<std::string> pop_chat_messages_batch(size_t count);
 
-//     // 获取当前缓存队列的长度
-//     size_t get_chat_message_queue_size();
+    // 暂时获取限定个数的历史消息（未落盘的）
+    std::vector<std::string> get_offline_messages(
+        const std::string& user_ID,
+        int64_t last_active,
+        size_t count,
+        const json& relation_data);
 
 /* ==================== 用户状态 ==================== */
 

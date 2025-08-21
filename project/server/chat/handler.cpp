@@ -9,6 +9,7 @@
 #include <regex>
 #include "../include/sfile_manager.hpp"
 #include "../../global/include/time_utils.hpp"
+#include "../../global/abstract/datatypes_hash.hpp"
 
 void try_send(ConnectionManager* conn_manager,
     TcpServerConnection* conn,
@@ -91,14 +92,22 @@ void MessageHandler::handle_recv(const ChatMessage& message, const std::string& 
             }
         }
     }
-    // // 缓存到redis
-    // disp->redis_con->cache_chat_message(ostr);
-    // 存起来
-    disp->mysql_con->add_chat_message(
-        sender, receiver, message.is_group(), message.timestamp(),
-        message.text(), message.pin(), message.payload().file_name(),
-        message.payload().file_size(), message.payload().file_hash()
-    );
+    // 缓存到redis
+    std::string conv;
+    if (message.is_group()) {
+        conv = message.receiver();
+    } else {
+        conv += std::min(sender, receiver);
+        conv += '.'; // 使用.分隔,无害
+        conv += std::max(sender, receiver);
+    }
+    disp->redis_con->cache_chat_message(ostr, conv, message.timestamp());
+    // // 存起来
+    // disp->mysql_con->add_chat_message(
+    //     sender, receiver, message.is_group(), message.timestamp(),
+    //     message.text(), message.pin(), message.payload().file_name(),
+    //     message.payload().file_size(), message.payload().file_hash()
+    // );
 }
 
 void MessageHandler::handle_send(TcpServerConnection* conn) {
@@ -1268,7 +1277,7 @@ void CommandHandler::handle_online_init(const std::string& user_ID, TcpServerCon
     // 发送所有在线好友的状态
     handle_post_friends_status(user_ID, relation_data["friends"]);
     // 发送用户离线消息（消息记录）
-    handle_post_offline_messages(user_ID);
+    handle_post_offline_messages(user_ID, relation_data);
     // 发送未接收的通知和未处理的好友请求/群聊邀请等
     //handle_post_unordered_noti_and_req(user_ID, relation_data);
     /**
@@ -1305,11 +1314,16 @@ void CommandHandler::handle_post_friends_status(
     }
 }
 
-void CommandHandler::handle_post_offline_messages(const std::string& user_ID) {
+void CommandHandler::handle_post_offline_messages(const std::string& user_ID, const json& relation_data) {
     log_debug("handle_post_offline_messages called for user: {}", user_ID);
 
     try {
-        std::vector<ChatMessage> chat_messages;
+        // std::vector<ChatMessage> chat_messages;
+        auto cmp = [](const ChatMessage& lhs, const ChatMessage& rhs) {
+            return is_same(lhs, rhs);
+        };
+        // 保证唯一性
+        std::unordered_set<ChatMessage, std::hash<ChatMessage>, decltype(cmp)> chat_messages(10, std::hash<ChatMessage>(), cmp);
 
         // 获取用户的last_active时间
         std::int64_t last_active = disp->mysql_con->get_user_last_active(user_ID);
@@ -1317,8 +1331,22 @@ void CommandHandler::handle_post_offline_messages(const std::string& user_ID) {
             // 理论上是初次登录
             log_debug("No last_active time found for user {}, sending empty offline messages", user_ID);
         } else {
-            // 从MySQL获取离线消息（最多200条）
-            auto offline_msg_data = disp->mysql_con->get_offline_messages(user_ID, last_active, 200);
+            int got_msg_cnt = 0;
+            // 从Redis获取离线消息（最后500条）
+            auto redis_msg_data = disp->redis_con->get_offline_messages(user_ID, last_active, 500, relation_data);
+            got_msg_cnt += redis_msg_data.size();
+
+            if (redis_msg_data.empty()) {
+                log_debug("No Redis offline messages found for user: {}", user_ID);
+            } else {
+                for (auto& str : redis_msg_data) {
+                    auto chat_msg = get_chat_message(str);
+                    chat_messages.insert(chat_msg);
+                }
+            }
+
+            // 从MySQL获取离线消息（最多500条）
+            auto offline_msg_data = disp->mysql_con->get_offline_messages(user_ID, last_active, 500 - got_msg_cnt);
 
             if (offline_msg_data.empty()) {
                 log_debug("No offline messages found for user: {}", user_ID);
@@ -1338,13 +1366,14 @@ void CommandHandler::handle_post_offline_messages(const std::string& user_ID) {
                         file_size,
                         file_hash
                     );
-                    chat_messages.push_back(chat_msg);
+                    chat_messages.insert(chat_msg);
                 }
             }
         }
 
         // 无论是否有消息, 都要发送OfflineMessages（可能为空）
-        std::string env_str = create_offline_messages_string(chat_messages);
+        std::vector<ChatMessage> msg_list(chat_messages.begin(), chat_messages.end());
+        std::string env_str = create_offline_messages_string(msg_list);
 
         // 发送到data连接通道（通道2）
         auto data_conn = disp->conn_manager->get_connection(user_ID, 2);
@@ -1362,7 +1391,6 @@ void CommandHandler::handle_post_offline_messages(const std::string& user_ID) {
         } else {
             log_error("Data connection not found for user: {}", user_ID);
         }
-
     } catch (const std::exception& e) {
         log_error("Error handling offline messages for user {}: {}", user_ID, e.what());
     }

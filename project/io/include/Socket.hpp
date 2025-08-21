@@ -73,7 +73,7 @@ public:
     bool send_protocol(const std::string& proto);
     bool receive_protocol(std::string& proto);
 
-    // 新增：事件内循环读, 自动处理粘包/半包
+    // 事件内循环读, 自动处理粘包/半包
     enum class RecvState{
         Success,
         NoMoreData,

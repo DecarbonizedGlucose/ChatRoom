@@ -114,6 +114,7 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
 │   │   │   ├── data.pb.h
 │   │   │   ├── datatypes.cpp
 │   │   │   ├── datatypes.hpp
+│   │   │   ├── datatypes_hash.hpp
 │   │   │   ├── envelope.pb.cc
 │   │   │   ├── envelope.pb.h
 │   │   │   ├── message.pb.cc
@@ -176,17 +177,27 @@ DataServer负责传输文件（`FileChunk`）、历史聊天记录（`OfflineMes
     ├── client_init.sql
     └── server_init.sql
 
-18 directories, 74 files
+18 directories, 75 files
 ~~~
-项目C++代码9400行。`protobuf`文件也编译为`.cc` `.h`，这些已排除在外。
+项目C++代码9600行。
 ~~~
 --------------------------------------------------------------------
 Language          files          blank        comment           code
 --------------------------------------------------------------------
-C++                  24            884            684           7615
-C/C++ Header         29            441            219           1825
+C++                  24            884            645           7717
+C/C++ Header         30            444            219           1869
 --------------------------------------------------------------------
-SUM:                 53           1325            903           9435
+SUM:                 54           1328            864           9586
 --------------------------------------------------------------------
 ~~~
 
+
+
+## After答辩
+
+答辩中的问题已经放在了[多路IO复用](https://blog.csdn.net/qq_53766808/article/details/150565889?fromshare=blogdetail&sharetype=blogdetail&sharerId=150565889&sharerefer=PC&sharesource=qq_53766808&sharefrom=from_link)和[零拷贝](https://blog.csdn.net/qq_53766808/article/details/150565879?fromshare=blogdetail&sharetype=blogdetail&sharerId=150565879&sharerefer=PC&sharesource=qq_53766808&sharefrom=from_link)。
+
+对项目进行了修改：
+
+- 处理消息的策略，先放到Redis，后定时存入MySQL
+- 拉取消息记录时从Redis和MySQL同时拉取，防止拉取不全
